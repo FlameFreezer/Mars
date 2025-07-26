@@ -1,0 +1,11 @@
+.{
+    .name = .zig_vulkan_setup,
+    .fingerprint = 0xbc087af135573d25,
+    .version = "0.0.0",
+    .minimum_zig_version = "0.14.1",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
