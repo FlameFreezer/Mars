@@ -1,6 +1,7 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("utils.zig");
+const Utils = @import("Utils");
+
 const Data = @import("data.zig");
 
 const shaderModule = struct {
@@ -9,7 +10,18 @@ const shaderModule = struct {
 };
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
-    const shaderMod = try createShaderModule(state.device, allocator);
+    //These dynamic states will be configured during the render pass
+    const dynamicStates = comptime [_]c.VkDynamicState{
+        c.VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT, 
+        c.VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT
+    };
+    const dynamicState = c.VkPipelineDynamicStateCreateInfo{
+        .sType = c.VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+        .dynamicStateCount = dynamicStates.len,
+        .pDynamicStates = dynamicStates[0..]
+    };
+
+    const shaderMod: shaderModule = try createShaderModule(state.device, allocator);
     defer std.heap.page_allocator.free(shaderMod.code);
     defer c.vkDestroyShaderModule(state.device, shaderMod.module, null);
 
@@ -78,45 +90,33 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
                 | c.VK_COLOR_COMPONENT_B_BIT
                 | c.VK_COLOR_COMPONENT_A_BIT
         },
-        .blendConstants = .{0.0} ** 4
-    };
-
-    const dynamicStates = comptime [_]c.VkDynamicState{c.VK_DYNAMIC_STATE_VIEWPORT, c.VK_DYNAMIC_STATE_SCISSOR};
-    const dynamicState = c.VkPipelineDynamicStateCreateInfo{
-        .sType = c.VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = dynamicStates.len,
-        .pDynamicStates = &dynamicStates[0]
-    };
-
-    const viewportState = c.VkPipelineViewportStateCreateInfo{
-        .sType = c.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .scissorCount = 1,
-        .viewportCount = 1
+        .blendConstants = comptime .{0.0} ** 4
     };
 
     const colorAttachmentFormats = comptime [_]c.VkFormat{c.VK_FORMAT_B8G8R8A8_SRGB};
     const pipelineRenderingInfo = c.VkPipelineRenderingCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = colorAttachmentFormats.len,
-        .pColorAttachmentFormats = &colorAttachmentFormats[0]
+        .pColorAttachmentFormats = &colorAttachmentFormats
     };
 
     const pipelineLayoutInfo = c.VkPipelineLayoutCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = 1,
+        .pSetLayouts = &state.descriptorSetLayout
     };
 
     if(c.vkCreatePipelineLayout(state.device, &pipelineLayoutInfo, allocator, &state.graphicsPipelineLayout) != c.VK_SUCCESS) {
-        return error.failed_to_create_pipeline_layout;
+        return error.failedToCreatePipelineLayout;
     }
-
     const graphicsPipelineInfo = c.VkGraphicsPipelineCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .stageCount = shaderStageInfos.len,
-        .pStages = &shaderStageInfos[0],
+        .pStages = &shaderStageInfos,
         .pVertexInputState = &vertexInputState,
         .pInputAssemblyState = &inputAssemblyState,
-        .pTessellationState = null,
-        .pViewportState = &viewportState,
+        .pTessellationState = null, //ignored for now
+        .pViewportState = null, //dynamic
         .pRasterizationState = &rasterizationState,
         .pMultisampleState = &multisampleState,
         .pDepthStencilState = &depthStencilState,
@@ -127,7 +127,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     };
 
     if(c.vkCreateGraphicsPipelines(state.device, null, 1, &graphicsPipelineInfo, allocator, &state.graphicsPipeline) != c.VK_SUCCESS) {
-        return error.failed_to_create_graphics_pipeline;
+        return error.failedToCreateGraphicsPipeline;
     }
 }
 

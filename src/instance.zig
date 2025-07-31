@@ -1,7 +1,8 @@
-const debugMessenger = @import("debugMessenger.zig");
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("utils.zig");
+const Utils = @import("Utils");
+
+const debugMessenger = @import("debugMessenger.zig");
 
 const validationLayers = [_][]const u8{ "VK_LAYER_KHRONOS_validation" };
 var enableValidationLayers: bool = false;
@@ -9,7 +10,7 @@ var enableValidationLayers: bool = false;
 pub fn init(state: *Utils.State, debug: bool) !void {
     enableValidationLayers = debug;
     if(enableValidationLayers and checkValidationLayerSupport()) {
-        return error.validation_layers_requested_but_not_supported;
+        return error.validationLayersRequestedButNotSupported;
     }
     const appInfo: c.VkApplicationInfo = .{
         .sType = c.VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -43,7 +44,7 @@ pub fn init(state: *Utils.State, debug: bool) !void {
     }
 
     if(c.vkCreateInstance(&instanceInfo, null, &state.instance) != c.VK_SUCCESS) {
-        return error.failed_to_create_instance;
+        return error.failedToCreateInstance;
     }
 }
 

@@ -4,13 +4,25 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const mars_mod = b.createModule(.{
+    const mars_mod = b.addModule("Mars", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize
     });
+    const test_mod = b.createModule(.{
+        .root_source_file = b.path("tests/tests.zig"),
+        .target = target,
+        .optimize = .Debug,
+        .link_libc = true
+    });
     const c_mod = b.createModule(.{
         .root_source_file = b.path("src/c.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true
+    });
+    const utils_mod = b.createModule(.{
+        .root_source_file = b.path("src/utils.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true
@@ -19,10 +31,14 @@ pub fn build(b: *std.Build) void {
     c_mod.addIncludePath(b.path("include/VULKAN"));
     c_mod.linkSystemLibrary("glfw", .{});
     c_mod.linkSystemLibrary("Vulkan", .{});
+    utils_mod.addImport("c", c_mod);
     mars_mod.addImport("c", c_mod);
+    mars_mod.addImport("Utils", utils_mod);
+    test_mod.addImport("c", c_mod);
+    test_mod.addImport("Utils", utils_mod);
 
     const sourceOptions = b.addOptions();
-    sourceOptions.addOption(bool, "isDebugBuild", optimize == std.builtin.OptimizeMode.Debug);
+    sourceOptions.addOption(bool, "isDebugBuild", optimize == .Debug);
     mars_mod.addOptions("buildOpts", sourceOptions);
 
     const shader_compile_step = b.addSystemCommand(&.{
@@ -39,15 +55,27 @@ pub fn build(b: *std.Build) void {
     shader_compile_step.addFileInput(b.path("shaders/shader.slang"));
     shader_compile_step.setCwd(b.path("shaders"));
 
+    const mars_lib = b.addLibrary(.{
+        .name = "Mars",
+        .linkage = .static,
+        .root_module = mars_mod,
+        .version = .{
+            .major = 0,
+            .minor = 1,
+            .patch = 0
+        }
+    });
+    b.installArtifact(mars_lib);
+
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("app/main.zig"),
         .target = target,
-        .optimize = optimize,
+        .optimize = optimize
     });
     exe_mod.addImport("Mars", mars_mod);
 
     const exe = b.addExecutable(.{
-        .name = "zig-vulkan",
+        .name = "MarsApp",
         .root_module = exe_mod
     });
 
@@ -63,4 +91,11 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the application");
     run_step.dependOn(&run_command.step);
+
+    const marsTests = b.addTest(.{
+        .root_module = test_mod
+    });
+    const test_command = b.addRunArtifact(marsTests);
+    const test_step = b.step("test", "Run the tests");
+    test_step.dependOn(&test_command.step);
 }

@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("utils.zig");
+const Utils = @import("Utils");
 
 const VertexAttributes: type = enum (u32) {
     COLOR = 0,
@@ -9,9 +9,11 @@ const VertexAttributes: type = enum (u32) {
 
 pub const Vertex = struct {
     color: [3]f32,
-    position: [2]f32,
+    position: [3]f32,
 
-    pub fn create(inColor: [3]f32, inPosition: [2]f32) Vertex {
+    const numAttribs: usize = @typeInfo(@This()).@"struct".fields.len;
+
+    pub fn create(inColor: [3]f32, inPosition: [3]f32) Vertex {
         return .{
             .position = inPosition,
             .color = inColor
@@ -26,18 +28,18 @@ pub const Vertex = struct {
         };
     }
 
-    pub fn inputAttributeDescriptions() [@typeInfo(Vertex).@"struct".fields.len]c.VkVertexInputAttributeDescription {
-        var attributes: [@typeInfo(Vertex).@"struct".fields.len]c.VkVertexInputAttributeDescription = undefined;
-        attributes[@intFromEnum(VertexAttributes.COLOR)] = .{
+    pub fn inputAttributeDescriptions() [numAttribs]c.VkVertexInputAttributeDescription {
+        comptime var attributes: [numAttribs]c.VkVertexInputAttributeDescription = undefined;
+        comptime attributes[@intFromEnum(VertexAttributes.COLOR)] = .{
             .location = @intFromEnum(VertexAttributes.COLOR),
             .binding = 0,
             .format = c.VK_FORMAT_R32G32B32_SFLOAT,
             .offset = 0
         };
-        attributes[@intFromEnum(VertexAttributes.POSITION)] = .{
+        comptime attributes[@intFromEnum(VertexAttributes.POSITION)] = .{
             .location = @intFromEnum(VertexAttributes.POSITION),
             .binding = 0,
-            .format = c.VK_FORMAT_R32G32_SFLOAT,
+            .format = c.VK_FORMAT_R32G32B32_SFLOAT,
             .offset = @offsetOf(Vertex, "position")
         };
         return attributes;
@@ -45,10 +47,10 @@ pub const Vertex = struct {
 };
 
 pub const Vertices = [_]Vertex{
-    .create(.{0.0,0.0,0.0}, .{0.5, -0.5}),
-    .create(.{0.0,0.0,0.0}, .{0.5, 0.5}),
-    .create(.{1.0,0.0,0.0}, .{-0.5, 0.5}),
-    .create(.{1.0,0.0,0.0}, .{-0.5, -0.5})
+    .create(.{0.0,0.0,0.0}, .{0.5, -0.5, 0.0}),
+    .create(.{0.0,0.0,0.0}, .{0.5, 0.5, 0.0}),
+    .create(.{1.0,0.0,0.0}, .{-0.5, 0.5, 0.0}),
+    .create(.{1.0,0.0,0.0}, .{-0.5, -0.5, 0.0})
 };
 
 pub const Indices = [_]u32{

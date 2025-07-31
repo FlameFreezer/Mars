@@ -1,14 +1,18 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("utils.zig");
+const Utils = @import("Utils");
 
-const deviceExtensions = [_][]const u8{ 
-    c.VK_KHR_SWAPCHAIN_EXTENSION_NAME
+//VkDeviceCreateInfo.ppEnabledExtensionNames assumes each name has an alignment of
+//  VK_MAX_EXTENSION_NAME_SIZE, so the string literal pointers have to be casted to fit into this 
+//  space to prevent a segmentation fault
+const deviceExtensions = [_]*const[c.VK_MAX_EXTENSION_NAME_SIZE]u8{ 
+    @ptrCast(c.VK_KHR_SWAPCHAIN_EXTENSION_NAME),
+    @ptrCast(c.VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME)
 };
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     if(c.glfwCreateWindowSurface(state.instance, state.window, null, &state.surface) != 0) {
-        return error.failed_to_create_window_surface;
+        return error.failedToCreateWindowSurface;
     }
     try pickPhysicalDevice(&state.physicalDevice, state.surface, state.instance);
     try createLogicalDevice(&state.device, &state.queues, state.physicalDevice, state.surface, allocator);
@@ -106,7 +110,7 @@ fn pickPhysicalDevice(physical: *c.VkPhysicalDevice, surface: c.VkSurfaceKHR, in
         physical.* = dev;
     }
     else {
-        return error.failed_to_find_suitable_GPU;
+        return error.failedToFindSuitableGPU;
     }
 }
 
@@ -116,32 +120,33 @@ fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, physical: c.V
     const indices: Utils.queueFamilyIndices = try Utils.findQueueFamilyIndices(physical, surface);
     var queueCreateInfos = std.ArrayList(c.VkDeviceQueueCreateInfo).init(std.heap.page_allocator);
     defer queueCreateInfos.deinit();
-    var uniqueQueueFamilyIndices = std.ArrayList(u32).init(std.heap.page_allocator);
+    //Create a set with each unique queue family index available
+    var uniqueQueueFamilyIndices = std.AutoHashMap(u32, void).init(std.heap.page_allocator);
     defer uniqueQueueFamilyIndices.deinit();
-    const priorities = comptime [1]f32{1.0};
 
+    //Iterate over the supported queue families by accessing each field of the queueFamilyIndices
+    //  struct
     const queueFamilyIndicesFields = @typeInfo(Utils.queueFamilyIndices).@"struct".fields;
     inline for(0..queueFamilyIndicesFields.len) |i| {
-        const indexUnique:bool = for(uniqueQueueFamilyIndices.items) |x| {
-            if(x == @as(u32, @intCast(@field(indices, queueFamilyIndicesFields[i].name).?))) break false;
-        } else true;
-
-        if(indexUnique) {
-            try uniqueQueueFamilyIndices.append(@intCast(@field(indices, queueFamilyIndicesFields[i].name).?));
+        const currentIndex: u32 = @field(indices, queueFamilyIndicesFields[i].name).?;
+        //If the index of the current queue family does not already have a creation struct,
+        //  then we initialize one
+        if(!uniqueQueueFamilyIndices.contains(currentIndex)) {
+            try uniqueQueueFamilyIndices.putNoClobber(currentIndex, void{});
 
             const queueCreateInfo = c.VkDeviceQueueCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
                 .flags = 0,
-                .pQueuePriorities = &priorities,
+                .pQueuePriorities = comptime &[_]f32{1.0},
                 .queueCount = 1,
-                .queueFamilyIndex = @intCast(@field(indices, queueFamilyIndicesFields[i].name).?)
+                .queueFamilyIndex = currentIndex
             };
 
             try queueCreateInfos.append(queueCreateInfo);
         }
     }
 
-
+    //pNext chain of device features to enable
     var sync2 = c.VkPhysicalDeviceSynchronization2Features{
         .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
         .synchronization2 = c.VK_TRUE
@@ -166,11 +171,10 @@ fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, physical: c.V
     };
 
     if(c.vkCreateDevice(physical, &deviceInfo, allocator, device) != c.VK_SUCCESS) {
-        return error.failed_to_create_logical_device;
+        return error.failedToCreateLogicalDevice;
     }
 
-    const FIRST_QUEUE_INDEX: u32 = 0;
-    c.vkGetDeviceQueue(device.*, @intCast(indices.graphicsIndex.?), FIRST_QUEUE_INDEX, &queues.graphics);
-    c.vkGetDeviceQueue(device.*, @intCast(indices.computeIndex.?), FIRST_QUEUE_INDEX, &queues.compute);
-    c.vkGetDeviceQueue(device.*, @intCast(indices.presentIndex.?), FIRST_QUEUE_INDEX, &queues.present);
+    c.vkGetDeviceQueue(device.*, indices.graphicsIndex.?, 0, &queues.graphics);
+    c.vkGetDeviceQueue(device.*, indices.computeIndex.?, 0, &queues.compute);
+    c.vkGetDeviceQueue(device.*, indices.presentIndex.?, 0, &queues.present);
 }

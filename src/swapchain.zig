@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("utils.zig");
+const Utils = @import("Utils");
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     try createSwapchain(state, allocator);
@@ -63,7 +63,7 @@ fn createSwapchain(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !v
         .pQueueFamilyIndices = queueFamilyIndicesArrayPtr,
     };
     if(c.vkCreateSwapchainKHR(state.device, &swapchainInfo, allocator, &state.swapchain) != c.VK_SUCCESS) {
-        return error.failed_to_create_swapchain;
+        return error.failedToCreateSwapchain;
     }
 }
 
@@ -92,7 +92,7 @@ fn createSwapchainImageViews(imageViews: *[]c.VkImageView, images: []c.VkImage, 
     for(images, imageViews.*) |image, *imageView| {
         imageViewInfo.image = image;
         if(c.vkCreateImageView(device, &imageViewInfo, allocator, imageView) != c.VK_SUCCESS) {
-            return error.failed_to_create_image_view;
+            return error.failedToCreateImageView;
         }
     }
 }

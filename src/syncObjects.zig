@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("utils.zig");
+const Utils = @import("Utils");
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     //Each swapchain image gets its own presentation semaphore
@@ -13,12 +13,12 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     };
     for(&state.fences) |*fence| {
         if(c.vkCreateFence(state.device, &fenceInfo, allocator, fence) != c.VK_SUCCESS) {
-            return error.failed_to_create_fence;
+            return error.failedToCreateFence;
         }
    }
     for(state.semaphores) |*semaphore| {
         if(c.vkCreateSemaphore(state.device, &.{.sType = c.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO}, allocator, semaphore) != c.VK_SUCCESS) {
-            return error.failed_to_create_semaphore;
+            return error.failedToCreateSemaphore;
         }
      }
 }

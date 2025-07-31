@@ -1,8 +1,8 @@
 const std = @import("std");
 const c = @import("c");
 const buildOpts = @import("buildOpts");
+const Utils = @import("Utils");
 
-const Utils = @import("utils.zig");
 const Window = @import("window.zig");
 const Instance = @import("instance.zig");
 const DebugMessenger = @import("debugMessenger.zig");
@@ -13,12 +13,14 @@ const Buffer = @import("buffer.zig");
 const CommandBuffer = @import("commandBuffer.zig");
 const SyncObjects = @import("syncObjects.zig");
 const Draw = @import("draw.zig");
+const Descriptors = @import("descriptors.zig");
 
 const enableValidationLayers: bool = buildOpts.isDebugBuild;
 
 pub const State = Utils.State;
+pub const mat = Utils.mat;
 
-pub fn init(state: *Utils.State) !void {
+pub fn init(state: *State) !void {
     if(c.glfwInit() == c.GLFW_FALSE) {
         return error.glfwFailedInit;
     }
@@ -34,7 +36,9 @@ pub fn init(state: *Utils.State) !void {
     try SyncObjects.init(state, null);
     try CommandBuffer.init(state, null);
     try Buffer.init(state, null);
+    try Descriptors.init(state, null);
     try GraphicsPipeline.init(state, null);
+    state.startTime = std.time.milliTimestamp();
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
@@ -48,6 +52,7 @@ pub fn mainLoop(state: *Utils.State) !void {
 pub fn cleanup(state: *Utils.State) void {
     Buffer.destroy(state, null);
     GraphicsPipeline.destroy(state, null);
+    Descriptors.destroy(state, null);
     CommandBuffer.destroy(state, null);
     SyncObjects.destroy(state, null);
     Swapchain.destroy(state, null);

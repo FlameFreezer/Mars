@@ -1,17 +1,17 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("utils.zig");
+const Utils = @import("Utils");
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     const queueFamilyIndices = try Utils.findQueueFamilyIndices(state.physicalDevice, state.surface);
     const commandPoolInfo = c.VkCommandPoolCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = c.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = @intCast(queueFamilyIndices.graphicsIndex.?)
+        .queueFamilyIndex = queueFamilyIndices.graphicsIndex.?
     };
 
     if(c.vkCreateCommandPool(state.device, &commandPoolInfo, allocator, &state.commandPool) != c.VK_SUCCESS) {
-        return error.failed_to_create_command_pool;
+        return error.failedToCreateCommandPool;
     }
 
     const commandBufferInfo = c.VkCommandBufferAllocateInfo{
@@ -22,7 +22,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     };
 
     if(c.vkAllocateCommandBuffers(state.device, &commandBufferInfo, &state.commandBuffers[0]) != c.VK_SUCCESS) {
-        return error.failed_to_allocate_command_buffers;
+        return error.failedToAllocateCommandBuffers;
     }
 
 }
