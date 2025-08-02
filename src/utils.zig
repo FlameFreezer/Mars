@@ -63,20 +63,24 @@ pub const Buffer = struct {
     }
 };
 
-pub const UBO = struct {
-    model: mat(4) align(16),
-    view: mat(4) align(16),
-    perspective: mat(4) align(16)
+pub const UniformBufferObject = struct {
+    model: Mat(4) align(16),
+    view: Mat(4) align(16),
+    perspective: Mat(4) align(16),
+
+    pub const default = UniformBufferObject{
+        .model = Mat(4).identity(),
+        .view = Mat(4).identity(),
+        .perspective = Mat(4).identity()
+    };
 };
 
-pub fn updateUBO(state: *State, deltaTime: i64) !void {
+pub fn updateUniformBufferObject(uniformBufferObject: *UniformBufferObject, startTime: i64) !void {
+    const now: i64 = std.time.milliTimestamp();
+    const deltaTime: i64 = now - startTime;
     //One rotation every 2 seconds
-    var ubo: UBO = undefined;
-    ubo.model = rotate(0, 0, 2.0 * std.math.pi / @as(f32, @floatFromInt(2000 * deltaTime)));
-    ubo.view = mat(4).identity();
-    ubo.perspective = mat(4).identity();
-
-    state.uniformBufferMapped[state.currentFrame] = ubo;
+    const rotation: Mat(4) = rotate(0.0, 0.0, 2.0 * std.math.pi / 2000.0 * @as(f32, @floatFromInt(deltaTime)));
+    uniformBufferObject.model = rotation;
 }
 
 pub const Queues = struct {
@@ -101,16 +105,16 @@ pub const State = struct {
     commandBuffers: [MAX_FRAMES_IN_FLIGHT]c.VkCommandBuffer,
     buffer: Buffer,
     uniformBuffer: Buffer,
-    uniformBufferMapped: []UBO,
+    uniformBufferMapped: []UniformBufferObject,
     graphicsPipelineLayout: c.VkPipelineLayout,
     graphicsPipeline: c.VkPipeline,
     fences: [MAX_FRAMES_IN_FLIGHT]c.VkFence,
     semaphores: []c.VkSemaphore,
     currentFrame: usize = 0,
-    startTime: i64,
+    startTime: *const i64,
     descriptorSetLayout: c.VkDescriptorSetLayout,
     descriptorPool: c.VkDescriptorPool,
-    descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet
+    descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
 };
 
 pub const queueFamilyIndices = struct {
@@ -219,26 +223,28 @@ pub fn beginSingleTimeCommandBuffer(device: c.VkDevice, commandPool: c.VkCommand
     return commandBuffer;
 }
 
-pub fn vec(comptime n: u32) type {
+pub fn Vec(comptime n: u32) type {
     return struct {
         arr: [n]f32,
         
         pub const default = @This(){ .arr = [1]f32{0.0} ** n};
 
         pub fn init(values: [n]f32) @This() {
-            return .{.arr = values};
+            var result: @This() = undefined;
+            @memcpy(result.arr[0..], values[0..]);
+            return result;
         }
 
         pub fn add(v1: *const @This(), v2: *const @This()) @This() {
             var result = default;
-            inline for(0..n) |i| {
+            for(0..n) |i| {
                 result.arr[i] = v1.arr[i] + v2.arr[i];
             }
             return result;
         }
 
         pub fn addInto(v1: *@This(), v2: *const @This()) *@This() {
-            inline for(0..n) |i| {
+            for(0..n) |i| {
                 v1.arr[i] += v2.arr[i];
             }
             return v1;
@@ -246,7 +252,7 @@ pub fn vec(comptime n: u32) type {
     };
 }
 
-pub fn mat(comptime r: u32) type {
+pub fn Mat(comptime r: u32) type {
     return struct {
         arr: [r*r]f32,
 
@@ -256,6 +262,12 @@ pub fn mat(comptime r: u32) type {
             RowOutOfBounds,
             ColumnOutOfBounds
         };
+
+        pub fn init(values: [r*r]f32) @This() {
+            var result: @This() = undefined;
+            @memcpy(result.arr[0..], values[0..]);
+            return result;
+        }
 
         pub fn at(self: *const @This(), row: usize, col: usize) MatrixError!f32 {
             try boundsCheck(row, col);
@@ -276,7 +288,7 @@ pub fn mat(comptime r: u32) type {
             inline for(0..r) |i| {
                 comptime result.arr[i * r + i] = 1.0;
             }
-            return result;
+            comptime return result;
         }
 
         pub fn multInto(m1: *@This(), m2: *const @This()) *@This() {
@@ -294,10 +306,25 @@ pub fn mat(comptime r: u32) type {
             return m1;
         }
 
+        pub fn mult(m1: *const @This(), m2: *const @This()) @This() {
+            var result = @This().copy(m1);
+            _ = result.multInto(m2);
+            return result;
+        }
+
         pub fn copy(other: *const @This()) @This() {
             var result: @This() = undefined;
             @memcpy(&result.arr, &other.arr);
             return result;
+        }
+
+        pub fn transform(self: *const @This(), vector: *Vec(r)) *Vec(r) {
+            var result = Vec(3).default;
+            for(0..r) |i| {
+                for(0..r) |j| result.arr[i] += self.atUnsafe(i,j) * vector.arr[j];
+            }
+            @memcpy(vector.arr[0..], result.arr[0..]);
+            return vector;
         }
 
         fn boundsCheck(row: usize, col: usize) MatrixError!void {
@@ -307,26 +334,25 @@ pub fn mat(comptime r: u32) type {
     };
 }
 
-pub fn rotate(tx: f32, ty: f32, tz: f32) mat(4) {
-    const rx = mat(4){ .arr = [16]f32{
+pub fn rotate(tx: f32, ty: f32, tz: f32) Mat(4) {
+    var rx = Mat(4){ .arr = [16]f32{
         1, 0, 0, 0,
         0, @cos(tx), -@sin(tx), 0,
         0, @sin(tx), @cos(ty), 0,
         0, 0, 0, 1
     }};
-    const ry = mat(4){ .arr = [16]f32{
+    const ry = Mat(4){ .arr = [16]f32{
         @cos(ty), 0, @sin(ty), 0,
         0, 1, 0, 0,
         -@sin(ty), 0, @cos(ty), 0,
         0, 0, 0, 1
     }};
-    const rz = mat(4){ .arr = [16]f32{
+    const rz = Mat(4){ .arr = [16]f32{
         @cos(tz), -@sin(tz), 0, 0,
         @sin(tz), @cos(tz), 0, 0,
         0, 0, 1, 0,
         0, 0, 0, 1
     }};
-    var result = mat(4).identity();
-    _ = result.multInto(&rx).multInto(&ry).multInto(&rz);
-    return result;
+    _ = rx.multInto(&ry).multInto(&rz);
+    return rx;
 }

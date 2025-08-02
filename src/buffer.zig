@@ -17,15 +17,18 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     );
 
     state.uniformBuffer = try Utils.Buffer.create(state.physicalDevice, state.device, allocator, 
-        @sizeOf(Utils.UBO) * Utils.MAX_FRAMES_IN_FLIGHT, c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+        @sizeOf(Utils.UniformBufferObject) * Utils.MAX_FRAMES_IN_FLIGHT, c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
         c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
     if(c.vkMapMemory(state.device, state.uniformBuffer.memory, 0, 
-        @sizeOf(Utils.UBO) * Utils.MAX_FRAMES_IN_FLIGHT, 0, @ptrCast(&state.uniformBufferMapped.ptr)
+        @sizeOf(Utils.UniformBufferObject) * Utils.MAX_FRAMES_IN_FLIGHT, 0, @ptrCast(&state.uniformBufferMapped.ptr)
     ) != c.VK_SUCCESS) {
         return error.failedToMapMemory;
     }
     state.uniformBufferMapped.len = Utils.MAX_FRAMES_IN_FLIGHT;
+    for(state.uniformBufferMapped) |*uniformBufferObject| {
+        uniformBufferObject.* = Utils.UniformBufferObject.default;
+    }
 
     var stagingBuffer = try Utils.Buffer.create(state.physicalDevice, state.device, 
         allocator, size, c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,

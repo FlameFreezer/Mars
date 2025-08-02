@@ -13,10 +13,7 @@ pub fn drawFrame(state: *Utils.State) !void {
         return error.failedToResetFence;
     }
 
-    const now: i64 = std.time.milliTimestamp();
-    const deltaTime: i64 = now - state.startTime;
-    state.startTime = now;
-    try Utils.updateUBO(state, deltaTime);
+    try Utils.updateUniformBufferObject(&state.uniformBufferMapped[state.currentFrame], state.startTime.*);
 
     //The image acquisition semaphores are stored at the front of this array. Each frame has one
     //  semaphore for this purpose

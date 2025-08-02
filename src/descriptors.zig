@@ -66,8 +66,8 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
             .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .pBufferInfo = &.{
                 .buffer = state.uniformBuffer.handle,
-                .offset = @sizeOf(Utils.UBO) * i,
-                .range = @sizeOf(Utils.UBO)
+                .offset = @sizeOf(Utils.UniformBufferObject) * i,
+                .range = @sizeOf(Utils.UniformBufferObject)
             }
         };
         c.vkUpdateDescriptorSets(state.device, 1, &writeDescriptorSet, 0, null);

@@ -17,12 +17,11 @@ const Descriptors = @import("descriptors.zig");
 
 const enableValidationLayers: bool = buildOpts.isDebugBuild;
 
-pub const State = Utils.State;
-pub const mat = Utils.mat;
+pub usingnamespace(Utils);
 
-pub fn init(state: *State) !void {
+pub fn init(state: *Utils.State) !void {
     if(c.glfwInit() == c.GLFW_FALSE) {
-        return error.glfwFailedInit;
+        return error.failedToInitializeGLFW;
     }
     state.currentFrame = 0;
 
@@ -38,7 +37,9 @@ pub fn init(state: *State) !void {
     try Buffer.init(state, null);
     try Descriptors.init(state, null);
     try GraphicsPipeline.init(state, null);
-    state.startTime = std.time.milliTimestamp();
+    const tempStartTime = try std.heap.page_allocator.create(i64);
+    tempStartTime.* = std.time.milliTimestamp();
+    state.startTime = tempStartTime;
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
@@ -63,5 +64,6 @@ pub fn cleanup(state: *Utils.State) void {
     Instance.destroy(state, null);
     Window.destroy(state);
     c.glfwTerminate();
+    std.heap.page_allocator.destroy(state.startTime);
 }
 
