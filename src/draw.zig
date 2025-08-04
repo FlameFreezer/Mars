@@ -150,7 +150,7 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
             .imageLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = c.VK_ATTACHMENT_LOAD_OP_CLEAR,
             .clearValue = c.VkClearValue{
-                .color = c.VkClearColorValue{.float32 = .{1.0, 1.0, 1.0, 1.0}}
+                .color = c.VkClearColorValue{.float32 = .{0.0, 0.0, 0.0, 1.0}}
             },
             .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE
         }

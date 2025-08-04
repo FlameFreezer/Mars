@@ -11,7 +11,7 @@ const shaderModule = struct {
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     //These dynamic states will be configured during the render pass
-    const dynamicStates = comptime [_]c.VkDynamicState{
+    const dynamicStates = [_]c.VkDynamicState{
         c.VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT, 
         c.VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT
     };
@@ -90,10 +90,10 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
                 | c.VK_COLOR_COMPONENT_B_BIT
                 | c.VK_COLOR_COMPONENT_A_BIT
         },
-        .blendConstants = comptime .{0.0} ** 4
+        .blendConstants = .{0.0} ** 4
     };
 
-    const colorAttachmentFormats = comptime [_]c.VkFormat{c.VK_FORMAT_B8G8R8A8_SRGB};
+    const colorAttachmentFormats = [_]c.VkFormat{c.VK_FORMAT_B8G8R8A8_SRGB};
     const pipelineRenderingInfo = c.VkPipelineRenderingCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = colorAttachmentFormats.len,

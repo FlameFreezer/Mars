@@ -69,9 +69,9 @@ pub const UniformBufferObject = struct {
     perspective: Mat(4) align(16),
 
     pub const default = UniformBufferObject{
-        .model = Mat(4).identity(),
-        .view = Mat(4).identity(),
-        .perspective = Mat(4).identity()
+        .model = Mat(4).identity,
+        .view = Mat(4).identity,
+        .perspective = Mat(4).identity
     };
 };
 
@@ -79,8 +79,9 @@ pub fn updateUniformBufferObject(uniformBufferObject: *UniformBufferObject, star
     const now: i64 = std.time.milliTimestamp();
     const deltaTime: i64 = now - startTime;
     //One rotation every 2 seconds
-    const rotation: Mat(4) = rotate(0.0, 0.0, 2.0 * std.math.pi / 2000.0 * @as(f32, @floatFromInt(deltaTime)));
-    uniformBufferObject.model = rotation;
+    uniformBufferObject.model = rotate(0.0, 0.0, 2.0 * std.math.pi / 2000.0 * @as(f32, @floatFromInt(deltaTime)));
+    uniformBufferObject.view = lookAt(Vec(3).init(.{0.0, 0.0, 1.0}), 0.0, Vec(3).init(.{0.0, 0.0, -1.0}));
+    uniformBufferObject.perspective = perspective(1.0, 10.0, 10.0, 8.0);
 }
 
 pub const Queues = struct {
@@ -235,21 +236,46 @@ pub fn Vec(comptime n: u32) type {
             return result;
         }
 
-        pub fn add(v1: *const @This(), v2: *const @This()) @This() {
-            var result = default;
-            for(0..n) |i| {
-                result.arr[i] = v1.arr[i] + v2.arr[i];
-            }
+        pub fn add(v1: @This(), v2: @This()) @This() {
+            var result = v1;
+            for(0..n) |i| result.arr[i] += v2.arr[i];
             return result;
         }
 
-        pub fn addInto(v1: *@This(), v2: *const @This()) *@This() {
-            for(0..n) |i| {
-                v1.arr[i] += v2.arr[i];
-            }
+        pub fn addInto(v1: *@This(), v2: @This()) *@This() {
+            for(0..n) |i| v1.arr[i] += v2.arr[i];
             return v1;
         }
+
+        pub fn subtract(v1: @This(), v2: @This()) @This() {
+            var result = v1;
+            for(0..n) |i| result.arr[i] -= v2.arr[i];
+            return result;
+        }
+
+        pub fn scale(v: @This(), factor: f32) @This() {
+            var result = v;
+            for(0..n) |i| result.arr[i] *= factor;
+            return result;
+        }
+
+        pub fn magnitude(v: @This()) f32 {
+            var result: f32 = 0;
+            for(0..n) |i| {
+                result += v.arr[i] * v.arr[i];
+            }
+            return std.math.sqrt(result);
+        }
+
     };
+}
+
+pub fn crossProduct(v1: Vec(3), v2: Vec(3)) Vec(3) {
+    return Vec(3).init(.{
+        v1.arr[1] * v2.arr[2] - v1.arr[2] * v2.arr[1],
+        -v1.arr[0] * v2.arr[2] + v1.arr[2] * v2.arr[0],
+        v1.arr[0] * v2.arr[1] - v1.arr[1] * v2.arr[0]
+    });
 }
 
 pub fn Mat(comptime r: u32) type {
@@ -257,6 +283,11 @@ pub fn Mat(comptime r: u32) type {
         arr: [r*r]f32,
 
         pub const default = @This(){ .arr = [1]f32{0.0} ** (r*r)};
+        pub const identity = i:{
+            var result = default;
+            for(0..r) |i| result.setUnsafe(i, i, 1.0);
+            break:i result;
+        };
 
         pub const MatrixError = error{
             RowOutOfBounds,
@@ -282,16 +313,12 @@ pub fn Mat(comptime r: u32) type {
             try boundsCheck(row, col);
             self.arr[row * r + col] = value;
         }
-
-        pub inline fn identity() @This() {
-            comptime var result = default;
-            inline for(0..r) |i| {
-                comptime result.arr[i * r + i] = 1.0;
-            }
-            comptime return result;
+        
+        pub fn setUnsafe(self: *@This(), row: usize, col: usize, value: f32) void {
+            self.arr[row * r + col] = value;
         }
 
-        pub fn multInto(m1: *@This(), m2: *const @This()) *@This() {
+        pub fn multInto(m1: *@This(), m2: @This()) *@This() {
             var result: @This() = @This().default;
             for(0..r) |row| {
                 for(0..r) |col| {
@@ -306,19 +333,19 @@ pub fn Mat(comptime r: u32) type {
             return m1;
         }
 
-        pub fn mult(m1: *const @This(), m2: *const @This()) @This() {
+        pub fn mult(m1: @This(), m2: @This()) @This() {
             var result = @This().copy(m1);
             _ = result.multInto(m2);
             return result;
         }
 
-        pub fn copy(other: *const @This()) @This() {
+        pub fn copy(other: @This()) @This() {
             var result: @This() = undefined;
             @memcpy(&result.arr, &other.arr);
             return result;
         }
 
-        pub fn transform(self: *const @This(), vector: *Vec(r)) *Vec(r) {
+        pub fn transform(self: @This(), vector: *Vec(r)) *Vec(r) {
             var result = Vec(3).default;
             for(0..r) |i| {
                 for(0..r) |j| result.arr[i] += self.atUnsafe(i,j) * vector.arr[j];
@@ -353,6 +380,51 @@ pub fn rotate(tx: f32, ty: f32, tz: f32) Mat(4) {
         0, 0, 1, 0,
         0, 0, 0, 1
     }};
-    _ = rx.multInto(&ry).multInto(&rz);
+    _ = rx.multInto(ry).multInto(rz);
     return rx;
+}
+
+pub fn translate(shift: Vec(3)) Mat(4) {
+    return Mat(4).init(.{
+        1, 0, 0, shift.arr[0],
+        0, 1, 0, shift.arr[1],
+        0, 0, 1, shift.arr[2],
+        0, 0, 0, 1
+    });
+}
+
+pub fn lookAt(where: Vec(3), cameraAngle: f32, cameraLocation: Vec(3)) Mat(4) {
+    const vecCameraToTarget = where.subtract(cameraLocation).scale(
+        1.0 / where.subtract(cameraLocation).magnitude()
+    );
+    const vecNormal = crossProduct(Vec(3).init(.{0.0, 1.0, 0.0}), vecCameraToTarget);
+    //Explanation: Create a Matrix cameraBasis with vecNormal, [0.0 1.0 0.0], and vecCameraToTarget
+    //  as the column vectors, in that order. This Matrix converts coordinates in camera space to
+    //  world space.
+    //The inverse of that matrix converts coordinates in world space to camera space, which is
+    //  what we want.
+    const cameraBasisInverse = Mat(4).init(.{
+        vecCameraToTarget.arr[2], 0.0, -vecCameraToTarget.arr[0], 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        -vecNormal.arr[2], 0.0, vecNormal.arr[0], 0.0,
+        0.0, 0.0, 0.0, 1.0
+    });
+    _ = cameraAngle;
+    return translate(cameraLocation.scale(-1.0)).mult(cameraBasisInverse);
+}
+
+pub fn perspective(near: f32, far: f32, width: f32, height: f32) Mat(4) {
+    const per = Mat(4).init(.{
+        near, 0, 0, 0,
+        0, near, 0, 0,
+        0, 0, near + far, -(near * far),
+        0, 0, 1, 0
+    });
+    const ortho = Mat(4).init(.{
+        2.0 / width, 0.0, 0.0, 0.0,
+        0.0, 2.0 / height, 0.0, 0.0,
+        0.0, 0.0, 1.0 / (far - near), -near / (far - near),
+        0.0, 0.0, 0.0, 1.0
+    });
+    return per.mult(ortho);
 }

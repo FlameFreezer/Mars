@@ -43,29 +43,28 @@ test "vector addition" {
 }
 
 test "identity matrix" {
-    comptime {
-    var I = Utils.Mat(4).identity();
-        for(0..4) |i| {
-            try expectEqual(I.at(i, i), 1.0);
-        }
+    const I = Utils.Mat(4).identity;
+    for(0..4) |i| {
+        try expectEqual(I.at(i, i), 1.0);
     }
 }
 
 test "copy matrix" {
-    const m = Utils.Mat(5).identity();
-    const copy = Utils.Mat(5).copy(&m);
+    const m = Utils.Mat(5).identity;
+    const copy = Utils.Mat(5).copy(m);
     try expectEqualSlices(f32, &m.arr, &copy.arr);
+    try expect(&m != &copy);
 }
 
 test "basic matrix multiplication" {
-    const I2 = Utils.Mat(2).identity();
+    const I2 = Utils.Mat(2).identity;
     var m2 = Utils.Mat(2){
         .arr = .{
             3.4, 3.4,
             3.4, 3.4
         }
     };
-    _ = m2.multInto(&I2);
+    _ = m2.multInto(I2);
     try expectEqualSlices(f32, &.{3.4, 3.4, 3.4, 3.4}, &m2.arr);
 
     const scale = Utils.Mat(2){
@@ -74,11 +73,11 @@ test "basic matrix multiplication" {
             0, 1
         }
     };
-    _ = m2.multInto(&scale);
+    _ = m2.multInto(scale);
     try expectEqualSlices(f32, &.{6.8, 6.8, 3.4, 3.4}, &m2.arr);
 
-    var m = Utils.Mat(2).identity();
-    _ = m.multInto(&scale).multInto(&scale).multInto(&scale);
+    var m = Utils.Mat(2).identity;
+    _ = m.multInto(scale).multInto(scale).multInto(scale);
     try expectEqualSlices(f32, &.{8, 0, 0, 1}, &m.arr);
 }
 
@@ -97,7 +96,7 @@ test "advanced matrix multiplication" {
             9.08, 0.003, -4.5
         }
     };
-    _ = m.multInto(&m1);
+    _ = m.multInto(m1);
     const expected = Utils.Mat(3){
         .arr = .{
             -30.2576, 124.3255, -0.6,
@@ -106,9 +105,4 @@ test "advanced matrix multiplication" {
         }
     };
     try expectApproxEqSlices(f32, &expected.arr, &m.arr, 0.000001);
-}
-
-test "rotation matrices around axes" {
-    const xaxis = Utils.Vec(3).init(.{1.0, 0.0, 0.0});
-    _ = xaxis;
 }
