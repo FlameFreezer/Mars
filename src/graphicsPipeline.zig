@@ -2,8 +2,6 @@ const c = @import("c");
 const std = @import("std");
 const Utils = @import("Utils");
 
-const Data = @import("data.zig");
-
 const shaderModule = struct {
     module: c.VkShaderModule,
     code: []const u8
@@ -43,9 +41,9 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     const vertexInputState = c.VkPipelineVertexInputStateCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions = &Data.Vertex.inputBindingDescription(),
-        .vertexAttributeDescriptionCount = @intCast(@typeInfo(Data.Vertex).@"struct".fields.len),
-        .pVertexAttributeDescriptions = &Data.Vertex.inputAttributeDescriptions()
+        .pVertexBindingDescriptions = &Utils.Vertex.inputBindingDescription(),
+        .vertexAttributeDescriptionCount = @intCast(@typeInfo(Utils.Vertex).@"struct".fields.len),
+        .pVertexAttributeDescriptions = &Utils.Vertex.inputAttributeDescriptions()
     };
 
     const inputAssemblyState = c.VkPipelineInputAssemblyStateCreateInfo{

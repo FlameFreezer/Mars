@@ -428,3 +428,106 @@ pub fn perspective(near: f32, far: f32, width: f32, height: f32) Mat(4) {
     });
     return per.mult(ortho);
 }
+
+const VertexAttributes: type = enum (u32) {
+    COLOR = 0,
+    POSITION
+};
+
+pub const Vertex = struct {
+    color: [3]f32,
+    position: [3]f32,
+
+    const numAttribs: usize = @typeInfo(@This()).@"struct".fields.len;
+
+    pub fn create(inColor: [3]f32, inPosition: [3]f32) Vertex {
+        return .{
+            .position = inPosition,
+            .color = inColor
+        };
+    }
+
+    pub fn inputBindingDescription() c.VkVertexInputBindingDescription {
+        return .{
+            .binding = 0,
+            .stride = @sizeOf(Vertex),
+            .inputRate = c.VK_VERTEX_INPUT_RATE_VERTEX
+        };
+    }
+
+    pub fn inputAttributeDescriptions() [numAttribs]c.VkVertexInputAttributeDescription {
+        comptime var attributes: [numAttribs]c.VkVertexInputAttributeDescription = undefined;
+        comptime attributes[@intFromEnum(VertexAttributes.COLOR)] = .{
+            .location = @intFromEnum(VertexAttributes.COLOR),
+            .binding = 0,
+            .format = c.VK_FORMAT_R32G32B32_SFLOAT,
+            .offset = 0
+        };
+        comptime attributes[@intFromEnum(VertexAttributes.POSITION)] = .{
+            .location = @intFromEnum(VertexAttributes.POSITION),
+            .binding = 0,
+            .format = c.VK_FORMAT_R32G32B32_SFLOAT,
+            .offset = @offsetOf(Vertex, "position")
+        };
+        return attributes;
+    }
+};
+
+pub const Position = struct {
+    x: f32,
+    y: f32,
+    z: f32
+};
+pub const Dimension = struct {
+    w: f32,
+    l: f32,
+    h: f32
+};
+
+pub const Cube = struct {
+    pos: Position,
+    dim: Dimension,
+
+    pub const numVertices: u32 = 8;
+    pub const numIndices: u32 = 36;
+
+    pub fn getVertices(self: Cube) [numVertices]Vertex {
+        const color = [3]f32{1.0, 1.0, 1.0};
+        return .{
+            .create(color,.{self.pos.x, self.pos.y, self.pos.z}),
+            .create(color,.{self.pos.x + self.dim.w, self.pos.y, self.pos.z}),
+            .create(color,.{self.pos.x + self.dim.w, self.pos.y + self.dim.h, self.pos.z}),
+            .create(color,.{self.pos.x, self.pos.y + self.dim.h, self.pos.z}),
+            .create(color,.{self.pos.x, self.pos.y, self.pos.z + self.dim.l}),
+            .create(color,.{self.pos.x + self.dim.w, self.pos.y, self.pos.z + self.dim.l}),
+            .create(color,.{self.pos.x + self.dim.w, self.pos.y + self.dim.h, self.pos.z + self.dim.l}),
+            .create(color,.{self.pos.x, self.pos.y + self.dim.h, self.pos.z + self.dim.l})
+        };
+    }
+
+    pub fn getIndices(self: ?Cube) [numIndices]u32 {
+        //self argument purely for more natural calling of this function. It is not needed
+        _ = self;
+        return .{
+            //FRONT FACE
+            0, 1, 2,
+            0, 2, 3,
+            //RIGHT SIDE FACE
+            1, 5, 6,
+            1, 6, 7,
+            //BACK FACE
+            5, 4, 7,
+            5, 7, 6,
+            //LEFT SIDE FACE
+            4, 0, 3,
+            4, 3, 7,
+            //TOP FACE
+            4, 5, 1,
+            4, 1, 0,
+            //BOTTOM FACE
+            7, 6, 2,
+            7, 2, 3
+        };
+    }
+};
+

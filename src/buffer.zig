@@ -5,8 +5,8 @@ const Utils = @import("Utils");
 const Data = @import("data.zig");
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
-    const sizeVertexBuffer: u32 = @sizeOf(@TypeOf(Data.Vertices));
-    const sizeIndexBuffer: u32 = @sizeOf(@TypeOf(Data.Indices)); 
+    const sizeVertexBuffer: u32 = Utils.Cube.numVertices * @sizeOf(Utils.Vertex);
+    const sizeIndexBuffer: u32 = Utils.Cube.numIndices * @sizeOf(u32); 
     const size: u32 = comptime sizeVertexBuffer + sizeIndexBuffer; 
     const usage: c.VkBufferUsageFlags = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT
             | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT
@@ -42,14 +42,14 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     if(c.vkMapMemory(state.device, stagingBuffer.memory, 0, sizeVertexBuffer, 0, &memory) != c.VK_SUCCESS) {
         return error.failedToMapMemory;
     }
-    @memcpy(@as([*]Data.Vertex, @ptrCast(@alignCast(memory))), &Data.Vertices);
+    @memcpy(@as([*]Utils.Vertex, @ptrCast(@alignCast(memory))), &Data.cube.getVertices());
     c.vkUnmapMemory(state.device, stagingBuffer.memory);
 
     //Map region for the Indices
     if(c.vkMapMemory(state.device, stagingBuffer.memory, sizeVertexBuffer, sizeIndexBuffer, 0, &memory) != c.VK_SUCCESS) {
         return error.failedToMapMemory;
     }
-    @memcpy(@as([*]u32, @ptrCast(@alignCast(memory))), &Data.Indices);
+    @memcpy(@as([*]u32, @ptrCast(@alignCast(memory))), &Data.cube.getIndices());
     c.vkUnmapMemory(state.device, stagingBuffer.memory);
 
     const commandBuffer: c.VkCommandBuffer = try Utils.beginSingleTimeCommandBuffer(state.device, state.commandPool);
