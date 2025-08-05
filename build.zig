@@ -4,6 +4,14 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const sdl_dep = b.dependency("sdl", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const sdl_lib = sdl_dep.artifact("SDL3");
+    const sdl_test_lib = sdl_dep.artifact("SDL3_test");
+    _ = sdl_test_lib;
+
     const mars_mod = b.addModule("Mars", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -27,10 +35,9 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .link_libc = true
     });
-    c_mod.addIncludePath(b.path("include/GLFW"));
-    c_mod.addIncludePath(b.path("include/VULKAN"));
-    c_mod.linkSystemLibrary("glfw", .{});
-    c_mod.linkSystemLibrary("Vulkan", .{});
+    c_mod.addIncludePath(b.path("include/"));
+    c_mod.linkSystemLibrary("vulkan", .{});
+    c_mod.linkLibrary(sdl_lib);
     utils_mod.addImport("c", c_mod);
     mars_mod.addImport("c", c_mod);
     mars_mod.addImport("Utils", utils_mod);

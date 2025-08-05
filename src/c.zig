@@ -1,5 +1,6 @@
 pub usingnamespace @cImport({
-    @cDefine("GLFW_INCLUDE_VULKAN", {});
-    @cInclude("GLFW/glfw3.h");
     @cInclude("string.h");
+    @cInclude("SDL3/SDL.h");
+    @cInclude("SDL3/SDL_vulkan.h");
+    @cInclude("vulkan/vulkan.h");
 });

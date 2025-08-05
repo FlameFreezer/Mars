@@ -19,13 +19,15 @@ const enableValidationLayers: bool = buildOpts.isDebugBuild;
 
 pub usingnamespace(Utils);
 
-pub fn init(state: *Utils.State) !void {
-    if(c.glfwInit() == c.GLFW_FALSE) {
-        return error.failedToInitializeGLFW;
+pub fn init(state: *Utils.State, name: []const u8) !void {
+    if(!c.SDL_Init(c.SDL_INIT_VIDEO)) {
+        return error.failedToInitializeSDL3;
     }
     state.currentFrame = 0;
+    state.name = name;
+    state.windowShouldClose = false;
 
-    Window.init(state);
+    try Window.init(state);
     try Instance.init(state, enableValidationLayers);
     if(enableValidationLayers) {
         DebugMessenger.init(state, null);
@@ -43,8 +45,14 @@ pub fn init(state: *Utils.State) !void {
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
-    while(c.glfwWindowShouldClose(state.window) == c.GLFW_FALSE) {
-        c.glfwPollEvents();
+    while(!state.windowShouldClose) {
+        while(c.SDL_PollEvent(&state.nextEvent)) {
+            //try Events.handleEvent(state);
+            switch(state.nextEvent.type) {
+                c.SDL_EVENT_QUIT => state.windowShouldClose = true,
+                else => {}
+            }
+        }
         try Draw.drawFrame(state);
     }
     _ = c.vkDeviceWaitIdle(state.device);
@@ -63,7 +71,7 @@ pub fn cleanup(state: *Utils.State) void {
     Device.destroy(state, null);
     Instance.destroy(state, null);
     Window.destroy(state);
-    c.glfwTerminate();
+    c.SDL_Quit();
     std.heap.page_allocator.destroy(state.startTime);
 }
 

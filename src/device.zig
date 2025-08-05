@@ -11,7 +11,7 @@ const deviceExtensions = [_]*const[c.VK_MAX_EXTENSION_NAME_SIZE]u8{
 };
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
-    if(c.glfwCreateWindowSurface(state.instance, state.window, null, &state.surface) != 0) {
+    if(!c.SDL_Vulkan_CreateSurface(state.window.?, state.instance, allocator, &state.surface)) {
         return error.failedToCreateWindowSurface;
     }
     try pickPhysicalDevice(&state.physicalDevice, state.surface, state.instance);
@@ -19,7 +19,8 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
 }
 
 pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
-    c.vkDestroySurfaceKHR(state.instance, state.surface, allocator);
+    //c.vkDestroySurfaceKHR(state.instance, state.surface, allocator);
+    c.SDL_Vulkan_DestroySurface(state.instance, state.surface, allocator);
     _ = c.vkDeviceWaitIdle(state.device);
     c.vkDestroyDevice(state.device, allocator);
 }

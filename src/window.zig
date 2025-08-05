@@ -5,11 +5,12 @@ const Utils = @import("Utils");
 const WIDTH: u32 = 800;
 const HEIGHT: u32 = 600;
 
-pub fn init(state: *Utils.State) void {
-    c.glfwWindowHint(c.GLFW_CLIENT_API, c.GLFW_NO_API);
-    state.window = c.glfwCreateWindow(WIDTH, HEIGHT, "Mars App", null, null);
+pub fn init(state: *Utils.State) !void {
+    state.window = c.SDL_CreateWindow(state.name.ptr, WIDTH, HEIGHT, 
+        c.SDL_WINDOW_VULKAN | c.SDL_WINDOW_RESIZABLE) orelse return error.failedToCreateWindow;
 }
 
 pub fn destroy(state: *Utils.State) void {
-    c.glfwDestroyWindow(state.window);
+    c.SDL_DestroyWindow(state.window);
+    state.window = null;
 }

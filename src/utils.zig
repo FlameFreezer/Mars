@@ -3,6 +3,37 @@ const c = @import("c");
 
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
+pub const State = struct {
+    name: []const u8,
+    windowShouldClose: bool,
+    nextEvent: c.SDL_Event,
+    window: ?*c.SDL_Window = null,
+    instance: c.VkInstance,
+    debugMessenger: c.VkDebugUtilsMessengerEXT,
+    physicalDevice: c.VkPhysicalDevice,
+    device: c.VkDevice,
+    surface: c.VkSurfaceKHR,
+    queues: Queues,
+    swapchain: c.VkSwapchainKHR,
+    swapchainImages: []c.VkImage,
+    swapchainImageViews: []c.VkImageView,
+    swapchainExtent: c.VkExtent2D,
+    commandPool: c.VkCommandPool,
+    commandBuffers: [MAX_FRAMES_IN_FLIGHT]c.VkCommandBuffer,
+    buffer: Buffer,
+    uniformBuffer: Buffer,
+    uniformBufferMapped: []UniformBufferObject,
+    graphicsPipelineLayout: c.VkPipelineLayout,
+    graphicsPipeline: c.VkPipeline,
+    fences: [MAX_FRAMES_IN_FLIGHT]c.VkFence,
+    semaphores: []c.VkSemaphore,
+    currentFrame: usize = 0,
+    startTime: *const i64,
+    descriptorSetLayout: c.VkDescriptorSetLayout,
+    descriptorPool: c.VkDescriptorPool,
+    descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
+};
+
 pub const Buffer = struct {
     handle: c.VkBuffer,
     memory: c.VkDeviceMemory,
@@ -90,34 +121,6 @@ pub const Queues = struct {
     graphics: c.VkQueue,
     compute: c.VkQueue,
     present: c.VkQueue
-};
-
-pub const State = struct {
-    window: ?*c.GLFWwindow = null,
-    instance: c.VkInstance,
-    debugMessenger: c.VkDebugUtilsMessengerEXT,
-    physicalDevice: c.VkPhysicalDevice,
-    device: c.VkDevice,
-    surface: c.VkSurfaceKHR,
-    queues: Queues,
-    swapchain: c.VkSwapchainKHR,
-    swapchainImages: []c.VkImage,
-    swapchainImageViews: []c.VkImageView,
-    swapchainExtent: c.VkExtent2D,
-    commandPool: c.VkCommandPool,
-    commandBuffers: [MAX_FRAMES_IN_FLIGHT]c.VkCommandBuffer,
-    buffer: Buffer,
-    uniformBuffer: Buffer,
-    uniformBufferMapped: []UniformBufferObject,
-    graphicsPipelineLayout: c.VkPipelineLayout,
-    graphicsPipeline: c.VkPipeline,
-    fences: [MAX_FRAMES_IN_FLIGHT]c.VkFence,
-    semaphores: []c.VkSemaphore,
-    currentFrame: usize = 0,
-    startTime: *const i64,
-    descriptorSetLayout: c.VkDescriptorSetLayout,
-    descriptorPool: c.VkDescriptorPool,
-    descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
 };
 
 pub const queueFamilyIndices = struct {

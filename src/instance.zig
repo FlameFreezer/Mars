@@ -79,8 +79,8 @@ fn checkValidationLayerSupport() bool {
 
 fn getRequiredExtensions(extensions: *std.ArrayList([*:0]const u8)) !void {
     var extensionCount: u32 = 0;
-    var extensionNames: ?[*]?[*:0]const u8 = null;
-    extensionNames = c.glfwGetRequiredInstanceExtensions(&extensionCount);
+    var extensionNames: ?[*]const?[*:0]const u8 = null;
+    extensionNames = c.SDL_Vulkan_GetInstanceExtensions(&extensionCount);
     try extensions.*.resize(extensionCount);
     if(extensionNames) |names| {
         for(0..extensionCount) |i| {

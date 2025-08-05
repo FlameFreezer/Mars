@@ -27,7 +27,7 @@ fn createSwapchain(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !v
     try surfaceInfo.query(state.physicalDevice, state.surface);
     defer surfaceInfo.free();
 
-    state.swapchainExtent = chooseImageExtent(state.window, surfaceInfo.capabilities);
+    state.swapchainExtent = try chooseImageExtent(state.window, surfaceInfo.capabilities);
 
     const queueFamilyIndices = try Utils.findQueueFamilyIndices(state.physicalDevice, state.surface);
 
@@ -97,7 +97,7 @@ fn createSwapchainImageViews(imageViews: *[]c.VkImageView, images: []c.VkImage, 
     }
 }
 
-fn chooseImageExtent(window: ?*c.GLFWwindow, capabilities: c.VkSurfaceCapabilitiesKHR) c.VkExtent2D {
+fn chooseImageExtent(window: ?*c.SDL_Window, capabilities: c.VkSurfaceCapabilitiesKHR) !c.VkExtent2D {
     var resultExtent: c.VkExtent2D = undefined;
     if(capabilities.currentExtent.width != std.math.maxInt(u32)) {
         resultExtent = capabilities.currentExtent;
@@ -105,7 +105,9 @@ fn chooseImageExtent(window: ?*c.GLFWwindow, capabilities: c.VkSurfaceCapabiliti
     else {
         var width: i32 = 0;
         var height: i32 = 0;
-        _ = c.glfwGetFramebufferSize(window, &width, &height);
+        if(!c.SDL_GetWindowSize(window.?, &width, &height)) {
+            return error.failedToGetWindowSize;
+        }
         resultExtent = .{
             .width = std.math.clamp(@as(u32, @intCast(width)), 
                 capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
