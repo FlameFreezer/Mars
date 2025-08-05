@@ -75,13 +75,15 @@ pub const UniformBufferObject = struct {
     };
 };
 
-pub fn updateUniformBufferObject(uniformBufferObject: *UniformBufferObject, startTime: i64) !void {
+pub fn updateUniformBufferObject(state: State, uniformBufferObject: *UniformBufferObject, startTime: i64) !void {
     const now: i64 = std.time.milliTimestamp();
     const deltaTime: i64 = now - startTime;
     //One rotation every 2 seconds
     uniformBufferObject.model = rotate(0.0, 0.0, 2.0 * std.math.pi / 2000.0 * @as(f32, @floatFromInt(deltaTime)));
     uniformBufferObject.view = lookAt(Vec(3).init(.{0.0, 0.0, 1.0}), 0.0, Vec(3).init(.{0.0, 0.0, -1.0}));
-    uniformBufferObject.perspective = perspective(1.0, 10.0, 10.0, 8.0);
+    uniformBufferObject.perspective = perspective(1.0, 10.0, std.math.degreesToRadians(150.0), 
+        @as(f32, @floatFromInt(state.swapchainExtent.height)) 
+        / @as(f32, @floatFromInt(state.swapchainExtent.width)));
 }
 
 pub const Queues = struct {
@@ -398,9 +400,8 @@ pub fn lookAt(where: Vec(3), cameraAngle: f32, cameraLocation: Vec(3)) Mat(4) {
         1.0 / where.subtract(cameraLocation).magnitude()
     );
     const vecNormal = crossProduct(Vec(3).init(.{0.0, 1.0, 0.0}), vecCameraToTarget);
-    //Explanation: Create a Matrix cameraBasis with vecNormal, [0.0 1.0 0.0], and vecCameraToTarget
-    //  as the column vectors, in that order. This Matrix converts coordinates in camera space to
-    //  world space.
+    //Create a Matrix cameraBasis with vecNormal, [0.0 1.0 0.0], and vecCameraToTarget as the column
+    //  vectors, in that order. This Matrix converts coordinates in camera space to world space.
     //The inverse of that matrix converts coordinates in world space to camera space, which is
     //  what we want.
     const cameraBasisInverse = Mat(4).init(.{
@@ -413,7 +414,9 @@ pub fn lookAt(where: Vec(3), cameraAngle: f32, cameraLocation: Vec(3)) Mat(4) {
     return translate(cameraLocation.scale(-1.0)).mult(cameraBasisInverse);
 }
 
-pub fn perspective(near: f32, far: f32, width: f32, height: f32) Mat(4) {
+pub fn perspective(near: f32, far: f32, fieldOfView: f32, dimension: f32) Mat(4) {
+    const width: f32 = @tan(fieldOfView / 2.0) * near * 2.0;
+    const height: f32 = dimension * width;
     const per = Mat(4).init(.{
         near, 0, 0, 0,
         0, near, 0, 0,

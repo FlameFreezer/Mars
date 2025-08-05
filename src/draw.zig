@@ -13,7 +13,7 @@ pub fn drawFrame(state: *Utils.State) !void {
         return error.failedToResetFence;
     }
 
-    try Utils.updateUniformBufferObject(&state.uniformBufferMapped[state.currentFrame], state.startTime.*);
+    try Utils.updateUniformBufferObject(state.*, &state.uniformBufferMapped[state.currentFrame], state.startTime.*);
 
     //The image acquisition semaphores are stored at the front of this array. Each frame has one
     //  semaphore for this purpose
