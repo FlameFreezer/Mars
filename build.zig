@@ -16,8 +16,8 @@ pub fn build(b: *std.Build) !void {
     c_mod.addIncludePath(b.path("include/"));
     const vulkanSDKPath = try std.process.getEnvVarOwned(arena.allocator(), "VULKAN_SDK");
     //Using absolute paths so as to not force platform-specific vulkan binaries into the repository
-    c_mod.addLibraryPath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "Lib"})});
-    c_mod.addIncludePath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "Include"})});
+    c_mod.addLibraryPath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "lib"})});
+    c_mod.addIncludePath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "include"})});
 
     if(target.result.os.tag == .windows) {
         c_mod.linkSystemLibrary("vulkan-1", .{});
