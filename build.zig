@@ -1,9 +1,12 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    
+   
     const c_mod = b.createModule(.{
         .root_source_file = b.path("src/c.zig"),
         .target = target,
@@ -11,12 +14,12 @@ pub fn build(b: *std.Build) !void {
         .link_libc = true
     });
     c_mod.addIncludePath(b.path("include/"));
+    const vulkanSDKPath = try std.process.getEnvVarOwned(arena.allocator(), "VULKAN_SDK");
+    //Using absolute paths so as to not force platform-specific vulkan binaries into the repository
+    c_mod.addLibraryPath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "Lib"})});
+    c_mod.addIncludePath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "Include"})});
+
     if(target.result.os.tag == .windows) {
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        defer arena.deinit();
-        const vulkanSDKPath = try std.process.getEnvVarOwned(arena.allocator(), "VULKAN_SDK");
-        c_mod.addLibraryPath(.{.cwd_relative = try joinPaths(arena.allocator(), vulkanSDKPath, "\\Lib")});
-        c_mod.addIncludePath(.{ .cwd_relative = try joinPaths(arena.allocator(), vulkanSDKPath, "\\Include")});
         c_mod.linkSystemLibrary("vulkan-1", .{});
     }
     else if(target.result.os.tag == .linux) {
@@ -114,11 +117,4 @@ pub fn build(b: *std.Build) !void {
     const test_command = b.addRunArtifact(marsTests);
     const test_step = b.step("test", "Run the tests");
     test_step.dependOn(&test_command.step);
-}
-
-fn joinPaths(allocator: std.mem.Allocator, absolute: []const u8, subpath: []const u8) ![]const u8 {
-    var buffer: []u8 = try allocator.alloc(u8, absolute.len + subpath.len); 
-    for(0..absolute.len) |i| buffer[i] = absolute[i];
-    for(0..subpath.len) |i| buffer[absolute.len + i] = subpath[i];
-    return buffer;
 }
