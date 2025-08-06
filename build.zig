@@ -14,11 +14,14 @@ pub fn build(b: *std.Build) !void {
     if(target.result.os.tag == .windows) {
         var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena.deinit();
-        const vulkanSDKPath: []u8 = try getVulkanSDKPathWindows(arena.allocator());
+        const vulkanSDKPath = try std.process.getEnvVarOwned(arena.allocator(), "VULKAN_SDK");
         c_mod.addLibraryPath(.{.cwd_relative = try joinPaths(arena.allocator(), vulkanSDKPath, "\\Lib")});
         c_mod.addIncludePath(.{ .cwd_relative = try joinPaths(arena.allocator(), vulkanSDKPath, "\\Include")});
+        c_mod.linkSystemLibrary("vulkan-1", .{});
     }
-    c_mod.linkSystemLibrary("vulkan-1", .{});
+    else if(target.result.os.tag == .linux) {
+        c_mod.linkSystemLibrary("vulkan", .{});
+    }
 
     const sdl_dep = b.dependency("sdl", .{
         .target = target,
@@ -111,18 +114,6 @@ pub fn build(b: *std.Build) !void {
     const test_command = b.addRunArtifact(marsTests);
     const test_step = b.step("test", "Run the tests");
     test_step.dependOn(&test_command.step);
-}
-
-fn getVulkanSDKPathWindows(allocator: std.mem.Allocator) ![]u8 {
-    var sdkpathWCHAR: [1024:0]u16 = undefined;
-    var sdkpathCHAR: []u8 = undefined;
-    const envnameCHAR = "VK_SDK_PATH";
-    var envnameWCHAR: [12:0]u16 = undefined;
-    for(0..12) |i| envnameWCHAR[i] = envnameCHAR[i];
-    const ccount = try std.os.windows.GetEnvironmentVariableW(envnameWCHAR[0..], sdkpathWCHAR[0..], sdkpathWCHAR.len);
-    sdkpathCHAR = try allocator.alloc(u8, ccount);
-    for(0..ccount) |i| sdkpathCHAR[i] = @intCast(sdkpathWCHAR[i]);
-    return sdkpathCHAR[0..ccount];
 }
 
 fn joinPaths(allocator: std.mem.Allocator, absolute: []const u8, subpath: []const u8) ![]const u8 {
