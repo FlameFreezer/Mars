@@ -68,9 +68,6 @@ fn pickPhysicalDevice(physical: *c.VkPhysicalDevice, surface: c.VkSurfaceKHR, in
         if(deviceSurfaceInfo.capabilities.supportedTransforms 
             & c.VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR == 0
         ) continue:findBestDevice;
-        if(deviceSurfaceInfo.capabilities.supportedCompositeAlpha 
-            & c.VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR == 0
-        ) continue:findBestDevice;
         if(deviceSurfaceInfo.capabilities.supportedUsageFlags
             & c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT == 0
         ) continue:findBestDevice;
