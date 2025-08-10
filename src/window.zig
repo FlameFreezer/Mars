@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("Utils");
+const Utils = @import("utils.zig");
 
 const WIDTH: u32 = 800;
 const HEIGHT: u32 = 600;

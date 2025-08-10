@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("Utils");
+const Utils = @import("utils.zig");
 
 //VkDeviceCreateInfo.ppEnabledExtensionNames assumes each name has an alignment of
 //  VK_MAX_EXTENSION_NAME_SIZE, so the string literal pointers have to be casted to fit into this 

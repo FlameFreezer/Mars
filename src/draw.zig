@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("Utils");
+const Utils = @import("utils.zig");
 
 const Data = @import("data.zig");
 

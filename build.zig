@@ -35,14 +35,6 @@ pub fn build(b: *std.Build) !void {
     _ = sdl_test_lib;
     c_mod.linkLibrary(sdl_lib);
 
-    const utils_mod = b.createModule(.{
-        .root_source_file = b.path("src/utils.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true
-    });
-    utils_mod.addImport("c", c_mod);
-
     const test_mod = b.createModule(.{
         .root_source_file = b.path("tests/tests.zig"),
         .target = target,
@@ -50,7 +42,6 @@ pub fn build(b: *std.Build) !void {
         .link_libc = true
     });
     test_mod.addImport("c", c_mod);
-    test_mod.addImport("Utils", utils_mod);
 
     const mars_mod = b.addModule("Mars", .{
         .root_source_file = b.path("src/root.zig"),
@@ -58,7 +49,8 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize
     });
     mars_mod.addImport("c", c_mod);
-    mars_mod.addImport("Utils", utils_mod);
+
+    test_mod.addImport("Mars", mars_mod);
 
     const sourceOptions = b.addOptions();
     sourceOptions.addOption(bool, "isDebugBuild", optimize == .Debug);

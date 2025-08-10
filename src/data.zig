@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("Utils");
+const Utils = @import("utils.zig");
 
 pub const cube = Utils.Cube{
     .w = 10.0,

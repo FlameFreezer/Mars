@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("Utils");
+const Utils = @import("utils.zig");
 
 const candidateDepthFormats = [_]c.VkFormat{
     c.VK_FORMAT_D32_SFLOAT, c.VK_FORMAT_D32_SFLOAT_S8_UINT, c.VK_FORMAT_D24_UNORM_S8_UINT

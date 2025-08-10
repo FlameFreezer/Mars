@@ -1,8 +1,8 @@
 const std = @import("std");
 const c = @import("c");
 const buildOpts = @import("buildOpts");
-const Utils = @import("Utils");
 
+const Utils = @import("utils.zig");
 const Window = @import("window.zig");
 const Instance = @import("instance.zig");
 const DebugMessenger = @import("debugMessenger.zig");

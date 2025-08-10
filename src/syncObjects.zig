@@ -1,6 +1,6 @@
 const c = @import("c");
 const std = @import("std");
-const Utils = @import("Utils");
+const Utils = @import("utils.zig");
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     //Each swapchain image gets its own presentation semaphore
