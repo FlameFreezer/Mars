@@ -14,6 +14,7 @@ const CommandBuffer = @import("commandBuffer.zig");
 const SyncObjects = @import("syncObjects.zig");
 const Draw = @import("draw.zig");
 const Descriptors = @import("descriptors.zig");
+const DepthResources = @import("depthResources.zig");
 
 const enableValidationLayers: bool = buildOpts.isDebugBuild;
 
@@ -34,6 +35,7 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     }
     try Device.init(state, null);
     try Swapchain.init(state, null);
+    try DepthResources.init(state, null);
     try SyncObjects.init(state, null);
     try CommandBuffer.init(state, null);
     try Buffer.init(state, null);
@@ -64,6 +66,7 @@ pub fn cleanup(state: *Utils.State) void {
     Descriptors.destroy(state, null);
     CommandBuffer.destroy(state, null);
     SyncObjects.destroy(state, null);
+    DepthResources.destroy(state, null);
     Swapchain.destroy(state, null);
     if(enableValidationLayers) {
         DebugMessenger.destroy(state, null);

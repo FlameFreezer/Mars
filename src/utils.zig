@@ -32,6 +32,9 @@ pub const State = struct {
     descriptorSetLayout: c.VkDescriptorSetLayout,
     descriptorPool: c.VkDescriptorPool,
     descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
+    depthImage: c.VkImage,
+    depthImageView: c.VkImageView,
+    depthImageMemory: c.VkDeviceMemory,
 };
 
 pub const Buffer = struct {
@@ -40,8 +43,8 @@ pub const Buffer = struct {
 
     pub fn create(physical: c.VkPhysicalDevice, device: c.VkDevice, 
         allocator: ?*c.VkAllocationCallbacks, size: u32, usage: c.VkBufferUsageFlags, 
-        properties: c.VkMemoryPropertyFlags) !Buffer 
-    {
+        properties: c.VkMemoryPropertyFlags
+    ) !Buffer {
         var result: Buffer = undefined;
         const bufferInfo: c.VkBufferCreateInfo = .{
             .sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -74,8 +77,28 @@ pub const Buffer = struct {
         c.vkDestroyBuffer(device, Self.*.handle, allocator);
         c.vkFreeMemory(device, Self.*.memory, allocator);
     }
+};
 
-    fn findPhysicalDeviceMemoryTypeIndex(physical: c.VkPhysicalDevice, availableTypes: u32, 
+pub const Image = struct {
+    handle: c.VkImage,
+    view: c.VkImageView,
+    memory: c.VkDeviceMemory,
+
+    pub fn create(Self: *Image, physicalDevice: c.VkPhysicalDevice, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) !void {
+       _ = Self;
+       _ = physicalDevice;
+       _ = device;
+       _ = allocator; 
+    }
+
+    pub fn destroy(Self: *const Image, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
+        _ = Self;
+        _ = device;
+        _ = allocator;
+    }
+};
+
+pub fn findPhysicalDeviceMemoryTypeIndex(physical: c.VkPhysicalDevice, availableTypes: u32, 
         properties: c.VkMemoryPropertyFlags
     ) !u32 {
         var deviceMemoryProperties = c.VkPhysicalDeviceMemoryProperties2{
@@ -92,7 +115,6 @@ pub const Buffer = struct {
 
         return error.failedToFindMemoryType;
     }
-};
 
 pub const UniformBufferObject = struct {
     model: Mat(4) align(16),
@@ -109,10 +131,16 @@ pub const UniformBufferObject = struct {
 pub fn updateUniformBufferObject(state: State, uniformBufferObject: *UniformBufferObject, startTime: i64) !void {
     const now: i64 = std.time.milliTimestamp();
     const deltaTime: i64 = now - startTime;
+    const fDeltaTime: f32 = @floatFromInt(deltaTime);
     //One rotation every 2 seconds
-    uniformBufferObject.model = rotate(0.0, 0.0, 2.0 * std.math.pi / 2000.0 * @as(f32, @floatFromInt(deltaTime)));
-    uniformBufferObject.view = lookAt(Vec(3).init(.{0.0, 0.0, 1.0}), 0.0, Vec(3).init(.{0.0, 0.0, -1.0}));
-    uniformBufferObject.perspective = perspective(1.0, 10.0, std.math.degreesToRadians(150.0), 
+    uniformBufferObject.model = translate(.init(.{-5.0, -5.0, -5.0}));
+    _ = uniformBufferObject.model.multInto(rotate(0.0, std.math.pi / 4000.0 * fDeltaTime, 0.0));
+    uniformBufferObject.view = lookAt(
+        Vec(3).init(.{0.0, 0.0, 0.0}),
+        Vec(3).init(.{0.0, 0.0, -10.0}),
+        Vec(3).init(.{0.0, 1.0, 0.0})
+    );
+    uniformBufferObject.perspective = perspective(1.0, 100.0, std.math.degreesToRadians(150.0), 
         @as(f32, @floatFromInt(state.swapchainExtent.height)) 
         / @as(f32, @floatFromInt(state.swapchainExtent.width)));
 }
@@ -234,6 +262,10 @@ pub fn Vec(comptime n: u32) type {
         arr: [n]f32,
         
         pub const default = @This(){ .arr = [1]f32{0.0} ** n};
+        pub const len: usize = n;
+        pub const VectorError = error{
+            outOfBounds
+        };
 
         pub fn init(values: [n]f32) @This() {
             var result: @This() = undefined;
@@ -272,7 +304,22 @@ pub fn Vec(comptime n: u32) type {
             return std.math.sqrt(result);
         }
 
+        pub fn normalize(v: @This()) @This() {
+            return v.scale(1.0 / v.magnitude());
+        }
+
+        pub fn at(Self: @This(), i: usize) VectorError!f32 {
+            if(i >= n) return VectorError.outOfBounds;
+            return Self.arr[i];
+        }
+
     };
+}
+
+pub fn dotProduct(comptime n: usize, v1: Vec(n), v2: Vec(n)) f32 {
+    var result: f32 = 0;
+    for(0..n) |i| result += v1.arr[i] * v2.arr[i];
+    return result;
 }
 
 pub fn crossProduct(v1: Vec(3), v2: Vec(3)) Vec(3) {
@@ -288,10 +335,10 @@ pub fn Mat(comptime r: u32) type {
         arr: [r*r]f32,
 
         pub const default = @This(){ .arr = [1]f32{0.0} ** (r*r)};
-        pub const identity = i:{
+        pub const identity = I:{
             var result = default;
             for(0..r) |i| result.setUnsafe(i, i, 1.0);
-            break:i result;
+            break:I result;
         };
 
         pub const MatrixError = error{
@@ -324,7 +371,7 @@ pub fn Mat(comptime r: u32) type {
         }
 
         pub fn multInto(m1: *@This(), m2: @This()) *@This() {
-            var result: @This() = @This().default;
+            var result: @This() = default;
             for(0..r) |row| {
                 for(0..r) |col| {
                     var sum: f32 = 0;
@@ -367,10 +414,10 @@ pub fn Mat(comptime r: u32) type {
 }
 
 pub fn rotate(tx: f32, ty: f32, tz: f32) Mat(4) {
-    var rx = Mat(4){ .arr = [16]f32{
-        1, 0, 0, 0,
-        0, @cos(tx), -@sin(tx), 0,
-        0, @sin(tx), @cos(ty), 0,
+    const rz = Mat(4){ .arr = [16]f32{
+        @cos(tz), -@sin(tz), 0, 0,
+        @sin(tz), @cos(tz), 0, 0,
+        0, 0, 1, 0,
         0, 0, 0, 1
     }};
     const ry = Mat(4){ .arr = [16]f32{
@@ -379,12 +426,13 @@ pub fn rotate(tx: f32, ty: f32, tz: f32) Mat(4) {
         -@sin(ty), 0, @cos(ty), 0,
         0, 0, 0, 1
     }};
-    const rz = Mat(4){ .arr = [16]f32{
-        @cos(tz), -@sin(tz), 0, 0,
-        @sin(tz), @cos(tz), 0, 0,
-        0, 0, 1, 0,
+    var rx = Mat(4){ .arr = [16]f32{
+        1, 0, 0, 0,
+        0, @cos(tx), -@sin(tx), 0,
+        0, @sin(tx), @cos(ty), 0,
         0, 0, 0, 1
     }};
+
     _ = rx.multInto(ry).multInto(rz);
     return rx;
 }
@@ -398,23 +446,16 @@ pub fn translate(shift: Vec(3)) Mat(4) {
     });
 }
 
-pub fn lookAt(where: Vec(3), cameraAngle: f32, cameraLocation: Vec(3)) Mat(4) {
-    const vecCameraToTarget = where.subtract(cameraLocation).scale(
-        1.0 / where.subtract(cameraLocation).magnitude()
-    );
-    const vecNormal = crossProduct(Vec(3).init(.{0.0, 1.0, 0.0}), vecCameraToTarget);
-    //Create a Matrix cameraBasis with vecNormal, [0.0 1.0 0.0], and vecCameraToTarget as the column
-    //  vectors, in that order. This Matrix converts coordinates in camera space to world space.
-    //The inverse of that matrix converts coordinates in world space to camera space, which is
-    //  what we want.
-    const cameraBasisInverse = Mat(4).init(.{
-        vecCameraToTarget.arr[2], 0.0, -vecCameraToTarget.arr[0], 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        -vecNormal.arr[2], 0.0, vecNormal.arr[0], 0.0,
+pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), upVector: Vec(3)) Mat(4) {
+    const W = where.subtract(cameraLocation).normalize();
+    const U = crossProduct(upVector, W).normalize();
+    const V = crossProduct(W, U);
+    return Mat(4).init(.{
+        U.arr[0], U.arr[1], U.arr[2], dotProduct(3, U, cameraLocation.scale(-1.0)),
+        V.arr[0], V.arr[1], V.arr[2], dotProduct(3, V, cameraLocation.scale(-1.0)),
+        W.arr[0], W.arr[1], W.arr[2], dotProduct(3, W, cameraLocation.scale(-1.0)),
         0.0, 0.0, 0.0, 1.0
     });
-    _ = cameraAngle;
-    return translate(cameraLocation.scale(-1.0)).mult(cameraBasisInverse);
 }
 
 pub fn perspective(near: f32, far: f32, fieldOfView: f32, dimension: f32) Mat(4) {
@@ -428,7 +469,7 @@ pub fn perspective(near: f32, far: f32, fieldOfView: f32, dimension: f32) Mat(4)
     });
     const ortho = Mat(4).init(.{
         2.0 / width, 0.0, 0.0, 0.0,
-        0.0, 2.0 / height, 0.0, 0.0,
+        0.0, -2.0 / height, 0.0, 0.0,
         0.0, 0.0, 1.0 / (far - near), -near / (far - near),
         0.0, 0.0, 0.0, 1.0
     });
@@ -462,14 +503,14 @@ pub const Vertex = struct {
     }
 
     pub fn inputAttributeDescriptions() [numAttribs]c.VkVertexInputAttributeDescription {
-        comptime var attributes: [numAttribs]c.VkVertexInputAttributeDescription = undefined;
-        comptime attributes[@intFromEnum(VertexAttributes.COLOR)] = .{
+        var attributes: [numAttribs]c.VkVertexInputAttributeDescription = undefined;
+        attributes[@intFromEnum(VertexAttributes.COLOR)] = .{
             .location = @intFromEnum(VertexAttributes.COLOR),
             .binding = 0,
             .format = c.VK_FORMAT_R32G32B32_SFLOAT,
             .offset = 0
         };
-        comptime attributes[@intFromEnum(VertexAttributes.POSITION)] = .{
+        attributes[@intFromEnum(VertexAttributes.POSITION)] = .{
             .location = @intFromEnum(VertexAttributes.POSITION),
             .binding = 0,
             .format = c.VK_FORMAT_R32G32B32_SFLOAT,
@@ -479,35 +520,52 @@ pub const Vertex = struct {
     }
 };
 
-pub const Position = struct {
-    x: f32,
-    y: f32,
-    z: f32
-};
-pub const Dimension = struct {
-    w: f32,
-    l: f32,
-    h: f32
-};
-
 pub const Cube = struct {
-    pos: Position,
-    dim: Dimension,
+    w: f32, //extension along x-axis
+    h: f32, //extension along y-axis
+    l: f32, //extension along z-axis
 
-    pub const numVertices: u32 = 8;
+    pub const numVertices: u32 = 24;
     pub const numIndices: u32 = 36;
 
     pub fn getVertices(self: Cube) [numVertices]Vertex {
-        const color = [3]f32{1.0, 1.0, 1.0};
+        const white = [3]f32{1.0, 1.0, 1.0};
+        const red = [3]f32{1.0, 0.0, 0.0};
+        const green = [3]f32{0.0, 1.0, 0.0};
+        const blue = [3]f32{0.0, 0.0, 1.0};
+        const yellow = [3]f32{1.0, 1.0, 0.0};
+        const purple = [3]f32{1.0, 0.0, 1.0};
         return .{
-            .create(color,.{self.pos.x, self.pos.y, self.pos.z}),
-            .create(color,.{self.pos.x + self.dim.w, self.pos.y, self.pos.z}),
-            .create(color,.{self.pos.x + self.dim.w, self.pos.y + self.dim.h, self.pos.z}),
-            .create(color,.{self.pos.x, self.pos.y + self.dim.h, self.pos.z}),
-            .create(color,.{self.pos.x, self.pos.y, self.pos.z + self.dim.l}),
-            .create(color,.{self.pos.x + self.dim.w, self.pos.y, self.pos.z + self.dim.l}),
-            .create(color,.{self.pos.x + self.dim.w, self.pos.y + self.dim.h, self.pos.z + self.dim.l}),
-            .create(color,.{self.pos.x, self.pos.y + self.dim.h, self.pos.z + self.dim.l})
+            //FRONT FACE
+            .create(white,.{0.0, self.h, 0.0}),
+            .create(white,.{self.w, self.h, 0.0}),
+            .create(white,.{self.w, 0.0, 0.0}),
+            .create(white,.{0.0, 0.0, 0.0}),
+            //BACK FACE
+            .create(purple,.{0.0, self.h, self.l}),
+            .create(purple,.{self.w, self.h, self.l}),
+            .create(purple,.{self.w, 0.0, self.l}),
+            .create(purple,.{0.0, 0.0, self.l}),
+            //RIGHT FACE
+            .create(yellow,.{self.w, self.h, 0.0}),
+            .create(yellow,.{self.w, self.h, self.l}),
+            .create(yellow,.{self.w, 0.0, self.l}),
+            .create(yellow,.{self.w, 0.0, 0.0}),
+            //LEFT FACE
+            .create(green,.{0.0, self.h, 0.0}),
+            .create(green,.{0.0, self.h, self.l}),
+            .create(green,.{0.0, 0.0, self.l}),
+            .create(green,.{0.0, 0.0, 0.0}),
+            //TOP FACE
+            .create(red,.{0.0, self.h, self.l}),
+            .create(red,.{self.w, self.h, self.l}),
+            .create(red,.{self.w, self.h, 0.0}),
+            .create(red,.{0.0, self.h, 0.0}),
+            //BOTTOM FACE
+            .create(blue,.{0.0, 0.0, self.l}),
+            .create(blue,.{self.w, 0.0, self.l}),
+            .create(blue,.{self.w, 0.0, 0.0}),
+            .create(blue,.{0.0, 0.0, 0.0}),
         };
     }
 
@@ -518,21 +576,21 @@ pub const Cube = struct {
             //FRONT FACE
             0, 1, 2,
             0, 2, 3,
-            //RIGHT SIDE FACE
-            1, 5, 6,
-            1, 6, 7,
             //BACK FACE
-            5, 4, 7,
-            5, 7, 6,
-            //LEFT SIDE FACE
-            4, 0, 3,
-            4, 3, 7,
+            4, 5, 6,
+            4, 6, 7,
+            //RIGHT FACE
+            8, 9, 10,
+            8, 10, 11,
+            //LEFT FACE
+            12, 13, 14, 
+            12, 14, 15,
             //TOP FACE
-            4, 5, 1,
-            4, 1, 0,
+            16, 17, 18,
+            16, 18, 19,
             //BOTTOM FACE
-            7, 6, 2,
-            7, 2, 3
+            20, 21, 22,
+            20, 22, 23
         };
     }
 };

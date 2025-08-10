@@ -141,7 +141,16 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
         },
         .layerCount = 1,
         .viewMask = 0,
-        .pDepthAttachment = null,
+        .pDepthAttachment = &c.VkRenderingAttachmentInfo{
+            .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = state.depthImageView,
+            .imageLayout = c.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .loadOp = c.VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .clearValue = c.VkClearValue{
+                .depthStencil = c.VkClearDepthStencilValue{.depth = 1.0, .stencil = 0.0}
+            },
+            .storeOp = c.VK_ATTACHMENT_STORE_OP_DONT_CARE
+        },
         .pStencilAttachment = null,
         .colorAttachmentCount = 1,
         .pColorAttachments = &c.VkRenderingAttachmentInfo{
@@ -150,7 +159,8 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
             .imageLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = c.VK_ATTACHMENT_LOAD_OP_CLEAR,
             .clearValue = c.VkClearValue{
-                .color = c.VkClearColorValue{.float32 = .{0.0, 0.0, 0.0, 1.0}}
+                .color = c.VkClearColorValue{.float32 = .{0.0, 0.0, 0.0, 1.0}},
+
             },
             .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE
         }
@@ -176,8 +186,9 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
     };
     c.vkCmdSetScissorWithCount(state.commandBuffers[state.currentFrame], 1, &scissor);
 
+    const offsets = [_]usize{0};
     c.vkCmdBindVertexBuffers(state.commandBuffers[state.currentFrame], 0, 1, &state.buffer.handle, 
-        &([1]u64{0})[0]);
+        offsets[0..]);
     c.vkCmdBindIndexBuffer(state.commandBuffers[state.currentFrame], state.buffer.handle, 
         @sizeOf(@TypeOf(Data.Vertices)), c.VK_INDEX_TYPE_UINT32);
     c.vkCmdBindDescriptorSets(state.commandBuffers[state.currentFrame], 

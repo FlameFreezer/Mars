@@ -57,7 +57,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
         .rasterizerDiscardEnable = c.VK_FALSE,
         .polygonMode = c.VK_POLYGON_MODE_FILL,
         .depthClampEnable = c.VK_FALSE,
-        .cullMode = c.VK_CULL_MODE_BACK_BIT,
+        .cullMode = c.VK_CULL_MODE_NONE,
         .frontFace = c.VK_FRONT_FACE_CLOCKWISE,
         .lineWidth = 1.0
     };
@@ -72,7 +72,9 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
 
     const depthStencilState = c.VkPipelineDepthStencilStateCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = c.VK_FALSE,
+        .depthTestEnable = c.VK_TRUE,
+        .depthWriteEnable = c.VK_TRUE,
+        .depthCompareOp = c.VK_COMPARE_OP_LESS,
         .depthBoundsTestEnable = c.VK_FALSE,
         .stencilTestEnable = c.VK_FALSE
     };
@@ -95,7 +97,8 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     const pipelineRenderingInfo = c.VkPipelineRenderingCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = colorAttachmentFormats.len,
-        .pColorAttachmentFormats = &colorAttachmentFormats
+        .pColorAttachmentFormats = &colorAttachmentFormats,
+        .depthAttachmentFormat = c.VK_FORMAT_D32_SFLOAT
     };
 
     const pipelineLayoutInfo = c.VkPipelineLayoutCreateInfo{
@@ -107,6 +110,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     if(c.vkCreatePipelineLayout(state.device, &pipelineLayoutInfo, allocator, &state.graphicsPipelineLayout) != c.VK_SUCCESS) {
         return error.failedToCreatePipelineLayout;
     }
+
     const graphicsPipelineInfo = c.VkGraphicsPipelineCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .stageCount = shaderStageInfos.len,
