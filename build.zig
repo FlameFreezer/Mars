@@ -19,6 +19,7 @@ pub fn build(b: *std.Build) !void {
     c_mod.addLibraryPath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "lib"})});
     c_mod.addIncludePath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "include"})});
 
+    //On Windows and Linux, the vulkan binaries are named differently
     if(target.result.os.tag == .windows) {
         c_mod.linkSystemLibrary("vulkan-1", .{});
     }

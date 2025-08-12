@@ -13,7 +13,7 @@ pub fn drawFrame(state: *Utils.State) !void {
         return error.failedToResetFence;
     }
 
-    try Utils.updateUniformBufferObject(state.*, &state.uniformBufferMapped[state.currentFrame], state.startTime.*);
+    try updateUniformBufferObject(state, &state.uniformBufferMapped[state.currentFrame]);
 
     //The image acquisition semaphores are stored at the front of this array. Each frame has one
     //  semaphore for this purpose
@@ -196,4 +196,20 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
         &state.descriptorSets[state.currentFrame], 0, 0);
     c.vkCmdDrawIndexed(state.commandBuffers[state.currentFrame], Data.Indices.len, 1, 0, 0, 0);
     c.vkCmdEndRendering(state.commandBuffers[state.currentFrame]);
+}
+
+fn updateUniformBufferObject(state: *const Utils.State, uniformBufferObject: *Utils.UniformBufferObject) !void {
+    const now: i64 = std.time.milliTimestamp();
+    const deltaTime: f32 = @floatFromInt(now - state.startTime.*);
+    const rpm: f32 = std.math.pi / 2000.0;
+    uniformBufferObject.model = Utils.translate(.init(.{-5.0, -5.0, -5.0}));
+    _ = uniformBufferObject.model.multInto(Utils.rotate(rpm * deltaTime, .init(.{0.0, 1.0, 0.0})));
+    uniformBufferObject.view = Utils.lookAt(
+        Utils.Vec(3).init(.{0.0, 0.0, 0.0}),
+        Utils.Vec(3).init(.{0.0, 7.0, -15.0}),
+        Utils.Vec(3).init(.{0.0, 1.0, 0.0})
+    );
+    uniformBufferObject.perspective = Utils.perspective(1.0, 100.0, std.math.degreesToRadians(150.0), 
+        @as(f32, @floatFromInt(state.swapchainExtent.height)) 
+        / @as(f32, @floatFromInt(state.swapchainExtent.width)));
 }

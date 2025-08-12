@@ -128,23 +128,6 @@ pub const UniformBufferObject = struct {
     };
 };
 
-pub fn updateUniformBufferObject(state: State, uniformBufferObject: *UniformBufferObject, startTime: i64) !void {
-    const now: i64 = std.time.milliTimestamp();
-    const deltaTime: i64 = now - startTime;
-    const fDeltaTime: f32 = @floatFromInt(deltaTime);
-    //One rotation every 2 seconds
-    uniformBufferObject.model = translate(.init(.{-5.0, -5.0, -5.0}));
-    _ = uniformBufferObject.model.multInto(rotate(0.0, std.math.pi / 4000.0 * fDeltaTime, 0.0));
-    uniformBufferObject.view = lookAt(
-        Vec(3).init(.{0.0, 0.0, 0.0}),
-        Vec(3).init(.{0.0, 0.0, -10.0}),
-        Vec(3).init(.{0.0, 1.0, 0.0})
-    );
-    uniformBufferObject.perspective = perspective(1.0, 100.0, std.math.degreesToRadians(150.0), 
-        @as(f32, @floatFromInt(state.swapchainExtent.height)) 
-        / @as(f32, @floatFromInt(state.swapchainExtent.width)));
-}
-
 pub const Queues = struct {
     graphics: c.VkQueue,
     compute: c.VkQueue,
@@ -257,7 +240,7 @@ pub fn beginSingleTimeCommandBuffer(device: c.VkDevice, commandPool: c.VkCommand
     return commandBuffer;
 }
 
-pub fn Vec(comptime n: u32) type {
+pub fn Vec(comptime n: usize) type {
     return struct {
         arr: [n]f32,
         
@@ -330,7 +313,7 @@ pub fn crossProduct(v1: Vec(3), v2: Vec(3)) Vec(3) {
     });
 }
 
-pub fn Mat(comptime r: u32) type {
+pub fn Mat(comptime r: usize) type {
     return struct {
         arr: [r*r]f32,
 
@@ -370,7 +353,7 @@ pub fn Mat(comptime r: u32) type {
             self.arr[row * r + col] = value;
         }
 
-        pub fn multInto(m1: *@This(), m2: @This()) *@This() {
+        pub fn mult(m1: @This(), m2: @This()) @This() {
             var result: @This() = default;
             for(0..r) |row| {
                 for(0..r) |col| {
@@ -378,17 +361,16 @@ pub fn Mat(comptime r: u32) type {
                     for(0..r) |i| {
                        sum += m2.atUnsafe(row, i) * m1.atUnsafe(i, col); 
                     }
-                    result.set(row, col, sum) catch unreachable; 
+                    result.setUnsafe(row, col, sum); 
                 }
             }
-            @memcpy(m1.arr[0..], result.arr[0..]);
-            return m1;
+            return result;
         }
 
-        pub fn mult(m1: @This(), m2: @This()) @This() {
-            var result = @This().copy(m1);
-            _ = result.multInto(m2);
-            return result;
+        pub fn multInto(m1: *@This(), m2: @This()) *@This() {
+            const result: @This() = m1.*.mult(m2);
+            @memcpy(m1.arr[0..], result.arr[0..]);
+            return m1;
         }
 
         pub fn copy(other: @This()) @This() {
@@ -413,28 +395,20 @@ pub fn Mat(comptime r: u32) type {
     };
 }
 
-pub fn rotate(tx: f32, ty: f32, tz: f32) Mat(4) {
-    const rz = Mat(4){ .arr = [16]f32{
-        @cos(tz), -@sin(tz), 0, 0,
-        @sin(tz), @cos(tz), 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    }};
-    const ry = Mat(4){ .arr = [16]f32{
-        @cos(ty), 0, @sin(ty), 0,
-        0, 1, 0, 0,
-        -@sin(ty), 0, @cos(ty), 0,
-        0, 0, 0, 1
-    }};
-    var rx = Mat(4){ .arr = [16]f32{
-        1, 0, 0, 0,
-        0, @cos(tx), -@sin(tx), 0,
-        0, @sin(tx), @cos(ty), 0,
-        0, 0, 0, 1
-    }};
-
-    _ = rx.multInto(ry).multInto(rz);
-    return rx;
+//Matrix taken from: https://en.wikipedia.org/wiki/Rotation_matrix#Rotation_matrix_from_axis_and_angle
+pub fn rotate(angle: f32, axis: Vec(3)) Mat(4) {
+    const u = axis.normalize(); 
+    const ux: f32 = u.arr[0];
+    const uy: f32 = u.arr[1];
+    const uz: f32 = u.arr[2];
+    const co: f32 = @cos(angle);
+    const si: f32 = @sin(angle);
+    return Mat(4).init(.{
+        ux * ux * (1.0 - co) + co, ux * uy * (1.0 - co) - uz * si, ux * uz * (1.0 - co) + uy * si, 0.0,
+        ux * uy * (1.0 - co) + uz * si, uy * uy * (1.0 - co) + co, uy * uz * (1.0 - co) - ux * si, 0.0,
+        ux * uz * (1.0 - co) - uy * si, uy * uz * (1.0 - co) + ux * si, uz * uz * (1.0 - co) + co, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    });
 }
 
 pub fn translate(shift: Vec(3)) Mat(4) {
@@ -451,9 +425,9 @@ pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), upVector: Vec(3)) Mat(4) {
     const U = crossProduct(upVector, W).normalize();
     const V = crossProduct(W, U);
     return Mat(4).init(.{
-        U.arr[0], U.arr[1], U.arr[2], dotProduct(3, U, cameraLocation.scale(-1.0)),
-        V.arr[0], V.arr[1], V.arr[2], dotProduct(3, V, cameraLocation.scale(-1.0)),
-        W.arr[0], W.arr[1], W.arr[2], dotProduct(3, W, cameraLocation.scale(-1.0)),
+        U.arr[0], U.arr[1], U.arr[2], -dotProduct(3, U, cameraLocation),
+        V.arr[0], V.arr[1], V.arr[2], -dotProduct(3, V, cameraLocation),
+        W.arr[0], W.arr[1], W.arr[2], -dotProduct(3, W, cameraLocation),
         0.0, 0.0, 0.0, 1.0
     });
 }
