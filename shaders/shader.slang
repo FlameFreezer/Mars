@@ -3,12 +3,10 @@ struct VertexInput {
 	float3 position;
 };
 
-struct UniformBuffer {
-	float4x4 model;
+struct Camera {
 	float4x4 view;
 	float4x4 proj;
 };
-ConstantBuffer<UniformBuffer> ubo;
 
 struct VertexOutput {
 	float4 position : SV_Position;
@@ -16,15 +14,14 @@ struct VertexOutput {
 };
 
 [shader("vertex")]
-VertexOutput vertMain(VertexInput input) {
+func vertMain(VertexInput input, uniform Camera camera) -> VertexOutput {
 	VertexOutput output;
-	//output.position = mul(ubo.proj, mul(ubo.view, mul(ubo.model, float4(input.position, 1.0))));
-	output.position = mul(mul(mul(float4(input.position, 1.0), ubo.model), ubo.view), ubo.proj);
+	output.position = mul(mul(float4(input.position, 1.0), camera.view), camera.proj);
 	output.color = input.color;
 	return output;
 }
 
 [shader("fragment")]
-float4 fragMain(VertexOutput inVert) : SV_Target {
+func fragMain(VertexOutput inVert) -> float4 {
 	return float4(inVert.color, 1.0);
 }

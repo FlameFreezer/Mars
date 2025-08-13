@@ -26,7 +26,17 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     }
     state.currentFrame = 0;
     state.name = name;
-    state.windowShouldClose = false;
+    state.objects[0].pos = .{
+        .x = 0.0, .y = 10.0, .z = 0.0,
+    };
+    state.objects[1].pos = .{
+        .x = 0.0, .y = -10.0, .z = 5.0
+    };
+    state.camera = .{
+        .angle = 0.0,
+        .dir = Utils.Vec(3).init(.{0.0, 0.0, 1.0}),
+        .pos = .{.x = 0.0, .y = -7.0, .z = -15.0}
+    };
 
     try Window.init(state);
     try Instance.init(state, enableValidationLayers);
@@ -41,17 +51,21 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     try Buffer.init(state, null);
     try Descriptors.init(state, null);
     try GraphicsPipeline.init(state, null);
-    const tempStartTime = try std.heap.page_allocator.create(i64);
-    tempStartTime.* = std.time.milliTimestamp();
-    state.startTime = tempStartTime;
+    state.programStartTime = std.time.milliTimestamp();
+    state.time = state.programStartTime;
+    state.deltaTimeUs = 0;
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
-    while(!state.windowShouldClose) {
+    var windowShouldClose: bool = false;
+    while(!windowShouldClose) {
+        const nowUs: i64 = std.time.microTimestamp();
+        state.time = @divFloor(nowUs, std.time.us_per_ms);
+        state.deltaTimeUs = nowUs - state.programStartTime * std.time.us_per_ms;
         while(c.SDL_PollEvent(&state.nextEvent)) {
             //try Events.handleEvent(state);
             switch(state.nextEvent.type) {
-                c.SDL_EVENT_QUIT => state.windowShouldClose = true,
+                c.SDL_EVENT_QUIT => windowShouldClose = true,
                 else => {}
             }
         }
@@ -75,6 +89,5 @@ pub fn cleanup(state: *Utils.State) void {
     Instance.destroy(state, null);
     Window.destroy(state);
     c.SDL_Quit();
-    std.heap.page_allocator.destroy(state.startTime);
 }
 

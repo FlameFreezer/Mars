@@ -3,6 +3,11 @@ const std = @import("std");
 const Utils = @import("utils.zig");
 
 pub const cube = Utils.Cube{
+    .pos = .{
+        .x = -5.0,
+        .y = -5.0,
+        .z = -5.0,
+    },
     .w = 10.0,
     .h = 10.0,
     .l = 10.0

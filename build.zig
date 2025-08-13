@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -20,11 +21,10 @@ pub fn build(b: *std.Build) !void {
     c_mod.addIncludePath(.{ .cwd_relative = try std.fs.path.join(arena.allocator(), &.{vulkanSDKPath, "include"})});
 
     //On Windows and Linux, the vulkan binaries are named differently
-    if(target.result.os.tag == .windows) {
-        c_mod.linkSystemLibrary("vulkan-1", .{});
-    }
-    else if(target.result.os.tag == .linux) {
-        c_mod.linkSystemLibrary("vulkan", .{});
+    switch(builtin.os.tag) {
+        .windows => c_mod.linkSystemLibrary("vulkan-1", .{}),
+        .linux => c_mod.linkSystemLibrary("vulkan", .{}),
+        else => {}
     }
 
     const sdl_dep = b.dependency("sdl", .{

@@ -4,9 +4,14 @@ const c = @import("c");
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 pub const State = struct {
+    objects: [2]Object,
     name: []const u8,
-    windowShouldClose: bool,
     nextEvent: c.SDL_Event,
+    programStartTime: i64,
+    time: i64,
+    deltaTimeUs: i64,
+    camera: Camera,
+
     window: ?*c.SDL_Window = null,
     instance: c.VkInstance,
     debugMessenger: c.VkDebugUtilsMessengerEXT,
@@ -21,14 +26,17 @@ pub const State = struct {
     commandPool: c.VkCommandPool,
     commandBuffers: [MAX_FRAMES_IN_FLIGHT]c.VkCommandBuffer,
     buffer: Buffer,
+
     uniformBuffer: Buffer,
     uniformBufferMapped: []UniformBufferObject,
+
+    cameraPushConstant: CameraPushConstant,
+
     graphicsPipelineLayout: c.VkPipelineLayout,
     graphicsPipeline: c.VkPipeline,
     fences: [MAX_FRAMES_IN_FLIGHT]c.VkFence,
     semaphores: []c.VkSemaphore,
     currentFrame: usize = 0,
-    startTime: *const i64,
     descriptorSetLayout: c.VkDescriptorSetLayout,
     descriptorPool: c.VkDescriptorPool,
     descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
@@ -123,6 +131,16 @@ pub const UniformBufferObject = struct {
 
     pub const default = UniformBufferObject{
         .model = Mat(4).identity,
+        .view = Mat(4).identity,
+        .perspective = Mat(4).identity
+    };
+};
+
+pub const CameraPushConstant = struct {
+    view: Mat(4) align(16),
+    perspective: Mat(4) align(16),
+
+    pub const default = CameraPushConstant{
         .view = Mat(4).identity,
         .perspective = Mat(4).identity
     };
@@ -244,7 +262,7 @@ pub fn Vec(comptime n: usize) type {
     return struct {
         arr: [n]f32,
         
-        pub const default = @This(){ .arr = [1]f32{0.0} ** n};
+        pub const zero = @This(){ .arr = [1]f32{0.0} ** n};
         pub const len: usize = n;
         pub const VectorError = error{
             outOfBounds
@@ -294,6 +312,11 @@ pub fn Vec(comptime n: usize) type {
         pub fn at(Self: @This(), i: usize) VectorError!f32 {
             if(i >= n) return VectorError.outOfBounds;
             return Self.arr[i];
+        }
+
+        pub fn equals(Self: @This(), other: @This()) bool {
+            for(0..n) |i| if(Self.arr[i] != other.arr[i]) return false;
+            return true;
         }
 
     };
@@ -379,12 +402,18 @@ pub fn Mat(comptime r: usize) type {
             return result;
         }
 
-        pub fn transform(self: @This(), vector: *Vec(r)) *Vec(r) {
-            var result = Vec(3).default;
+        pub fn transform(self: @This(), vector: Vec(r)) Vec(r) {
+            var result = Vec(r).zero;
             for(0..r) |i| {
                 for(0..r) |j| result.arr[i] += self.atUnsafe(i,j) * vector.arr[j];
             }
-            @memcpy(vector.arr[0..], result.arr[0..]);
+            return result;
+
+        }
+
+        pub fn transformInto(self: @This(), vector: *Vec(r)) *Vec(r) {
+            const temp = self.transform(vector.*);
+            @memcpy(vector.arr[0..], temp.arr[0..]);
             return vector;
         }
 
@@ -401,12 +430,25 @@ pub fn rotate(angle: f32, axis: Vec(3)) Mat(4) {
     const ux: f32 = u.arr[0];
     const uy: f32 = u.arr[1];
     const uz: f32 = u.arr[2];
-    const co: f32 = @cos(angle);
-    const si: f32 = @sin(angle);
+    const cos: f32 = @cos(angle);
+    const sin: f32 = @sin(angle);
     return Mat(4).init(.{
-        ux * ux * (1.0 - co) + co, ux * uy * (1.0 - co) - uz * si, ux * uz * (1.0 - co) + uy * si, 0.0,
-        ux * uy * (1.0 - co) + uz * si, uy * uy * (1.0 - co) + co, uy * uz * (1.0 - co) - ux * si, 0.0,
-        ux * uz * (1.0 - co) - uy * si, uy * uz * (1.0 - co) + ux * si, uz * uz * (1.0 - co) + co, 0.0,
+        ux * ux * (1.0 - cos) + cos, ux * uy * (1.0 - cos) - uz * sin, ux * uz * (1.0 - cos) + uy * sin, 0.0,
+        ux * uy * (1.0 - cos) + uz * sin, uy * uy * (1.0 - cos) + cos, uy * uz * (1.0 - cos) - ux * sin, 0.0,
+        ux * uz * (1.0 - cos) - uy * sin, uy * uz * (1.0 - cos) + ux * sin, uz * uz * (1.0 - cos) + cos, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    });
+}
+
+pub fn rotate2(cos: f32, sin: f32, axis: Vec(3)) Mat(4) {
+    const u = axis.normalize();
+    const ux: f32 = u.arr[0];
+    const uy: f32 = u.arr[1];
+    const uz: f32 = u.arr[2];
+    return Mat(4).init(.{
+        ux * ux * (1.0 - cos) + cos, ux * uy * (1.0 - cos) - uz * sin, ux * uz * (1.0 - cos) + uy * sin, 0.0,
+        ux * uy * (1.0 - cos) + uz * sin, uy * uy * (1.0 - cos) + cos, uy * uz * (1.0 - cos) - ux * sin, 0.0,
+        ux * uz * (1.0 - cos) - uy * sin, uy * uz * (1.0 - cos) + ux * sin, uz * uz * (1.0 - cos) + cos, 0.0,
         0.0, 0.0, 0.0, 1.0
     });
 }
@@ -420,9 +462,22 @@ pub fn translate(shift: Vec(3)) Mat(4) {
     });
 }
 
-pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), upVector: Vec(3)) Mat(4) {
+pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), cameraAngle: f32) Mat(4) {
     const W = where.subtract(cameraLocation).normalize();
-    const U = crossProduct(upVector, W).normalize();
+    // Create upVector:
+    // Get cos, sin, and axis of rotation from world z-axis to camera z-axis
+    const cos: f32 = dotProduct(3, W, Vec(3).init(.{0.0, 0.0, 1.0}));
+    const sin: f32 = crossProduct(W, Vec(3).init(.{0.0, 0.0, 1.0})).magnitude();
+    const axis: Vec(3) = crossProduct(W, Vec(3).init(.{0.0, 0.0, 1.0})).scale(-1.0);
+    var upVector = Vec(4).init(.{0.0, 1.0, 0.0, 0.0});
+    //If the axis is not the zero vector, then we transform the world y-axis to a new location
+    if(!axis.equals(Vec(3).zero)) {
+        upVector = rotate2(cos, sin, axis).transform(Vec(4).init(.{0.0, 1.0, 0.0, 0.0}));
+    }
+    const upVectorRotated = rotate(cameraAngle - std.math.pi / 2.0, W).transform(upVector).normalize();
+    const U = Vec(3).init(.{upVectorRotated.arr[0], upVectorRotated.arr[1], upVectorRotated.arr[2]});
+
+    //const U = crossProduct(upVector, W).normalize();
     const V = crossProduct(W, U);
     return Mat(4).init(.{
         U.arr[0], U.arr[1], U.arr[2], -dotProduct(3, U, cameraLocation),
@@ -494,7 +549,18 @@ pub const Vertex = struct {
     }
 };
 
+pub const Pos = struct {
+    x: f32,
+    y: f32,
+    z: f32,
+
+    pub fn vector(pos: *const Pos) Vec(3) {
+        return Vec(3).init(.{pos.*.x, pos.*.y, pos.*.z});
+    }
+};
+
 pub const Cube = struct {
+    pos: Pos,
     w: f32, //extension along x-axis
     h: f32, //extension along y-axis
     l: f32, //extension along z-axis
@@ -509,37 +575,50 @@ pub const Cube = struct {
         const blue = [3]f32{0.0, 0.0, 1.0};
         const yellow = [3]f32{1.0, 1.0, 0.0};
         const purple = [3]f32{1.0, 0.0, 1.0};
+
+        const frontFace = [4][3]f32{
+            .{self.pos.x, self.pos.y + self.h, self.pos.z},
+            .{self.pos.x + self.w, self.pos.y + self.h, self.pos.z},
+            .{self.pos.x + self.w, self.pos.y, self.pos.z},
+            .{self.pos.x, self.pos.y, self.pos.z}
+        };
+        const backFace = [4][3]f32{
+            .{self.pos.x, self.pos.y + self.h, self.pos.z + self.l},
+            .{self.pos.x + self.w, self.pos.y + self.h, self.pos.z + self.l},
+            .{self.pos.x + self.w, self.pos.y, self.pos.z + self.l},
+            .{self.pos.x, self.pos.y, self.pos.z + self.l}
+        };
         return .{
             //FRONT FACE
-            .create(white,.{0.0, self.h, 0.0}),
-            .create(white,.{self.w, self.h, 0.0}),
-            .create(white,.{self.w, 0.0, 0.0}),
-            .create(white,.{0.0, 0.0, 0.0}),
+            .create(white,frontFace[0]),
+            .create(white,frontFace[1]),
+            .create(white,frontFace[2]),
+            .create(white,frontFace[3]),
             //BACK FACE
-            .create(purple,.{0.0, self.h, self.l}),
-            .create(purple,.{self.w, self.h, self.l}),
-            .create(purple,.{self.w, 0.0, self.l}),
-            .create(purple,.{0.0, 0.0, self.l}),
+            .create(purple,backFace[0]),
+            .create(purple,backFace[1]),
+            .create(purple,backFace[2]),
+            .create(purple,backFace[3]),
             //RIGHT FACE
-            .create(yellow,.{self.w, self.h, 0.0}),
-            .create(yellow,.{self.w, self.h, self.l}),
-            .create(yellow,.{self.w, 0.0, self.l}),
-            .create(yellow,.{self.w, 0.0, 0.0}),
+            .create(yellow,frontFace[1]),
+            .create(yellow,backFace[1]),
+            .create(yellow,backFace[2]),
+            .create(yellow,frontFace[2]),
             //LEFT FACE
-            .create(green,.{0.0, self.h, 0.0}),
-            .create(green,.{0.0, self.h, self.l}),
-            .create(green,.{0.0, 0.0, self.l}),
-            .create(green,.{0.0, 0.0, 0.0}),
+            .create(green,frontFace[0]),
+            .create(green,backFace[0]),
+            .create(green,backFace[3]),
+            .create(green,frontFace[3]),
             //TOP FACE
-            .create(red,.{0.0, self.h, self.l}),
-            .create(red,.{self.w, self.h, self.l}),
-            .create(red,.{self.w, self.h, 0.0}),
-            .create(red,.{0.0, self.h, 0.0}),
+            .create(red,backFace[0]),
+            .create(red,backFace[1]),
+            .create(red,frontFace[1]),
+            .create(red,frontFace[0]),
             //BOTTOM FACE
-            .create(blue,.{0.0, 0.0, self.l}),
-            .create(blue,.{self.w, 0.0, self.l}),
-            .create(blue,.{self.w, 0.0, 0.0}),
-            .create(blue,.{0.0, 0.0, 0.0}),
+            .create(blue,backFace[3]),
+            .create(blue,backFace[2]),
+            .create(blue,frontFace[2]),
+            .create(blue,frontFace[3]),
         };
     }
 
@@ -569,3 +648,12 @@ pub const Cube = struct {
     }
 };
 
+pub const Camera = struct {
+    pos: Pos,
+    dir: Vec(3),
+    angle: f32
+};
+
+pub const Object = struct {
+    pos: Pos,
+};

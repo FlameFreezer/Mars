@@ -103,8 +103,13 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
 
     const pipelineLayoutInfo = c.VkPipelineLayoutCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &state.descriptorSetLayout
+        .setLayoutCount = 0,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &c.VkPushConstantRange{
+            .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT,
+            .offset = 0,
+            .size = @sizeOf(Utils.CameraPushConstant)
+        }
     };
 
     if(c.vkCreatePipelineLayout(state.device, &pipelineLayoutInfo, allocator, &state.graphicsPipelineLayout) != c.VK_SUCCESS) {

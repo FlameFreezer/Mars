@@ -5,6 +5,7 @@ const Utils = @import("utils.zig");
 const Data = @import("data.zig");
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+    // Create all-purpose buffer
     const sizeVertexBuffer: u32 = @sizeOf(@TypeOf(Data.Vertices));
     const sizeIndexBuffer: u32 = @sizeOf(@TypeOf(Data.Indices)); 
     const size: u32 = comptime sizeVertexBuffer + sizeIndexBuffer; 
@@ -16,6 +17,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
         c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
 
+    // Create and map uniform buffer
     state.uniformBuffer = try Utils.Buffer.create(state.physicalDevice, state.device, allocator, 
         @sizeOf(Utils.UniformBufferObject) * Utils.MAX_FRAMES_IN_FLIGHT, c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
         c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
@@ -30,6 +32,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
         uniformBufferObject.* = Utils.UniformBufferObject.default;
     }
 
+    // Create staging buffer to initalize the all-purpose buffer
     var stagingBuffer = try Utils.Buffer.create(state.physicalDevice, state.device, 
         allocator, size, c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT

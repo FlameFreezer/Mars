@@ -13,7 +13,7 @@ pub fn drawFrame(state: *Utils.State) !void {
         return error.failedToResetFence;
     }
 
-    try updateUniformBufferObject(state, &state.uniformBufferMapped[state.currentFrame]);
+    updateCameraPushConstant(state, state.time - state.programStartTime);
 
     //The image acquisition semaphores are stored at the front of this array. Each frame has one
     //  semaphore for this purpose
@@ -170,6 +170,9 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
     c.vkCmdBindPipeline(state.commandBuffers[state.currentFrame], c.VK_PIPELINE_BIND_POINT_GRAPHICS, 
         state.graphicsPipeline);
 
+    c.vkCmdPushConstants(state.commandBuffers[state.currentFrame], state.graphicsPipelineLayout, c.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(Utils.CameraPushConstant),
+        &state.cameraPushConstant);
+
     const viewport = c.VkViewport{
         .x = 0.0,
         .y = 0.0,
@@ -189,27 +192,44 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
     const offsets = [_]usize{0};
     c.vkCmdBindVertexBuffers(state.commandBuffers[state.currentFrame], 0, 1, &state.buffer.handle, 
         offsets[0..]);
+
     c.vkCmdBindIndexBuffer(state.commandBuffers[state.currentFrame], state.buffer.handle, 
         @sizeOf(@TypeOf(Data.Vertices)), c.VK_INDEX_TYPE_UINT32);
-    c.vkCmdBindDescriptorSets(state.commandBuffers[state.currentFrame], 
-        c.VK_PIPELINE_BIND_POINT_GRAPHICS, state.graphicsPipelineLayout, 0, 1, 
-        &state.descriptorSets[state.currentFrame], 0, 0);
+
+    //c.vkCmdBindDescriptorSets(state.commandBuffers[state.currentFrame], 
+    //    c.VK_PIPELINE_BIND_POINT_GRAPHICS, state.graphicsPipelineLayout, 0, 1, 
+    //    &state.descriptorSets[state.currentFrame], 0, 0);
+
     c.vkCmdDrawIndexed(state.commandBuffers[state.currentFrame], Data.Indices.len, 1, 0, 0, 0);
     c.vkCmdEndRendering(state.commandBuffers[state.currentFrame]);
 }
 
-fn updateUniformBufferObject(state: *const Utils.State, uniformBufferObject: *Utils.UniformBufferObject) !void {
-    const now: i64 = std.time.milliTimestamp();
-    const deltaTime: f32 = @floatFromInt(now - state.startTime.*);
+fn updateUniformBufferObject(state: *const Utils.State, uniformBufferObject: *Utils.UniformBufferObject, deltaTime: i64) void {
+    const fDeltaTime: f32 = @floatFromInt(deltaTime);
     const rpm: f32 = std.math.pi / 2000.0;
-    uniformBufferObject.model = Utils.translate(.init(.{-5.0, -5.0, -5.0}));
-    _ = uniformBufferObject.model.multInto(Utils.rotate(rpm * deltaTime, .init(.{0.0, 1.0, 0.0})));
+    _ = rpm; _ = fDeltaTime;
+    //uniformBufferObject.model = Utils.rotate(rpm * fDeltaTime, .init(.{0.0, 1.0, 0.0}));
     uniformBufferObject.view = Utils.lookAt(
         Utils.Vec(3).init(.{0.0, 0.0, 0.0}),
-        Utils.Vec(3).init(.{0.0, 7.0, -15.0}),
-        Utils.Vec(3).init(.{0.0, 1.0, 0.0})
+        Utils.Vec(3).init(.{-7.0, 0.0, -15.0}),
+        0.0
     );
     uniformBufferObject.perspective = Utils.perspective(1.0, 100.0, std.math.degreesToRadians(150.0), 
         @as(f32, @floatFromInt(state.swapchainExtent.height)) 
         / @as(f32, @floatFromInt(state.swapchainExtent.width)));
+}
+
+fn updateCameraPushConstant(state: *Utils.State, deltaTime: i64) void {
+    _ = deltaTime;
+    const aspectRatio: f32 = @as(f32, @floatFromInt(state.swapchainExtent.height)) 
+            / @as(f32, @floatFromInt(state.swapchainExtent.width));
+
+    state.cameraPushConstant = .{
+        .view = Utils.lookAt(
+            Utils.Vec(3).zero,
+            state.camera.pos.vector(),
+            state.camera.angle
+        ),
+        .perspective = Utils.perspective(1.0, 100.0, std.math.degreesToRadians(150.0), aspectRatio)
+    };
 }
