@@ -2,14 +2,15 @@ const std = @import("std");
 const c = @import("c");
 
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
+pub const MAX_OBJECTS: usize = 512;
 
 pub const State = struct {
-    objects: [2]Object,
     name: []const u8,
     nextEvent: c.SDL_Event,
     programStartTime: i64,
     time: i64,
     deltaTimeUs: i64,
+    elapsedTime: i64,
     camera: Camera,
 
     window: ?*c.SDL_Window = null,
@@ -25,10 +26,6 @@ pub const State = struct {
     swapchainExtent: c.VkExtent2D,
     commandPool: c.VkCommandPool,
     commandBuffers: [MAX_FRAMES_IN_FLIGHT]c.VkCommandBuffer,
-    buffer: Buffer,
-
-    uniformBuffer: Buffer,
-    uniformBufferMapped: []UniformBufferObject,
 
     cameraPushConstant: CameraPushConstant,
 
@@ -39,10 +36,11 @@ pub const State = struct {
     currentFrame: usize = 0,
     descriptorSetLayout: c.VkDescriptorSetLayout,
     descriptorPool: c.VkDescriptorPool,
-    descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
     depthImage: c.VkImage,
     depthImageView: c.VkImageView,
     depthImageMemory: c.VkDeviceMemory,
+    meshes: std.ArrayList(Mesh),
+    objects: std.ArrayList(Object),
 };
 
 pub const Buffer = struct {
@@ -87,6 +85,34 @@ pub const Buffer = struct {
     }
 };
 
+pub const UniformBuffer = struct {
+    handle: c.VkBuffer,
+    deviceMemory: c.VkDeviceMemory,
+    hostMemory: []align(16) Mat(4),
+
+    pub fn create(state: *const State, allocator: ?*c.VkAllocationCallbacks) !UniformBuffer {
+        var result: UniformBuffer = undefined;
+        const buffer = try Buffer.create(state.physicalDevice, state.device, allocator, @sizeOf(Mat(4)) * MAX_FRAMES_IN_FLIGHT,
+            c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+            c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        );
+        result.handle = buffer.handle;
+        result.deviceMemory = buffer.memory;
+        if(c.vkMapMemory(state.device, result.deviceMemory, 0, @sizeOf(Mat(4)), 0, @ptrCast(&result.hostMemory.ptr)) != c.VK_SUCCESS) {
+            return error.failedToMapMemory;
+        }
+        result.hostMemory.len = MAX_FRAMES_IN_FLIGHT;
+        for(result.hostMemory) |*matrix| matrix.* = Mat(4).identity;
+        return result;
+    }
+
+    pub fn destroy(Self: *UniformBuffer, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
+        c.vkUnmapMemory(device, Self.deviceMemory);
+        c.vkDestroyBuffer(device, Self.handle, allocator);
+        c.vkFreeMemory(device, Self.deviceMemory, allocator);
+    }
+};
+
 pub const Image = struct {
     handle: c.VkImage,
     view: c.VkImageView,
@@ -123,18 +149,6 @@ pub fn findPhysicalDeviceMemoryTypeIndex(physical: c.VkPhysicalDevice, available
 
         return error.failedToFindMemoryType;
     }
-
-pub const UniformBufferObject = struct {
-    model: Mat(4) align(16),
-    view: Mat(4) align(16),
-    perspective: Mat(4) align(16),
-
-    pub const default = UniformBufferObject{
-        .model = Mat(4).identity,
-        .view = Mat(4).identity,
-        .perspective = Mat(4).identity
-    };
-};
 
 pub const CameraPushConstant = struct {
     view: Mat(4) align(16),
@@ -227,11 +241,11 @@ pub const surfaceInfo = struct {
         }
     }
 
-    pub fn free(self: *surfaceInfo) void {
-        if(self.*.formats) |formats| {
+    pub fn free(Self: *surfaceInfo) void {
+        if(Self.*.formats) |formats| {
             std.heap.page_allocator.free(formats);
         }
-        if(self.*.presentModes) |presentModes| {
+        if(Self.*.presentModes) |presentModes| {
             std.heap.page_allocator.free(presentModes);
         }
     }
@@ -336,6 +350,7 @@ pub fn crossProduct(v1: Vec(3), v2: Vec(3)) Vec(3) {
     });
 }
 
+pub const Mat4 = Mat(4);
 pub fn Mat(comptime r: usize) type {
     return struct {
         arr: [r*r]f32,
@@ -358,22 +373,22 @@ pub fn Mat(comptime r: usize) type {
             return result;
         }
 
-        pub fn at(self: *const @This(), row: usize, col: usize) MatrixError!f32 {
+        pub fn at(Self: *const @This(), row: usize, col: usize) MatrixError!f32 {
             try boundsCheck(row, col);
-            return self.arr[row * r + col];
+            return Self.arr[row * r + col];
         }
         
-        pub fn atUnsafe(self: *const @This(), row: usize, col: usize) f32 {
-            return self.arr[row * r + col];
+        pub fn atUnsafe(Self: *const @This(), row: usize, col: usize) f32 {
+            return Self.arr[row * r + col];
         }
 
-        pub fn set(self: * @This(), row: usize, col : usize, value: f32) MatrixError!void {
+        pub fn set(Self: * @This(), row: usize, col : usize, value: f32) MatrixError!void {
             try boundsCheck(row, col);
-            self.arr[row * r + col] = value;
+            Self.arr[row * r + col] = value;
         }
         
-        pub fn setUnsafe(self: *@This(), row: usize, col: usize, value: f32) void {
-            self.arr[row * r + col] = value;
+        pub fn setUnsafe(Self: *@This(), row: usize, col: usize, value: f32) void {
+            Self.arr[row * r + col] = value;
         }
 
         pub fn mult(m1: @This(), m2: @This()) @This() {
@@ -402,17 +417,17 @@ pub fn Mat(comptime r: usize) type {
             return result;
         }
 
-        pub fn transform(self: @This(), vector: Vec(r)) Vec(r) {
+        pub fn transform(Self: @This(), vector: Vec(r)) Vec(r) {
             var result = Vec(r).zero;
             for(0..r) |i| {
-                for(0..r) |j| result.arr[i] += self.atUnsafe(i,j) * vector.arr[j];
+                for(0..r) |j| result.arr[i] += Self.atUnsafe(i,j) * vector.arr[j];
             }
             return result;
 
         }
 
-        pub fn transformInto(self: @This(), vector: *Vec(r)) *Vec(r) {
-            const temp = self.transform(vector.*);
+        pub fn transformInto(Self: @This(), vector: *Vec(r)) *Vec(r) {
+            const temp = Self.transform(vector.*);
             @memcpy(vector.arr[0..], temp.arr[0..]);
             return vector;
         }
@@ -460,6 +475,14 @@ pub fn translate(shift: Vec(3)) Mat(4) {
         0, 0, 1, shift.arr[2],
         0, 0, 0, 1
     });
+}
+
+pub fn scale(factors: [3]f32) Mat(4) {
+    var result = Mat(4).identity;
+    result.setUnsafe(0, 0, factors[0]);
+    result.setUnsafe(1, 1, factors[1]);
+    result.setUnsafe(2, 2, factors[2]);
+    return result;
 }
 
 pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), cameraAngle: f32) Mat(4) {
@@ -559,93 +582,10 @@ pub const Pos = struct {
     }
 };
 
-pub const Cube = struct {
-    pos: Pos,
+pub const Dim = struct {
     w: f32, //extension along x-axis
     h: f32, //extension along y-axis
-    l: f32, //extension along z-axis
-
-    pub const numVertices: u32 = 24;
-    pub const numIndices: u32 = 36;
-
-    pub fn getVertices(self: Cube) [numVertices]Vertex {
-        const white = [3]f32{1.0, 1.0, 1.0};
-        const red = [3]f32{1.0, 0.0, 0.0};
-        const green = [3]f32{0.0, 1.0, 0.0};
-        const blue = [3]f32{0.0, 0.0, 1.0};
-        const yellow = [3]f32{1.0, 1.0, 0.0};
-        const purple = [3]f32{1.0, 0.0, 1.0};
-
-        const frontFace = [4][3]f32{
-            .{self.pos.x, self.pos.y + self.h, self.pos.z},
-            .{self.pos.x + self.w, self.pos.y + self.h, self.pos.z},
-            .{self.pos.x + self.w, self.pos.y, self.pos.z},
-            .{self.pos.x, self.pos.y, self.pos.z}
-        };
-        const backFace = [4][3]f32{
-            .{self.pos.x, self.pos.y + self.h, self.pos.z + self.l},
-            .{self.pos.x + self.w, self.pos.y + self.h, self.pos.z + self.l},
-            .{self.pos.x + self.w, self.pos.y, self.pos.z + self.l},
-            .{self.pos.x, self.pos.y, self.pos.z + self.l}
-        };
-        return .{
-            //FRONT FACE
-            .create(white,frontFace[0]),
-            .create(white,frontFace[1]),
-            .create(white,frontFace[2]),
-            .create(white,frontFace[3]),
-            //BACK FACE
-            .create(purple,backFace[0]),
-            .create(purple,backFace[1]),
-            .create(purple,backFace[2]),
-            .create(purple,backFace[3]),
-            //RIGHT FACE
-            .create(yellow,frontFace[1]),
-            .create(yellow,backFace[1]),
-            .create(yellow,backFace[2]),
-            .create(yellow,frontFace[2]),
-            //LEFT FACE
-            .create(green,frontFace[0]),
-            .create(green,backFace[0]),
-            .create(green,backFace[3]),
-            .create(green,frontFace[3]),
-            //TOP FACE
-            .create(red,backFace[0]),
-            .create(red,backFace[1]),
-            .create(red,frontFace[1]),
-            .create(red,frontFace[0]),
-            //BOTTOM FACE
-            .create(blue,backFace[3]),
-            .create(blue,backFace[2]),
-            .create(blue,frontFace[2]),
-            .create(blue,frontFace[3]),
-        };
-    }
-
-    pub fn getIndices(self: ?Cube) [numIndices]u32 {
-        //self argument purely for more natural calling of this function. It is not needed
-        _ = self;
-        return .{
-            //FRONT FACE
-            0, 1, 2,
-            0, 2, 3,
-            //BACK FACE
-            4, 5, 6,
-            4, 6, 7,
-            //RIGHT FACE
-            8, 9, 10,
-            8, 10, 11,
-            //LEFT FACE
-            12, 13, 14, 
-            12, 14, 15,
-            //TOP FACE
-            16, 17, 18,
-            16, 18, 19,
-            //BOTTOM FACE
-            20, 21, 22,
-            20, 22, 23
-        };
-    }
+    l: f32  //extension along z-axis
 };
 
 pub const Camera = struct {
@@ -654,6 +594,64 @@ pub const Camera = struct {
     angle: f32
 };
 
+pub const Mesh = struct {
+    buffer: Buffer,
+    verticesSize: u32,
+    indicesSize: u32
+};
+
 pub const Object = struct {
     pos: Pos,
+    scale: Pos,
+    orientation: Vec(3),
+    angle: f32,
+    mesh: Mesh,
+    uniformBuffer: UniformBuffer,
+    descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
+
+    pub fn getModelMatrix(Self: *const Object) Mat(4){
+        const rotation = rotate(Self.angle, Self.orientation);
+        const translation = translate(Self.pos.vector());
+        const scaling = scale(.{Self.scale.x, Self.scale.y, Self.scale.z});
+        return rotation.mult(translation).mult(scaling);
+    }
+
+    pub fn create(state: *State, pos: Pos, scaling: Pos, orientation: Vec(3), angle: f32, mesh: Mesh, allocator: ?*c.VkAllocationCallbacks) !Object {
+        var result: Object = undefined;
+        result.pos = pos;
+        result.scale = scaling;
+        result.orientation = orientation;
+        result.angle = angle;
+        result.mesh = mesh;
+        result.uniformBuffer = try UniformBuffer.create(state, allocator);
+        for(result.uniformBuffer.hostMemory) |*modelMatrix| modelMatrix.* = Mat4.identity;
+
+        const layouts: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSetLayout = .{state.descriptorSetLayout} ** MAX_FRAMES_IN_FLIGHT;
+        const allocInfo = c.VkDescriptorSetAllocateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = state.descriptorPool,
+            .descriptorSetCount = result.descriptorSets.len,
+            .pSetLayouts = layouts[0..]
+        };
+        if(c.vkAllocateDescriptorSets(state.device, &allocInfo, &result.descriptorSets) != c.VK_SUCCESS) {
+            return error.failedToAllocateDescriptorSets;
+        }
+
+        for(0..result.descriptorSets.len) |i| {
+            const writeDescriptorSet = c.VkWriteDescriptorSet{
+                .sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = result.descriptorSets[i],
+                .dstBinding = 0,
+                .descriptorCount = 1,
+                .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .pBufferInfo = &.{
+                    .buffer = result.uniformBuffer.handle,
+                    .offset = @sizeOf(Mat4) * i,
+                    .range = @sizeOf(Mat4)
+                }
+            };
+            c.vkUpdateDescriptorSets(state.device, 1, &writeDescriptorSet, 0, null);
+        }
+        return result;
+    }
 };

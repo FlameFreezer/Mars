@@ -103,7 +103,8 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
 
     const pipelineLayoutInfo = c.VkPipelineLayoutCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 0,
+        .setLayoutCount = 1,
+        .pSetLayouts = &state.descriptorSetLayout,
         .pushConstantRangeCount = 1,
         .pPushConstantRanges = &c.VkPushConstantRange{
             .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT,

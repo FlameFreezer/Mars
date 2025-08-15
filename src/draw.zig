@@ -2,8 +2,6 @@ const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
 
-const Data = @import("data.zig");
-
 pub fn drawFrame(state: *Utils.State) !void {
     const fenceWaitResult = c.vkWaitForFences(state.device, 1, &state.fences[state.currentFrame], c.VK_TRUE, std.math.maxInt(u64));
     if(fenceWaitResult != c.VK_SUCCESS and fenceWaitResult != c.VK_TIMEOUT) {
@@ -13,7 +11,8 @@ pub fn drawFrame(state: *Utils.State) !void {
         return error.failedToResetFence;
     }
 
-    updateCameraPushConstant(state, state.time - state.programStartTime);
+    updateCameraPushConstant(state);
+    updateObjectUniformBuffers(state);
 
     //The image acquisition semaphores are stored at the front of this array. Each frame has one
     //  semaphore for this purpose
@@ -29,14 +28,16 @@ pub fn drawFrame(state: *Utils.State) !void {
         return error.failedToAcquireSwapchainImage;
     }
 
-    if(c.vkResetCommandBuffer(state.commandBuffers[state.currentFrame], 0) != c.VK_SUCCESS) {
+    const currentCommandBuffer = state.commandBuffers[state.currentFrame];
+
+    if(c.vkResetCommandBuffer(currentCommandBuffer, 0) != c.VK_SUCCESS) {
         return error.failedToResetCommandBuffer;
     }
     const cmdBeginInfo = c.VkCommandBufferBeginInfo{
         .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
     };
-    if(c.vkBeginCommandBuffer(state.commandBuffers[state.currentFrame], &cmdBeginInfo) != c.VK_SUCCESS) {
+    if(c.vkBeginCommandBuffer(currentCommandBuffer, &cmdBeginInfo) != c.VK_SUCCESS) {
         return error.failedToBeginCommandBuffer;
     }
     
@@ -62,9 +63,9 @@ pub fn drawFrame(state: *Utils.State) !void {
             }
         }
     };
-    c.vkCmdPipelineBarrier2(state.commandBuffers[state.currentFrame], &colorWriteDependency);
+    c.vkCmdPipelineBarrier2(currentCommandBuffer, &colorWriteDependency);
 
-    doRenderPass(state, imageViewIndex);
+    try doRenderPass(state, imageViewIndex);
 
     const presentDependencyInfo = c.VkDependencyInfo{
         .sType = c.VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -88,9 +89,9 @@ pub fn drawFrame(state: *Utils.State) !void {
             }
         }
     };
-    c.vkCmdPipelineBarrier2(state.commandBuffers[state.currentFrame], &presentDependencyInfo);
+    c.vkCmdPipelineBarrier2(currentCommandBuffer, &presentDependencyInfo);
 
-    if(c.vkEndCommandBuffer(state.commandBuffers[state.currentFrame]) != c.VK_SUCCESS) {
+    if(c.vkEndCommandBuffer(currentCommandBuffer) != c.VK_SUCCESS) {
         return error.failedToEndCommandBuffer;
     }
     const submitInfo = c.VkSubmitInfo2{
@@ -110,7 +111,7 @@ pub fn drawFrame(state: *Utils.State) !void {
         .commandBufferInfoCount = 1,
         .pCommandBufferInfos = &c.VkCommandBufferSubmitInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-            .commandBuffer = state.commandBuffers[state.currentFrame]
+            .commandBuffer = currentCommandBuffer
         }
     };
     if(c.vkQueueSubmit2(state.queues.graphics, 1, &submitInfo, state.fences[state.currentFrame]) != c.VK_SUCCESS) {
@@ -132,7 +133,8 @@ pub fn drawFrame(state: *Utils.State) !void {
     state.currentFrame = (state.currentFrame + 1) % Utils.MAX_FRAMES_IN_FLIGHT;
 }
 
-fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
+fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
+    const currentCommandBuffer = state.commandBuffers[state.currentFrame];
     const renderingInfo = c.VkRenderingInfo{
         .sType = c.VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = c.VkRect2D{
@@ -165,12 +167,12 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
             .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE
         }
     };
-    c.vkCmdBeginRendering(state.commandBuffers[state.currentFrame], &renderingInfo);
+    c.vkCmdBeginRendering(currentCommandBuffer, &renderingInfo);
 
-    c.vkCmdBindPipeline(state.commandBuffers[state.currentFrame], c.VK_PIPELINE_BIND_POINT_GRAPHICS, 
+    c.vkCmdBindPipeline(currentCommandBuffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS, 
         state.graphicsPipeline);
 
-    c.vkCmdPushConstants(state.commandBuffers[state.currentFrame], state.graphicsPipelineLayout, c.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(Utils.CameraPushConstant),
+    c.vkCmdPushConstants(currentCommandBuffer, state.graphicsPipelineLayout, c.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(Utils.CameraPushConstant),
         &state.cameraPushConstant);
 
     const viewport = c.VkViewport{
@@ -181,46 +183,46 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) void {
         .minDepth = 0.0,
         .maxDepth = 1.0,
     };
-    c.vkCmdSetViewportWithCount(state.commandBuffers[state.currentFrame], 1, &viewport);
+    c.vkCmdSetViewportWithCount(currentCommandBuffer, 1, &viewport);
 
     const scissor = c.VkRect2D{
         .offset = c.VkOffset2D{.x = 0, .y = 0},
         .extent = state.swapchainExtent
     };
-    c.vkCmdSetScissorWithCount(state.commandBuffers[state.currentFrame], 1, &scissor);
+    c.vkCmdSetScissorWithCount(currentCommandBuffer, 1, &scissor);
 
-    const offsets = [_]usize{0};
-    c.vkCmdBindVertexBuffers(state.commandBuffers[state.currentFrame], 0, 1, &state.buffer.handle, 
-        offsets[0..]);
+    var vertexBuffers =  std.ArrayList(c.VkBuffer).init(std.heap.page_allocator);
+    defer vertexBuffers.deinit();
+    for(state.meshes.items) |*mesh| try vertexBuffers.append(mesh.buffer.handle);
 
-    c.vkCmdBindIndexBuffer(state.commandBuffers[state.currentFrame], state.buffer.handle, 
-        @sizeOf(@TypeOf(Data.Vertices)), c.VK_INDEX_TYPE_UINT32);
+    var offsets = try std.ArrayList(u64).initCapacity(std.heap.page_allocator, 
+        vertexBuffers.items.len);
 
-    //c.vkCmdBindDescriptorSets(state.commandBuffers[state.currentFrame], 
-    //    c.VK_PIPELINE_BIND_POINT_GRAPHICS, state.graphicsPipelineLayout, 0, 1, 
-    //    &state.descriptorSets[state.currentFrame], 0, 0);
+    defer offsets.deinit();
+    offsets.appendNTimesAssumeCapacity(0, vertexBuffers.items.len); 
 
-    c.vkCmdDrawIndexed(state.commandBuffers[state.currentFrame], Data.Indices.len, 1, 0, 0, 0);
-    c.vkCmdEndRendering(state.commandBuffers[state.currentFrame]);
+    c.vkCmdBindVertexBuffers(currentCommandBuffer, 0, @intCast(vertexBuffers.items.len), 
+        vertexBuffers.items.ptr, offsets.items.ptr);
+
+    var vertexOffset: i32 = 0;
+    for(state.meshes.items) |*mesh| {
+        c.vkCmdBindIndexBuffer(currentCommandBuffer, mesh.buffer.handle, mesh.verticesSize, 
+            c.VK_INDEX_TYPE_UINT32);
+
+        // FUTURE: create hash set of meshes to the objects which use it, then iterate over
+        //  that list, bind each object's descriptor sets, then call draw indexed
+        c.vkCmdBindDescriptorSets(currentCommandBuffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS, 
+            state.graphicsPipelineLayout, 0, 1, 
+            &state.objects.items[0].descriptorSets[state.currentFrame], 0, null);
+
+        c.vkCmdDrawIndexed(currentCommandBuffer, mesh.indicesSize / @sizeOf(u32), 1, 0, vertexOffset, 0);
+        vertexOffset += @intCast(mesh.verticesSize / @sizeOf(Utils.Vertex));
+    }
+
+    c.vkCmdEndRendering(currentCommandBuffer);
 }
 
-fn updateUniformBufferObject(state: *const Utils.State, uniformBufferObject: *Utils.UniformBufferObject, deltaTime: i64) void {
-    const fDeltaTime: f32 = @floatFromInt(deltaTime);
-    const rpm: f32 = std.math.pi / 2000.0;
-    _ = rpm; _ = fDeltaTime;
-    //uniformBufferObject.model = Utils.rotate(rpm * fDeltaTime, .init(.{0.0, 1.0, 0.0}));
-    uniformBufferObject.view = Utils.lookAt(
-        Utils.Vec(3).init(.{0.0, 0.0, 0.0}),
-        Utils.Vec(3).init(.{-7.0, 0.0, -15.0}),
-        0.0
-    );
-    uniformBufferObject.perspective = Utils.perspective(1.0, 100.0, std.math.degreesToRadians(150.0), 
-        @as(f32, @floatFromInt(state.swapchainExtent.height)) 
-        / @as(f32, @floatFromInt(state.swapchainExtent.width)));
-}
-
-fn updateCameraPushConstant(state: *Utils.State, deltaTime: i64) void {
-    _ = deltaTime;
+fn updateCameraPushConstant(state: *Utils.State) void {
     const aspectRatio: f32 = @as(f32, @floatFromInt(state.swapchainExtent.height)) 
             / @as(f32, @floatFromInt(state.swapchainExtent.width));
 
@@ -232,4 +234,10 @@ fn updateCameraPushConstant(state: *Utils.State, deltaTime: i64) void {
         ),
         .perspective = Utils.perspective(1.0, 100.0, std.math.degreesToRadians(150.0), aspectRatio)
     };
+}
+
+fn updateObjectUniformBuffers(state: *Utils.State) void {
+    for(state.objects.items) |*object| {
+        object.uniformBuffer.hostMemory[state.currentFrame] = object.getModelMatrix();
+    }
 }

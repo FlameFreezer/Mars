@@ -14,9 +14,9 @@ struct VertexOutput {
 };
 
 [shader("vertex")]
-func vertMain(VertexInput input, uniform Camera camera) -> VertexOutput {
+func vertMain(VertexInput input, uniform Camera camera, ConstantBuffer<float4x4> model) -> VertexOutput {
 	VertexOutput output;
-	output.position = mul(mul(float4(input.position, 1.0), camera.view), camera.proj);
+	output.position = mul(mul(mul(float4(input.position, 1.0), model), camera.view), camera.proj);
 	output.color = input.color;
 	return output;
 }
