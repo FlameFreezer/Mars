@@ -9,7 +9,6 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
             .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptorCount = 1,
             .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT,
-            .pImmutableSamplers = null
         }
     };
     const descriptorSetLayoutInfo = c.VkDescriptorSetLayoutCreateInfo{

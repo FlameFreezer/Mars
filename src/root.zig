@@ -26,11 +26,6 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     }
     state.currentFrame = 0;
     state.name = name;
-    state.camera = .{
-        .angle = 0.0,
-        .dir = Utils.Vec(3).init(.{0.0, 0.0, 1.0}),
-        .pos = .{.x = 0.0, .y = -7.0, .z = -15.0}
-    };
 
     try Window.init(state);
     try Instance.init(state, enableValidationLayers);
@@ -45,16 +40,16 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     try DescriptorSetLayout.init(state, null);
     try GraphicsPipeline.init(state, null);
     state.meshes = std.ArrayList(Utils.Mesh).init(std.heap.page_allocator);
+    state.objects = try std.ArrayList(Utils.Object).initCapacity(std.heap.page_allocator, Utils.MAX_OBJECTS);
     state.programStartTime = std.time.milliTimestamp();
     state.time = state.programStartTime;
     state.deltaTimeUs = 0;
-    const mesh = try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null);
-    try state.meshes.append(mesh);
-    state.objects = try std.ArrayList(Utils.Object).initCapacity(std.heap.page_allocator, Utils.MAX_OBJECTS);
+
+    try state.meshes.append(try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null));
     state.objects.appendAssumeCapacity(try Utils.Object.create(state, 
         Utils.Pos{
             .x = -5.0, 
-            .y = -5.0, 
+            .y = 5.0, 
             .z = -5.0
         },
         Utils.Pos{
@@ -64,6 +59,11 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
         },
         Utils.Vec(3).init(.{0.0, 1.0, 0.0}),
         0.0, state.meshes.items[0], null));
+
+    state.camera = .{
+        .pos = .{.x = 0.0, .y = 7.0, .z = -15.0},
+    };
+    state.camera.setTarget(.{.x = 0.0, .y = 0.0, .z = 0.0});
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
@@ -80,7 +80,7 @@ pub fn mainLoop(state: *Utils.State) !void {
                 else => {}
             }
         }
-        state.objects.items[0].angle += std.math.pi / 2000.0 * @as(f32, @floatFromInt(state.elapsedTime));
+        state.objects.items[0].angle = std.math.pi / 2000.0 * @as(f32, @floatFromInt(state.elapsedTime));
         try Draw.drawFrame(state);
     }
     _ = c.vkDeviceWaitIdle(state.device);
@@ -90,6 +90,7 @@ pub fn cleanup(state: *Utils.State) void {
     for(state.meshes.items) |*mesh| mesh.buffer.destroy(state.device, null);
     state.meshes.deinit();
     for(state.objects.items) |*object| object.uniformBuffer.destroy(state.device, null);
+    state.objects.deinit();
     GraphicsPipeline.destroy(state, null);
     DescriptorSetLayout.destroy(state, null);
     CommandBuffer.destroy(state, null);

@@ -477,16 +477,15 @@ pub fn translate(shift: Vec(3)) Mat(4) {
     });
 }
 
-pub fn scale(factors: [3]f32) Mat(4) {
+pub fn scaleMatrix(factors: [3]f32) Mat(4) {
     var result = Mat(4).identity;
     result.setUnsafe(0, 0, factors[0]);
     result.setUnsafe(1, 1, factors[1]);
     result.setUnsafe(2, 2, factors[2]);
     return result;
 }
-
-pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), cameraAngle: f32) Mat(4) {
-    const W = where.subtract(cameraLocation).normalize();
+pub fn view(direction: Vec(3), cameraLocation: Vec(3), cameraAngle: f32) Mat(4) {
+    const W = direction.normalize();
     // Create upVector:
     // Get cos, sin, and axis of rotation from world z-axis to camera z-axis
     const cos: f32 = dotProduct(3, W, Vec(3).init(.{0.0, 0.0, 1.0}));
@@ -508,6 +507,10 @@ pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), cameraAngle: f32) Mat(4) {
         W.arr[0], W.arr[1], W.arr[2], -dotProduct(3, W, cameraLocation),
         0.0, 0.0, 0.0, 1.0
     });
+}
+
+pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), cameraAngle: f32) Mat(4) {
+    return view(where.subtract(cameraLocation), cameraLocation, cameraAngle); 
 }
 
 pub fn perspective(near: f32, far: f32, fieldOfView: f32, dimension: f32) Mat(4) {
@@ -578,7 +581,7 @@ pub const Pos = struct {
     z: f32,
 
     pub fn vector(pos: *const Pos) Vec(3) {
-        return Vec(3).init(.{pos.*.x, pos.*.y, pos.*.z});
+        return Vec(3).init(.{pos.x, pos.y, pos.z});
     }
 };
 
@@ -589,9 +592,14 @@ pub const Dim = struct {
 };
 
 pub const Camera = struct {
-    pos: Pos,
-    dir: Vec(3),
-    angle: f32
+    pos: Pos = .{.x = 0.0, .y = 0.0, .z = 0.0},
+    dir: Vec(3) = .init(.{0.0, 0.0, 1.0}),
+    angle: f32 = 0.0,
+    fov: f32 = 5.0 * std.math.pi / 6.0,
+
+    pub fn setTarget(Self: *Camera, targetPos: Pos) void {
+        Self.dir = targetPos.vector().subtract(Self.pos.vector());
+    }
 };
 
 pub const Mesh = struct {
@@ -612,8 +620,8 @@ pub const Object = struct {
     pub fn getModelMatrix(Self: *const Object) Mat(4){
         const rotation = rotate(Self.angle, Self.orientation);
         const translation = translate(Self.pos.vector());
-        const scaling = scale(.{Self.scale.x, Self.scale.y, Self.scale.z});
-        return rotation.mult(translation).mult(scaling);
+        const scale = scaleMatrix(.{Self.scale.x, Self.scale.y, Self.scale.z});
+        return scale.mult(translation).mult(rotation);
     }
 
     pub fn create(state: *State, pos: Pos, scaling: Pos, orientation: Vec(3), angle: f32, mesh: Mesh, allocator: ?*c.VkAllocationCallbacks) !Object {

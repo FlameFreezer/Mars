@@ -205,7 +205,7 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
         vertexBuffers.items.ptr, offsets.items.ptr);
 
     var vertexOffset: i32 = 0;
-    for(state.meshes.items) |*mesh| {
+    for(state.meshes.items) |mesh| {
         c.vkCmdBindIndexBuffer(currentCommandBuffer, mesh.buffer.handle, mesh.verticesSize, 
             c.VK_INDEX_TYPE_UINT32);
 
@@ -216,6 +216,7 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
             &state.objects.items[0].descriptorSets[state.currentFrame], 0, null);
 
         c.vkCmdDrawIndexed(currentCommandBuffer, mesh.indicesSize / @sizeOf(u32), 1, 0, vertexOffset, 0);
+
         vertexOffset += @intCast(mesh.verticesSize / @sizeOf(Utils.Vertex));
     }
 
@@ -227,12 +228,12 @@ fn updateCameraPushConstant(state: *Utils.State) void {
             / @as(f32, @floatFromInt(state.swapchainExtent.width));
 
     state.cameraPushConstant = .{
-        .view = Utils.lookAt(
-            Utils.Vec(3).zero,
+        .view = Utils.view(
+            state.camera.dir,
             state.camera.pos.vector(),
             state.camera.angle
         ),
-        .perspective = Utils.perspective(1.0, 100.0, std.math.degreesToRadians(150.0), aspectRatio)
+        .perspective = Utils.perspective(1.0, 1000.0, state.camera.fov, aspectRatio)
     };
 }
 

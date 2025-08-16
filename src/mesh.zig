@@ -6,11 +6,15 @@ pub fn init(state: *const Utils.State, vertices: []const Utils.Vertex, indices: 
     allocator: ?*c.VkAllocationCallbacks) 
 !Utils.Mesh {
     const commandBuffer = try Utils.beginSingleTimeCommandBuffer(state.device, state.commandPool);
+
     var stagingBuffer: Utils.Buffer = undefined;
+
     const resultMesh = try createMesh(state, &stagingBuffer, commandBuffer, vertices, indices);
+
     if(c.vkEndCommandBuffer(commandBuffer) != c.VK_SUCCESS) {
         return error.failedToEndCommandBuffer;
     }
+
     const submitInfo = c.VkSubmitInfo2{
         .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
         .waitSemaphoreInfoCount = 0,
@@ -38,6 +42,7 @@ pub fn createMesh(state: *const Utils.State, stagingBuffer: *Utils.Buffer,
     var result: Utils.Mesh = undefined;
     result.verticesSize = @as(u32, @intCast(vertices.len)) * @sizeOf(Utils.Vertex);
     result.indicesSize = @as(u32, @intCast(indices.len)) * @sizeOf(u32);
+
     result.buffer = try Utils.Buffer.create(state.physicalDevice, state.device, null, 
         result.verticesSize + result.indicesSize, 
         c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT 
@@ -45,6 +50,7 @@ pub fn createMesh(state: *const Utils.State, stagingBuffer: *Utils.Buffer,
             | c.VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
+
     stagingBuffer.* = try Utils.Buffer.create(state.physicalDevice, state.device, null,
         result.verticesSize + result.indicesSize, 
         c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
