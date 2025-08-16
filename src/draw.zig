@@ -209,8 +209,6 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
         c.vkCmdBindIndexBuffer(currentCommandBuffer, mesh.buffer.handle, mesh.verticesSize, 
             c.VK_INDEX_TYPE_UINT32);
 
-        // FUTURE: create hash set of meshes to the objects which use it, then iterate over
-        //  that list, bind each object's descriptor sets, then call draw indexed
         for(mesh.objects.items) |i| {
             const object = state.objects.get(i) orelse return error.failedToFindObject;
             c.vkCmdBindDescriptorSets(currentCommandBuffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -219,7 +217,6 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
 
             c.vkCmdDrawIndexed(currentCommandBuffer, mesh.indicesSize / @sizeOf(u32), 1, 0, vertexOffset, 0);
         }
-        c.vkCmdDrawIndexed(currentCommandBuffer, mesh.indicesSize / @sizeOf(u32), 1, 0, vertexOffset, 0);
 
         vertexOffset += @intCast(mesh.verticesSize / @sizeOf(Utils.Vertex));
     }
