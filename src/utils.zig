@@ -618,9 +618,10 @@ pub const Object = struct {
     descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
 
     pub fn getModelMatrix(Self: *const Object) Mat(4){
-        const rotation = rotate(Self.angle, Self.orientation);
-        const translation = translate(Self.pos.vector());
         const scale = scaleMatrix(.{Self.scale.x, Self.scale.y, Self.scale.z});
+        const translation = translate(Self.pos.vector());
+        const centerPos = Self.pos.vector().add(Self.scale.vector().scale(0.5));
+        const rotation = translate(centerPos.scale(-1.0)).mult(rotate(Self.angle, Self.orientation)).mult(translate(centerPos));
         return scale.mult(translation).mult(rotation);
     }
 

@@ -49,19 +49,19 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     state.objects.appendAssumeCapacity(try Utils.Object.create(state, 
         Utils.Pos{
             .x = -5.0, 
-            .y = 5.0, 
+            .y = -10.0, 
             .z = -5.0
         },
         Utils.Pos{
             .x = 10.0,
-            .y = 10.0,
+            .y = 20.0,
             .z = 10.0
         },
         Utils.Vec(3).init(.{0.0, 1.0, 0.0}),
         0.0, state.meshes.items[0], null));
 
     state.camera = .{
-        .pos = .{.x = 0.0, .y = 7.0, .z = -15.0},
+        .pos = .{.x = 0.0, .y = 17.0, .z = -15.0},
     };
     state.camera.setTarget(.{.x = 0.0, .y = 0.0, .z = 0.0});
 }
