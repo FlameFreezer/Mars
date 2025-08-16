@@ -34,7 +34,8 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
         .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = Utils.MAX_OBJECTS * Utils.MAX_FRAMES_IN_FLIGHT,
         .poolSizeCount = descriptorPoolSizes.len,
-        .pPoolSizes = &descriptorPoolSizes
+        .pPoolSizes = &descriptorPoolSizes,
+        .flags = c.VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
     };
 
     if(c.vkCreateDescriptorPool(state.device, &descriptorPoolInfo, allocator, 

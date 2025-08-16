@@ -42,6 +42,7 @@ pub fn createMesh(state: *const Utils.State, stagingBuffer: *Utils.Buffer,
     var result: Utils.Mesh = undefined;
     result.verticesSize = @as(u32, @intCast(vertices.len)) * @sizeOf(Utils.Vertex);
     result.indicesSize = @as(u32, @intCast(indices.len)) * @sizeOf(u32);
+    result.objects = try std.ArrayList(u64).initCapacity(std.heap.page_allocator, Utils.MAX_OBJECTS);
 
     result.buffer = try Utils.Buffer.create(state.physicalDevice, state.device, null, 
         result.verticesSize + result.indicesSize, 

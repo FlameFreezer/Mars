@@ -211,10 +211,14 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
 
         // FUTURE: create hash set of meshes to the objects which use it, then iterate over
         //  that list, bind each object's descriptor sets, then call draw indexed
-        c.vkCmdBindDescriptorSets(currentCommandBuffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS, 
-            state.graphicsPipelineLayout, 0, 1, 
-            &state.objects.items[0].descriptorSets[state.currentFrame], 0, null);
+        for(mesh.objects.items) |i| {
+            const object = state.objects.get(i) orelse return error.failedToFindObject;
+            c.vkCmdBindDescriptorSets(currentCommandBuffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS,
+                state.graphicsPipelineLayout, 0, 1,
+                &object.descriptorSets[state.currentFrame], 0, null);
 
+            c.vkCmdDrawIndexed(currentCommandBuffer, mesh.indicesSize / @sizeOf(u32), 1, 0, vertexOffset, 0);
+        }
         c.vkCmdDrawIndexed(currentCommandBuffer, mesh.indicesSize / @sizeOf(u32), 1, 0, vertexOffset, 0);
 
         vertexOffset += @intCast(mesh.verticesSize / @sizeOf(Utils.Vertex));
@@ -238,7 +242,9 @@ fn updateCameraPushConstant(state: *Utils.State) void {
 }
 
 fn updateObjectUniformBuffers(state: *Utils.State) void {
-    for(state.objects.items) |*object| {
+    var it = state.objects.iterator();
+    while(it.next()) |entry| {
+        const object = entry.value_ptr;
         object.uniformBuffer.hostMemory[state.currentFrame] = object.getModelMatrix();
     }
 }

@@ -40,13 +40,14 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     try DescriptorSetLayout.init(state, null);
     try GraphicsPipeline.init(state, null);
     state.meshes = std.ArrayList(Utils.Mesh).init(std.heap.page_allocator);
-    state.objects = try std.ArrayList(Utils.Object).initCapacity(std.heap.page_allocator, Utils.MAX_OBJECTS);
+    state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, Utils.Object.Hashing{.hashModulus = Utils.MAX_OBJECTS});
     state.programStartTime = std.time.milliTimestamp();
     state.time = state.programStartTime;
     state.deltaTimeUs = 0;
 
     try state.meshes.append(try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null));
-    state.objects.appendAssumeCapacity(try Utils.Object.create(state, 
+    var obj: Utils.Object = undefined;
+    try obj.create(state, 
         Utils.Pos{
             .x = -5.0, 
             .y = -10.0, 
@@ -58,7 +59,9 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
             .z = 10.0
         },
         Utils.Vec(3).init(.{0.0, 1.0, 0.0}),
-        0.0, state.meshes.items[0], null));
+        0.0, &state.meshes.items[0], null
+    );
+    try state.objects.put(obj.id, obj);
 
     state.camera = .{
         .pos = .{.x = 0.0, .y = 17.0, .z = -15.0},
@@ -80,17 +83,21 @@ pub fn mainLoop(state: *Utils.State) !void {
                 else => {}
             }
         }
-        state.objects.items[0].angle = std.math.pi / 2000.0 * @as(f32, @floatFromInt(state.elapsedTime));
+        var obj = state.objects.get(0) orelse unreachable;
+        obj.angle = std.math.pi / 2000.0 * @as(f32, @floatFromInt(state.elapsedTime));
         try Draw.drawFrame(state);
     }
     _ = c.vkDeviceWaitIdle(state.device);
 }
 
 pub fn cleanup(state: *Utils.State) void {
-    for(state.meshes.items) |*mesh| mesh.buffer.destroy(state.device, null);
-    state.meshes.deinit();
-    for(state.objects.items) |*object| object.uniformBuffer.destroy(state.device, null);
+    var it = state.objects.iterator();
+    while(it.next()) |entry| {
+        entry.value_ptr.destroy(state.device, state.descriptorPool, null);
+    }
     state.objects.deinit();
+    for(state.meshes.items) |*mesh| mesh.destroy(state.device, null);
+    state.meshes.deinit();
     GraphicsPipeline.destroy(state, null);
     DescriptorSetLayout.destroy(state, null);
     CommandBuffer.destroy(state, null);

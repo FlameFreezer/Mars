@@ -40,8 +40,10 @@ pub const State = struct {
     depthImageView: c.VkImageView,
     depthImageMemory: c.VkDeviceMemory,
     meshes: std.ArrayList(Mesh),
-    objects: std.ArrayList(Object),
+    objects: ObjectArrayHashMap,
 };
+
+pub const ObjectArrayHashMap = std.ArrayHashMap(u64, Object, Object.Hashing, true);
 
 pub const Buffer = struct {
     handle: c.VkBuffer,
@@ -605,7 +607,13 @@ pub const Camera = struct {
 pub const Mesh = struct {
     buffer: Buffer,
     verticesSize: u32,
-    indicesSize: u32
+    indicesSize: u32,
+    objects: std.ArrayList(u64),
+
+    pub fn destroy(Self: *Mesh, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
+        Self.buffer.destroy(device, allocator);
+        Self.objects.deinit();
+    }
 };
 
 pub const Object = struct {
@@ -613,9 +621,23 @@ pub const Object = struct {
     scale: Pos,
     orientation: Vec(3),
     angle: f32,
-    mesh: Mesh,
+    id: u64,
+    mesh: *Mesh,
     uniformBuffer: UniformBuffer,
     descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
+
+    pub const Hashing = struct {
+        hashModulus: u32,
+
+        pub fn hash(Self: Hashing, key: u64) u32 {
+            return @intCast(key % Self.hashModulus);
+        }
+
+        pub fn eql(Self: Hashing, key1: u64, key2: u64, inMap: usize) bool {
+            _ = Self; _ = inMap;
+            return key1 == key2;
+        }
+    };
 
     pub fn getModelMatrix(Self: *const Object) Mat(4){
         const scale = scaleMatrix(.{Self.scale.x, Self.scale.y, Self.scale.z});
@@ -625,42 +647,53 @@ pub const Object = struct {
         return scale.mult(translation).mult(rotation);
     }
 
-    pub fn create(state: *State, pos: Pos, scaling: Pos, orientation: Vec(3), angle: f32, mesh: Mesh, allocator: ?*c.VkAllocationCallbacks) !Object {
-        var result: Object = undefined;
-        result.pos = pos;
-        result.scale = scaling;
-        result.orientation = orientation;
-        result.angle = angle;
-        result.mesh = mesh;
-        result.uniformBuffer = try UniformBuffer.create(state, allocator);
-        for(result.uniformBuffer.hostMemory) |*modelMatrix| modelMatrix.* = Mat4.identity;
+    pub fn create(Self: *Object, state: *State, pos: Pos, scaling: Pos, orientation: Vec(3), angle: f32, mesh: *Mesh, allocator: ?*c.VkAllocationCallbacks) !void {
+        Self.pos = pos;
+        Self.scale = scaling;
+        Self.orientation = orientation;
+        Self.angle = angle;
+        Self.mesh = mesh;
+        Self.id = 0;
+        Self.mesh.objects.appendAssumeCapacity(Self.id);
+        Self.uniformBuffer = try UniformBuffer.create(state, allocator);
+        for(Self.uniformBuffer.hostMemory) |*modelMatrix| modelMatrix.* = Mat4.identity;
 
         const layouts: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSetLayout = .{state.descriptorSetLayout} ** MAX_FRAMES_IN_FLIGHT;
         const allocInfo = c.VkDescriptorSetAllocateInfo{
             .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
             .descriptorPool = state.descriptorPool,
-            .descriptorSetCount = result.descriptorSets.len,
+            .descriptorSetCount = Self.descriptorSets.len,
             .pSetLayouts = layouts[0..]
         };
-        if(c.vkAllocateDescriptorSets(state.device, &allocInfo, &result.descriptorSets) != c.VK_SUCCESS) {
+        if(c.vkAllocateDescriptorSets(state.device, &allocInfo, &Self.descriptorSets) != c.VK_SUCCESS) {
             return error.failedToAllocateDescriptorSets;
         }
 
-        for(0..result.descriptorSets.len) |i| {
+        for(0..Self.descriptorSets.len) |i| {
             const writeDescriptorSet = c.VkWriteDescriptorSet{
                 .sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = result.descriptorSets[i],
+                .dstSet = Self.descriptorSets[i],
                 .dstBinding = 0,
                 .descriptorCount = 1,
                 .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .pBufferInfo = &.{
-                    .buffer = result.uniformBuffer.handle,
+                    .buffer = Self.uniformBuffer.handle,
                     .offset = @sizeOf(Mat4) * i,
                     .range = @sizeOf(Mat4)
                 }
             };
             c.vkUpdateDescriptorSets(state.device, 1, &writeDescriptorSet, 0, null);
         }
-        return result;
+    }
+
+    pub fn destroy(Self: *Object, device: c.VkDevice, pool: c.VkDescriptorPool, allocator: ?*c.VkAllocationCallbacks) void {
+        Self.uniformBuffer.destroy(device, allocator);
+        _ = c.vkFreeDescriptorSets(device, pool, Self.descriptorSets.len, &Self.descriptorSets); 
+        for(0..Self.mesh.objects.items.len) |i| {
+            if(Self.mesh.objects.items[i] == Self.id) {
+                _ = Self.mesh.objects.swapRemove(i);
+                break;
+            }
+        }
     }
 };
