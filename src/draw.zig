@@ -232,7 +232,7 @@ fn updateCameraPushConstant(state: *Utils.State) void {
         .view = Utils.view(
             state.camera.dir,
             state.camera.pos.vector(),
-            state.camera.angle
+            Utils.Vec(3).init(.{0.0, 1.0, 0.0})
         ),
         .perspective = Utils.perspective(1.0, 1000.0, state.camera.fov, aspectRatio)
     };

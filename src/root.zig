@@ -26,6 +26,7 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     }
     state.currentFrame = 0;
     state.name = name;
+    state.lastGeneratedId = 0;
 
     try Window.init(state);
     try Instance.init(state, enableValidationLayers);
@@ -46,25 +47,25 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     state.deltaTimeUs = 0;
 
     try state.meshes.append(try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null));
-    var obj: Utils.Object = undefined;
-    try obj.create(state, 
-        Utils.Pos{
-            .x = -5.0, 
-            .y = -10.0, 
-            .z = -5.0
-        },
-        Utils.Pos{
-            .x = 10.0,
-            .y = 20.0,
-            .z = 10.0
-        },
+
+    const obj = try Utils.Object.create(state, 
+        Utils.Pos{.x = -25.0, .y = -5.0, .z = -5.0},
+        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
         Utils.Vec(3).init(.{0.0, 1.0, 0.0}),
         0.0, &state.meshes.items[0], null
     );
     try state.objects.put(obj.id, obj);
 
+    const obj2 = try Utils.Object.create(state,
+        Utils.Pos{.x = 20, .y = -5.0, .z = -5.0},
+        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
+        Utils.Vec(3).init(.{0.0, 1.0, 0.0}),
+        0.0, &state.meshes.items[0], null
+    );
+    try state.objects.put(obj2.id, obj2);
+
     state.camera = .{
-        .pos = .{.x = 0.0, .y = 17.0, .z = -15.0},
+        .pos = .{.x = -65.0, .y = 20.0, .z = 0.0},
     };
     state.camera.setTarget(.{.x = 0.0, .y = 0.0, .z = 0.0});
 }
@@ -83,8 +84,11 @@ pub fn mainLoop(state: *Utils.State) !void {
                 else => {}
             }
         }
-        var obj = state.objects.get(0) orelse unreachable;
-        obj.angle = std.math.pi / 2000.0 * @as(f32, @floatFromInt(state.elapsedTime));
+        var it = state.objects.iterator();
+        while(it.next()) |entry| {
+            const obj = entry.value_ptr;
+            obj.angle = std.math.pi / 2000.0 * @as(f32, @floatFromInt(state.elapsedTime));
+        }
         try Draw.drawFrame(state);
     }
     _ = c.vkDeviceWaitIdle(state.device);

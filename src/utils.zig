@@ -41,6 +41,7 @@ pub const State = struct {
     depthImageMemory: c.VkDeviceMemory,
     meshes: std.ArrayList(Mesh),
     objects: ObjectArrayHashMap,
+    lastGeneratedId: u64,
 };
 
 pub const ObjectArrayHashMap = std.ArrayHashMap(u64, Object, Object.Hashing, true);
@@ -399,18 +400,12 @@ pub fn Mat(comptime r: usize) type {
                 for(0..r) |col| {
                     var sum: f32 = 0;
                     for(0..r) |i| {
-                       sum += m2.atUnsafe(row, i) * m1.atUnsafe(i, col); 
+                       sum += m1.atUnsafe(row, i) * m2.atUnsafe(i, col); 
                     }
                     result.setUnsafe(row, col, sum); 
                 }
             }
             return result;
-        }
-
-        pub fn multInto(m1: *@This(), m2: @This()) *@This() {
-            const result: @This() = m1.*.mult(m2);
-            @memcpy(m1.arr[0..], result.arr[0..]);
-            return m1;
         }
 
         pub fn copy(other: @This()) @This() {
@@ -486,23 +481,11 @@ pub fn scaleMatrix(factors: [3]f32) Mat(4) {
     result.setUnsafe(2, 2, factors[2]);
     return result;
 }
-pub fn view(direction: Vec(3), cameraLocation: Vec(3), cameraAngle: f32) Mat(4) {
-    const W = direction.normalize();
-    // Create upVector:
-    // Get cos, sin, and axis of rotation from world z-axis to camera z-axis
-    const cos: f32 = dotProduct(3, W, Vec(3).init(.{0.0, 0.0, 1.0}));
-    const sin: f32 = crossProduct(W, Vec(3).init(.{0.0, 0.0, 1.0})).magnitude();
-    const axis: Vec(3) = crossProduct(W, Vec(3).init(.{0.0, 0.0, 1.0})).scale(-1.0);
-    var upVector = Vec(4).init(.{0.0, 1.0, 0.0, 0.0});
-    //If the axis is not the zero vector, then we transform the world y-axis to a new location
-    if(!axis.equals(Vec(3).zero)) {
-        upVector = rotate2(cos, sin, axis).transform(Vec(4).init(.{0.0, 1.0, 0.0, 0.0}));
-    }
-    const upVectorRotated = rotate(cameraAngle - std.math.pi / 2.0, W).transform(upVector).normalize();
-    const U = Vec(3).init(.{upVectorRotated.arr[0], upVectorRotated.arr[1], upVectorRotated.arr[2]});
 
-    //const U = crossProduct(upVector, W).normalize();
-    const V = crossProduct(W, U);
+pub fn view(direction: Vec(3), cameraLocation: Vec(3), upVector: Vec(3)) Mat(4) {
+    const W = direction.normalize(); //Camera space z-axis
+    const U = crossProduct(upVector, W).normalize(); //Camera space x-axis
+    const V = crossProduct(W, U).normalize(); //Camera space y-axis
     return Mat(4).init(.{
         U.arr[0], U.arr[1], U.arr[2], -dotProduct(3, U, cameraLocation),
         V.arr[0], V.arr[1], V.arr[2], -dotProduct(3, V, cameraLocation),
@@ -516,13 +499,13 @@ pub fn lookAt(where: Vec(3), cameraLocation: Vec(3), cameraAngle: f32) Mat(4) {
 }
 
 pub fn perspective(near: f32, far: f32, fieldOfView: f32, dimension: f32) Mat(4) {
-    const width: f32 = @tan(fieldOfView / 2.0) * near * 2.0;
+    const width: f32 = @abs(@tan(fieldOfView / 2.0)) * near * 2.0;
     const height: f32 = dimension * width;
     const per = Mat(4).init(.{
-        near, 0, 0, 0,
-        0, near, 0, 0,
-        0, 0, near + far, -(near * far),
-        0, 0, 1, 0
+        near, 0.0, 0.0, 0.0,
+        0.0, near, 0.0, 0.0,
+        0.0, 0.0, near + far, -(near * far),
+        0.0, 0.0, 1.0, 0.0
     });
     const ortho = Mat(4).init(.{
         2.0 / width, 0.0, 0.0, 0.0,
@@ -530,7 +513,7 @@ pub fn perspective(near: f32, far: f32, fieldOfView: f32, dimension: f32) Mat(4)
         0.0, 0.0, 1.0 / (far - near), -near / (far - near),
         0.0, 0.0, 0.0, 1.0
     });
-    return per.mult(ortho);
+    return ortho.mult(per);
 }
 
 const VertexAttributes: type = enum (u32) {
@@ -587,17 +570,11 @@ pub const Pos = struct {
     }
 };
 
-pub const Dim = struct {
-    w: f32, //extension along x-axis
-    h: f32, //extension along y-axis
-    l: f32  //extension along z-axis
-};
-
 pub const Camera = struct {
     pos: Pos = .{.x = 0.0, .y = 0.0, .z = 0.0},
     dir: Vec(3) = .init(.{0.0, 0.0, 1.0}),
     angle: f32 = 0.0,
-    fov: f32 = 5.0 * std.math.pi / 6.0,
+    fov: f32 = std.math.pi / 2.0,
 
     pub fn setTarget(Self: *Camera, targetPos: Pos) void {
         Self.dir = targetPos.vector().subtract(Self.pos.vector());
@@ -643,47 +620,53 @@ pub const Object = struct {
         const scale = scaleMatrix(.{Self.scale.x, Self.scale.y, Self.scale.z});
         const translation = translate(Self.pos.vector());
         const centerPos = Self.pos.vector().add(Self.scale.vector().scale(0.5));
-        const rotation = translate(centerPos.scale(-1.0)).mult(rotate(Self.angle, Self.orientation)).mult(translate(centerPos));
-        return scale.mult(translation).mult(rotation);
+        const rotation = translate(centerPos).mult(rotate(Self.angle, Self.orientation)).mult(translate(centerPos.scale(-1.0)));
+        return rotation.mult(translation).mult(scale);
     }
 
-    pub fn create(Self: *Object, state: *State, pos: Pos, scaling: Pos, orientation: Vec(3), angle: f32, mesh: *Mesh, allocator: ?*c.VkAllocationCallbacks) !void {
-        Self.pos = pos;
-        Self.scale = scaling;
-        Self.orientation = orientation;
-        Self.angle = angle;
-        Self.mesh = mesh;
-        Self.id = 0;
-        Self.mesh.objects.appendAssumeCapacity(Self.id);
-        Self.uniformBuffer = try UniformBuffer.create(state, allocator);
-        for(Self.uniformBuffer.hostMemory) |*modelMatrix| modelMatrix.* = Mat4.identity;
+    pub fn create(state: *State, pos: Pos, scaling: Pos, orientation: Vec(3), angle: f32, mesh: *Mesh, allocator: ?*c.VkAllocationCallbacks) !Object {
+        var result: Object = undefined;
+        result.pos = pos;
+        result.scale = scaling;
+        result.orientation = orientation;
+        result.angle = angle;
+        result.mesh = mesh;
+        result.id = state.lastGeneratedId + 1;
+        while(state.objects.contains(result.id)) {
+            result.id += 1;
+        }
+        state.lastGeneratedId = result.id;
+        result.mesh.objects.appendAssumeCapacity(result.id);
+        result.uniformBuffer = try UniformBuffer.create(state, allocator);
+        for(result.uniformBuffer.hostMemory) |*modelMatrix| modelMatrix.* = Mat4.identity;
 
         const layouts: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSetLayout = .{state.descriptorSetLayout} ** MAX_FRAMES_IN_FLIGHT;
         const allocInfo = c.VkDescriptorSetAllocateInfo{
             .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
             .descriptorPool = state.descriptorPool,
-            .descriptorSetCount = Self.descriptorSets.len,
+            .descriptorSetCount = result.descriptorSets.len,
             .pSetLayouts = layouts[0..]
         };
-        if(c.vkAllocateDescriptorSets(state.device, &allocInfo, &Self.descriptorSets) != c.VK_SUCCESS) {
+        if(c.vkAllocateDescriptorSets(state.device, &allocInfo, &result.descriptorSets) != c.VK_SUCCESS) {
             return error.failedToAllocateDescriptorSets;
         }
 
-        for(0..Self.descriptorSets.len) |i| {
+        for(0..result.descriptorSets.len) |i| {
             const writeDescriptorSet = c.VkWriteDescriptorSet{
                 .sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = Self.descriptorSets[i],
+                .dstSet = result.descriptorSets[i],
                 .dstBinding = 0,
                 .descriptorCount = 1,
                 .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .pBufferInfo = &.{
-                    .buffer = Self.uniformBuffer.handle,
+                    .buffer = result.uniformBuffer.handle,
                     .offset = @sizeOf(Mat4) * i,
                     .range = @sizeOf(Mat4)
                 }
             };
             c.vkUpdateDescriptorSets(state.device, 1, &writeDescriptorSet, 0, null);
         }
+        return result;
     }
 
     pub fn destroy(Self: *Object, device: c.VkDevice, pool: c.VkDescriptorPool, allocator: ?*c.VkAllocationCallbacks) void {
