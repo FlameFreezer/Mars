@@ -3,10 +3,6 @@ const std = @import("std");
 const Utils = @import("utils.zig");
 
 pub fn drawFrame(state: *Utils.State) !void {
-    if(state.windowActiveFlags & Utils.WindowActiveFlags.IS_MINIMIZED != 0) {
-        return;
-    }
-
     const fenceWaitResult = c.vkWaitForFences(state.device, 1, &state.fences[state.currentFrame], c.VK_TRUE, std.math.maxInt(u64));
     if(fenceWaitResult != c.VK_SUCCESS and fenceWaitResult != c.VK_TIMEOUT) {
         return error.failedWaitingOnFence;

@@ -4,10 +4,13 @@ const c = @import("c");
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
 pub const MAX_OBJECTS: usize = 512;
 
-pub const WindowActiveFlags = struct {
-    pub const IS_MINIMIZED: u32 = 1;
-    pub const IS_MAXIMIZED: u32 = 1 << 1;
-    pub const SHOULD_CLOSE: u32 = 1 << 2;
+pub const MarsFlags = u16;
+pub const Flags = struct {
+    pub const NONE: MarsFlags = 0;
+    pub const WINDOW_IS_MINIMIZED: MarsFlags = 1;
+    pub const WINDOW_IS_MAXIMIZED: MarsFlags = 1 << 1;
+    pub const WINDOW_SHOULD_CLOSE: MarsFlags = 1 << 2;
+    pub const IS_PAUSED: MarsFlags = 1 << 3;
 };
 
 pub const State = struct {
@@ -18,8 +21,7 @@ pub const State = struct {
     deltaTimeUs: i64,
     elapsedTime: i64,
     camera: Camera,
-    windowActiveFlags: u32 = 0,
-
+    activeFlags: MarsFlags = 0,
     window: *c.SDL_Window,
     instance: c.VkInstance,
     debugMessenger: c.VkDebugUtilsMessengerEXT,
@@ -33,9 +35,7 @@ pub const State = struct {
     swapchainExtent: c.VkExtent2D,
     commandPool: c.VkCommandPool,
     commandBuffers: [MAX_FRAMES_IN_FLIGHT]c.VkCommandBuffer,
-
     cameraPushConstant: CameraPushConstant,
-
     graphicsPipelineLayout: c.VkPipelineLayout,
     graphicsPipeline: c.VkPipeline,
     fences: [MAX_FRAMES_IN_FLIGHT]c.VkFence,

@@ -1,5 +1,5 @@
 .{
-    .name = .zig_vulkan_setup,
+    .name = .mars_engine,
     .fingerprint = 0xbc087af135573d25,
     .version = "0.0.0",
     .dependencies = .{

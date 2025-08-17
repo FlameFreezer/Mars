@@ -27,6 +27,7 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     state.currentFrame = 0;
     state.name = name;
     state.lastGeneratedId = 0;
+    state.activeFlags = Utils.Flags.NONE;
 
     try Window.init(state);
     try Instance.init(state, enableValidationLayers);
@@ -71,20 +72,25 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
-    while(state.windowActiveFlags & Utils.WindowActiveFlags.SHOULD_CLOSE == 0) {
+    while(state.activeFlags & Utils.Flags.WINDOW_SHOULD_CLOSE == 0) {
         const nowUs: i64 = std.time.microTimestamp();
         state.deltaTimeUs = nowUs - state.time * std.time.us_per_ms;
         state.time = @divFloor(nowUs, std.time.us_per_ms);
         state.elapsedTime = state.time - state.programStartTime;
+
         while(c.SDL_PollEvent(&state.nextEvent)) {
             try handleEvent(state);
         }
-        var it = state.objects.iterator();
-        while(it.next()) |entry| {
-            const obj = entry.value_ptr;
-            obj.angle += std.math.pi / 2000000.0 * @as(f32, @floatFromInt(state.deltaTimeUs));
+
+        if(state.activeFlags & Utils.Flags.IS_PAUSED == 0) {
+            var it = state.objects.iterator();
+            while(it.next()) |entry| {
+                const obj = entry.value_ptr;
+                obj.angle += std.math.pi / 2000000.0 * @as(f32, @floatFromInt(state.deltaTimeUs));
+            }
+
+            try Draw.drawFrame(state);
         }
-        try Draw.drawFrame(state);
     }
     _ = c.vkDeviceWaitIdle(state.device);
 }
@@ -114,19 +120,22 @@ pub fn cleanup(state: *Utils.State) void {
 
 fn handleEvent(state: *Utils.State) !void {
     switch(state.nextEvent.type) {
-        c.SDL_EVENT_QUIT => state.windowActiveFlags |= Utils.WindowActiveFlags.SHOULD_CLOSE,
-        c.SDL_EVENT_WINDOW_CLOSE_REQUESTED => state.windowActiveFlags 
-            |= Utils.WindowActiveFlags.SHOULD_CLOSE,
+        c.SDL_EVENT_QUIT => state.activeFlags |= Utils.Flags.WINDOW_SHOULD_CLOSE,
+        c.SDL_EVENT_WINDOW_CLOSE_REQUESTED => state.activeFlags 
+            |= Utils.Flags.WINDOW_SHOULD_CLOSE,
         c.SDL_EVENT_WINDOW_RESIZED => try Swapchain.recreate(state, null),
-        c.SDL_EVENT_WINDOW_MINIMIZED => state.windowActiveFlags 
-            |= Utils.WindowActiveFlags.IS_MINIMIZED,
+        c.SDL_EVENT_WINDOW_MINIMIZED => {
+            state.activeFlags |= Utils.Flags.WINDOW_IS_MINIMIZED | Utils.Flags.IS_PAUSED;
+            state.activeFlags &= ~Utils.Flags.WINDOW_IS_MAXIMIZED;
+        },
         c.SDL_EVENT_WINDOW_MAXIMIZED => {
-            state.windowActiveFlags |= Utils.WindowActiveFlags.IS_MAXIMIZED;
-            try Swapchain.recreate(state, null);
+            state.activeFlags |= Utils.Flags.WINDOW_IS_MAXIMIZED;
+            state.activeFlags &= ~Utils.Flags.WINDOW_IS_MINIMIZED;
         },
         c.SDL_EVENT_WINDOW_RESTORED => {
-            state.windowActiveFlags &= ~Utils.WindowActiveFlags.IS_MAXIMIZED;
-            state.windowActiveFlags &= ~Utils.WindowActiveFlags.IS_MINIMIZED;
+            state.activeFlags &= ~Utils.Flags.WINDOW_IS_MAXIMIZED;
+            state.activeFlags &= ~Utils.Flags.WINDOW_IS_MINIMIZED;
+            state.activeFlags &= ~Utils.Flags.IS_PAUSED;
             try Swapchain.recreate(state, null);
         },
         else => {}
