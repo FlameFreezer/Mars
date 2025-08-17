@@ -41,7 +41,7 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     try DescriptorSetLayout.init(state, null);
     try GraphicsPipeline.init(state, null);
     state.meshes = std.ArrayList(Utils.Mesh).init(std.heap.page_allocator);
-    state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, Utils.Object.Hashing{.hashModulus = Utils.MAX_OBJECTS});
+    state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, Utils.Object.HashContext{.hashModulus = Utils.MAX_OBJECTS});
     state.programStartTime = std.time.milliTimestamp();
     state.time = state.programStartTime;
     state.deltaTimeUs = 0;
@@ -71,23 +71,18 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
-    var windowShouldClose: bool = false;
-    while(!windowShouldClose) {
+    while(state.windowActiveFlags & Utils.WindowActiveFlags.SHOULD_CLOSE == 0) {
         const nowUs: i64 = std.time.microTimestamp();
+        state.deltaTimeUs = nowUs - state.time * std.time.us_per_ms;
         state.time = @divFloor(nowUs, std.time.us_per_ms);
-        state.deltaTimeUs = nowUs - state.programStartTime * std.time.us_per_ms;
         state.elapsedTime = state.time - state.programStartTime;
         while(c.SDL_PollEvent(&state.nextEvent)) {
-            //try Events.handleEvent(state);
-            switch(state.nextEvent.type) {
-                c.SDL_EVENT_QUIT => windowShouldClose = true,
-                else => {}
-            }
+            try handleEvent(state);
         }
         var it = state.objects.iterator();
         while(it.next()) |entry| {
             const obj = entry.value_ptr;
-            obj.angle = std.math.pi / 2000.0 * @as(f32, @floatFromInt(state.elapsedTime));
+            obj.angle += std.math.pi / 2000000.0 * @as(f32, @floatFromInt(state.deltaTimeUs));
         }
         try Draw.drawFrame(state);
     }
@@ -117,3 +112,23 @@ pub fn cleanup(state: *Utils.State) void {
     c.SDL_Quit();
 }
 
+fn handleEvent(state: *Utils.State) !void {
+    switch(state.nextEvent.type) {
+        c.SDL_EVENT_QUIT => state.windowActiveFlags |= Utils.WindowActiveFlags.SHOULD_CLOSE,
+        c.SDL_EVENT_WINDOW_CLOSE_REQUESTED => state.windowActiveFlags 
+            |= Utils.WindowActiveFlags.SHOULD_CLOSE,
+        c.SDL_EVENT_WINDOW_RESIZED => try Swapchain.recreate(state, null),
+        c.SDL_EVENT_WINDOW_MINIMIZED => state.windowActiveFlags 
+            |= Utils.WindowActiveFlags.IS_MINIMIZED,
+        c.SDL_EVENT_WINDOW_MAXIMIZED => {
+            state.windowActiveFlags |= Utils.WindowActiveFlags.IS_MAXIMIZED;
+            try Swapchain.recreate(state, null);
+        },
+        c.SDL_EVENT_WINDOW_RESTORED => {
+            state.windowActiveFlags &= ~Utils.WindowActiveFlags.IS_MAXIMIZED;
+            state.windowActiveFlags &= ~Utils.WindowActiveFlags.IS_MINIMIZED;
+            try Swapchain.recreate(state, null);
+        },
+        else => {}
+    }
+}

@@ -12,5 +12,4 @@ pub fn init(state: *Utils.State) !void {
 
 pub fn destroy(state: *Utils.State) void {
     c.SDL_DestroyWindow(state.window);
-    state.window = null;
 }

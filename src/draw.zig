@@ -3,6 +3,10 @@ const std = @import("std");
 const Utils = @import("utils.zig");
 
 pub fn drawFrame(state: *Utils.State) !void {
+    if(state.windowActiveFlags & Utils.WindowActiveFlags.IS_MINIMIZED != 0) {
+        return;
+    }
+
     const fenceWaitResult = c.vkWaitForFences(state.device, 1, &state.fences[state.currentFrame], c.VK_TRUE, std.math.maxInt(u64));
     if(fenceWaitResult != c.VK_SUCCESS and fenceWaitResult != c.VK_TIMEOUT) {
         return error.failedWaitingOnFence;
@@ -10,9 +14,6 @@ pub fn drawFrame(state: *Utils.State) !void {
     if(c.vkResetFences(state.device, 1, &state.fences[state.currentFrame]) != c.VK_SUCCESS) {
         return error.failedToResetFence;
     }
-
-    updateCameraPushConstant(state);
-    updateObjectUniformBuffers(state);
 
     //The image acquisition semaphores are stored at the front of this array. Each frame has one
     //  semaphore for this purpose
@@ -22,11 +23,15 @@ pub fn drawFrame(state: *Utils.State) !void {
     const presentReadySemaphores = state.semaphores[Utils.MAX_FRAMES_IN_FLIGHT..];
 
     var imageViewIndex: u32 = undefined;
-    if(c.vkAcquireNextImageKHR(state.device, state.swapchain, std.math.maxInt(u64), 
-        imageAcquiredSemaphores[state.currentFrame], null, &imageViewIndex) != c.VK_SUCCESS) 
-    {
+    const acquireImageResult: c.VkResult = c.vkAcquireNextImageKHR(state.device, state.swapchain, std.math.maxInt(u64), 
+        imageAcquiredSemaphores[state.currentFrame], null, &imageViewIndex);
+    
+    if(acquireImageResult != c.VK_SUCCESS and acquireImageResult != c.VK_SUBOPTIMAL_KHR) {
         return error.failedToAcquireSwapchainImage;
     }
+
+    updateCameraPushConstant(state);
+    updateObjectUniformBuffers(state);
 
     const currentCommandBuffer = state.commandBuffers[state.currentFrame];
 
@@ -210,7 +215,7 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
             c.VK_INDEX_TYPE_UINT32);
 
         for(mesh.objects.items) |i| {
-            const object = state.objects.get(i) orelse return error.failedToFindObject;
+            const object: *Utils.Object = state.objects.getPtr(i) orelse return error.failedToFindObject;
             c.vkCmdBindDescriptorSets(currentCommandBuffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS,
                 state.graphicsPipelineLayout, 0, 1,
                 &object.descriptorSets[state.currentFrame], 0, null);

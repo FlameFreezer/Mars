@@ -11,7 +11,7 @@ const deviceExtensions = [_]*const[c.VK_MAX_EXTENSION_NAME_SIZE]u8{
 };
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
-    if(!c.SDL_Vulkan_CreateSurface(state.window.?, state.instance, allocator, &state.surface)) {
+    if(!c.SDL_Vulkan_CreateSurface(state.window, state.instance, allocator, &state.surface)) {
         return error.failedToCreateWindowSurface;
     }
     try pickPhysicalDevice(&state.physicalDevice, state.surface, state.instance);

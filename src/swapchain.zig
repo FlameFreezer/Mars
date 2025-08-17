@@ -1,6 +1,7 @@
 const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
+const DepthResources = @import("depthResources.zig");
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     try createSwapchain(state, allocator);
@@ -20,6 +21,15 @@ pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
     }
     std.heap.page_allocator.free(state.swapchainImageViews);
     c.vkDestroySwapchainKHR(state.device, state.swapchain, allocator);
+}
+
+pub fn recreate(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+    _ = c.vkDeviceWaitIdle(state.device);
+    const Swapchain = @This();
+    Swapchain.destroy(state, allocator);
+    DepthResources.destroy(state, allocator);
+    try Swapchain.init(state, allocator);
+    try DepthResources.init(state, allocator);
 }
 
 fn createSwapchain(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
@@ -97,7 +107,7 @@ fn createSwapchainImageViews(imageViews: *[]c.VkImageView, images: []c.VkImage, 
     }
 }
 
-fn chooseImageExtent(window: ?*c.SDL_Window, capabilities: c.VkSurfaceCapabilitiesKHR) !c.VkExtent2D {
+fn chooseImageExtent(window: *c.SDL_Window, capabilities: c.VkSurfaceCapabilitiesKHR) !c.VkExtent2D {
     var resultExtent: c.VkExtent2D = undefined;
     if(capabilities.currentExtent.width != std.math.maxInt(u32)) {
         resultExtent = capabilities.currentExtent;
@@ -105,7 +115,7 @@ fn chooseImageExtent(window: ?*c.SDL_Window, capabilities: c.VkSurfaceCapabiliti
     else {
         var width: i32 = 0;
         var height: i32 = 0;
-        if(!c.SDL_GetWindowSize(window.?, &width, &height)) {
+        if(!c.SDL_GetWindowSize(window, &width, &height)) {
             return error.failedToGetWindowSize;
         }
         resultExtent = .{

@@ -4,6 +4,12 @@ const c = @import("c");
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
 pub const MAX_OBJECTS: usize = 512;
 
+pub const WindowActiveFlags = struct {
+    pub const IS_MINIMIZED: u32 = 1;
+    pub const IS_MAXIMIZED: u32 = 1 << 1;
+    pub const SHOULD_CLOSE: u32 = 1 << 2;
+};
+
 pub const State = struct {
     name: []const u8,
     nextEvent: c.SDL_Event,
@@ -12,8 +18,9 @@ pub const State = struct {
     deltaTimeUs: i64,
     elapsedTime: i64,
     camera: Camera,
+    windowActiveFlags: u32 = 0,
 
-    window: ?*c.SDL_Window = null,
+    window: *c.SDL_Window,
     instance: c.VkInstance,
     debugMessenger: c.VkDebugUtilsMessengerEXT,
     physicalDevice: c.VkPhysicalDevice,
@@ -44,7 +51,7 @@ pub const State = struct {
     lastGeneratedId: u64,
 };
 
-pub const ObjectArrayHashMap = std.ArrayHashMap(u64, Object, Object.Hashing, true);
+pub const ObjectArrayHashMap = std.ArrayHashMap(u64, Object, Object.HashContext, true);
 
 pub const Buffer = struct {
     handle: c.VkBuffer,
@@ -583,7 +590,9 @@ pub const Camera = struct {
 
 pub const Mesh = struct {
     buffer: Buffer,
+    /// The size of the chunk of buffer memory containing vertex data, in bytes.
     verticesSize: u32,
+    /// The size of the chunk of buffer memory containing index data, in bytes.
     indicesSize: u32,
     objects: std.ArrayList(u64),
 
@@ -603,14 +612,14 @@ pub const Object = struct {
     uniformBuffer: UniformBuffer,
     descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
 
-    pub const Hashing = struct {
+    pub const HashContext = struct {
         hashModulus: u32,
 
-        pub fn hash(Self: Hashing, key: u64) u32 {
+        pub fn hash(Self: HashContext, key: u64) u32 {
             return @intCast(key % Self.hashModulus);
         }
 
-        pub fn eql(Self: Hashing, key1: u64, key2: u64, inMap: usize) bool {
+        pub fn eql(Self: HashContext, key1: u64, key2: u64, inMap: usize) bool {
             _ = Self; _ = inMap;
             return key1 == key2;
         }
