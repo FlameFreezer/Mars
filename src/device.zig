@@ -11,16 +11,12 @@ const deviceExtensions = [_]*const[c.VK_MAX_EXTENSION_NAME_SIZE]u8{
 };
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
-    if(!c.SDL_Vulkan_CreateSurface(state.window, state.instance, allocator, &state.surface)) {
-        return error.failedToCreateWindowSurface;
-    }
+    
     try pickPhysicalDevice(&state.physicalDevice, state.surface, state.instance);
     try createLogicalDevice(&state.device, &state.queues, state.physicalDevice, state.surface, allocator);
 }
 
 pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
-    //c.vkDestroySurfaceKHR(state.instance, state.surface, allocator);
-    c.SDL_Vulkan_DestroySurface(state.instance, state.surface, allocator);
     _ = c.vkDeviceWaitIdle(state.device);
     c.vkDestroyDevice(state.device, allocator);
 }
@@ -61,7 +57,7 @@ fn pickPhysicalDevice(physical: *c.VkPhysicalDevice, surface: c.VkSurfaceKHR, in
             continue:findBestDevice;
         }
 
-        var deviceSurfaceInfo = Utils.surfaceInfo{};
+        var deviceSurfaceInfo = Utils.SurfaceInfo{};
         try deviceSurfaceInfo.query(device, surface);
         defer deviceSurfaceInfo.free();
 
@@ -115,7 +111,7 @@ fn pickPhysicalDevice(physical: *c.VkPhysicalDevice, surface: c.VkSurfaceKHR, in
 fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, physical: c.VkPhysicalDevice, 
     surface: c.VkSurfaceKHR, allocator: ?*c.VkAllocationCallbacks
 ) !void {
-    const indices: Utils.queueFamilyIndices = try Utils.findQueueFamilyIndices(physical, surface);
+    const indices: Utils.QueueFamilyIndices = try Utils.findQueueFamilyIndices(physical, surface);
     var queueCreateInfos = std.ArrayList(c.VkDeviceQueueCreateInfo).init(std.heap.page_allocator);
     defer queueCreateInfos.deinit();
     //Create a set with each unique queue family index available
@@ -124,9 +120,8 @@ fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, physical: c.V
 
     //Iterate over the supported queue families by accessing each field of the queueFamilyIndices
     //  struct
-    const queueFamilyIndicesFields = @typeInfo(Utils.queueFamilyIndices).@"struct".fields;
-    inline for(0..queueFamilyIndicesFields.len) |i| {
-        const currentIndex: u32 = @field(indices, queueFamilyIndicesFields[i].name).?;
+    inline for(@typeInfo(Utils.QueueFamilyIndices).@"struct".fields) |field| {
+        const currentIndex: u32 = @field(indices, field.name).?;
         //If the index of the current queue family does not already have a creation struct,
         //  then we initialize one
         if(!uniqueQueueFamilyIndices.contains(currentIndex)) {
@@ -175,4 +170,5 @@ fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, physical: c.V
     c.vkGetDeviceQueue(device.*, indices.graphicsIndex.?, 0, &queues.graphics);
     c.vkGetDeviceQueue(device.*, indices.computeIndex.?, 0, &queues.compute);
     c.vkGetDeviceQueue(device.*, indices.presentIndex.?, 0, &queues.present);
+    c.vkGetDeviceQueue(device.*, indices.transferIndex.?, 0, &queues.transfer);
 }

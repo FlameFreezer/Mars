@@ -29,11 +29,11 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     state.lastGeneratedId = 0;
     state.activeFlags = Utils.Flags.NONE;
 
-    try Window.init(state);
-    try Instance.init(state, enableValidationLayers);
+    try Instance.init(state, enableValidationLayers, null);
     if(enableValidationLayers) {
         DebugMessenger.init(state, null);
     }
+    try Window.init(state, null);
     try Device.init(state, null);
     try Swapchain.init(state, null);
     try DepthResources.init(state, null);
@@ -42,7 +42,8 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     try DescriptorSetLayout.init(state, null);
     try GraphicsPipeline.init(state, null);
     state.meshes = std.ArrayList(Utils.Mesh).init(std.heap.page_allocator);
-    state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, Utils.Object.HashContext{.hashModulus = Utils.MAX_OBJECTS});
+    state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, 
+        Utils.Object.HashContext{.hashModulus = Utils.MAX_OBJECTS});
     state.programStartTime = std.time.milliTimestamp();
     state.time = state.programStartTime;
     state.deltaTimeUs = 0;
@@ -113,8 +114,8 @@ pub fn cleanup(state: *Utils.State) void {
         DebugMessenger.destroy(state, null);
     }
     Device.destroy(state, null);
+    Window.destroy(state, null);
     Instance.destroy(state, null);
-    Window.destroy(state);
     c.SDL_Quit();
 }
 

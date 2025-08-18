@@ -25,11 +25,11 @@ pub fn init(state: *const Utils.State, vertices: []const Utils.Vertex, indices: 
             .commandBuffer = commandBuffer
         }
     };
-    if(c.vkQueueSubmit2(state.queues.graphics, 1, &submitInfo, null) != c.VK_SUCCESS) {
+    if(c.vkQueueSubmit2(state.queues.transfer, 1, &submitInfo, null) != c.VK_SUCCESS) {
         return error.failedToSubmitToQueue;
     }
 
-    _ = c.vkQueueWaitIdle(state.queues.graphics);
+    _ = c.vkQueueWaitIdle(state.queues.transfer);
 
     c.vkFreeCommandBuffers(state.device, state.commandPool, 1, &commandBuffer);
     stagingBuffer.destroy(state.device, allocator);

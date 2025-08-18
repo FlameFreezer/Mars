@@ -173,26 +173,29 @@ pub const CameraPushConstant = struct {
 pub const Queues = struct {
     graphics: c.VkQueue,
     compute: c.VkQueue,
-    present: c.VkQueue
+    present: c.VkQueue,
+    transfer: c.VkQueue,
 };
 
-pub const queueFamilyIndices = struct {
+pub const QueueFamilyIndices = struct {
     graphicsIndex: ?u32 = null,
     computeIndex: ?u32 = null,
     presentIndex: ?u32 = null,
+    transferIndex: ?u32 = null,
 
-    pub fn isComplete(Self: *queueFamilyIndices) bool {
-        return Self.*.graphicsIndex != null
-            and Self.*.computeIndex != null
-            and Self.*.presentIndex != null
-        ;
+    pub fn isComplete(Self: *QueueFamilyIndices) bool {
+        inline for(@typeInfo(QueueFamilyIndices).@"struct".fields) |field| {
+            if(@field(Self.*, field.name) == null) return false;
+        }
+        return true;
     }
 };
 
-pub fn findQueueFamilyIndices(device: c.VkPhysicalDevice, surface: c.VkSurfaceKHR) !queueFamilyIndices {
+pub fn findQueueFamilyIndices(device: c.VkPhysicalDevice, surface: c.VkSurfaceKHR) !QueueFamilyIndices {
     var queueFamilyPropertiesCount: u32 = 0;
     _ = c.vkGetPhysicalDeviceQueueFamilyProperties2(device, &queueFamilyPropertiesCount, null);
     const queueFamilyProperties = try std.heap.page_allocator.alloc(c.VkQueueFamilyProperties2, queueFamilyPropertiesCount);
+    defer std.heap.page_allocator.free(queueFamilyProperties);
     //Each property struct needs to have its type manually assigned for the next function call
     //  to work
     for(0..queueFamilyPropertiesCount) |i| {
@@ -204,13 +207,16 @@ pub fn findQueueFamilyIndices(device: c.VkPhysicalDevice, surface: c.VkSurfaceKH
 
     for(0..queueFamilyProperties.len) |i| {
         const properties = queueFamilyProperties[i].queueFamilyProperties;
-        var deviceQueueFamilyIndices = queueFamilyIndices{};
+        var deviceQueueFamilyIndices = QueueFamilyIndices{};
 
         if(properties.queueFlags & c.VK_QUEUE_COMPUTE_BIT != 0) {
             deviceQueueFamilyIndices.computeIndex = @intCast(i);
         }
         if(properties.queueFlags & c.VK_QUEUE_GRAPHICS_BIT != 0) {
             deviceQueueFamilyIndices.graphicsIndex = @intCast(i);
+        }
+        if(properties.queueFlags & c.VK_QUEUE_TRANSFER_BIT != 0) {
+            deviceQueueFamilyIndices.transferIndex = @intCast(i);
         }
         var presentSupport: c.VkBool32 = c.VK_FALSE;
         if(c.vkGetPhysicalDeviceSurfaceSupportKHR(device, @intCast(i), surface, &presentSupport) != c.VK_SUCCESS) {
@@ -221,19 +227,18 @@ pub fn findQueueFamilyIndices(device: c.VkPhysicalDevice, surface: c.VkSurfaceKH
         }
 
         if(deviceQueueFamilyIndices.isComplete()) {
-            std.heap.page_allocator.free(queueFamilyProperties);
             return deviceQueueFamilyIndices;
         }
     }
 
     return error.queueFamiliesUnsupported;
 }
-pub const surfaceInfo = struct {
+pub const SurfaceInfo = struct {
     capabilities: c.VkSurfaceCapabilitiesKHR = undefined,
     formats: ?[]c.VkSurfaceFormatKHR = null,
     presentModes: ?[]c.VkPresentModeKHR = null,
 
-    pub fn query(Self: *surfaceInfo, device: c.VkPhysicalDevice, surface: c.VkSurfaceKHR) !void {
+    pub fn query(Self: *SurfaceInfo, device: c.VkPhysicalDevice, surface: c.VkSurfaceKHR) !void {
         _ = c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &Self.*.capabilities);
 
         var surfaceFormatCount: usize = 0;
@@ -251,7 +256,7 @@ pub const surfaceInfo = struct {
         }
     }
 
-    pub fn free(Self: *surfaceInfo) void {
+    pub fn free(Self: *SurfaceInfo) void {
         if(Self.*.formats) |formats| {
             std.heap.page_allocator.free(formats);
         }

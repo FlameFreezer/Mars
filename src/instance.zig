@@ -7,7 +7,7 @@ const debugMessenger = @import("debugMessenger.zig");
 const validationLayers = [_][]const u8{ "VK_LAYER_KHRONOS_validation" };
 var enableValidationLayers: bool = false;
 
-pub fn init(state: *Utils.State, debug: bool) !void {
+pub fn init(state: *Utils.State, debug: bool, allocator: ?*c.VkAllocationCallbacks) !void {
     enableValidationLayers = debug;
     if(enableValidationLayers and checkValidationLayerSupport()) {
         return error.validationLayersRequestedButNotSupported;
@@ -43,7 +43,7 @@ pub fn init(state: *Utils.State, debug: bool) !void {
         instanceInfo.pNext = &debugUtilsMessengerInfo;
     }
 
-    if(c.vkCreateInstance(&instanceInfo, null, &state.instance) != c.VK_SUCCESS) {
+    if(c.vkCreateInstance(&instanceInfo, allocator, &state.instance) != c.VK_SUCCESS) {
         return error.failedToCreateInstance;
     }
 }

@@ -3,6 +3,8 @@ const std = @import("std");
 const Utils = @import("utils.zig");
 const DepthResources = @import("depthResources.zig");
 
+const Swapchain = @This();
+
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     try createSwapchain(state, allocator);
     
@@ -25,7 +27,6 @@ pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
 
 pub fn recreate(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     _ = c.vkDeviceWaitIdle(state.device);
-    const Swapchain = @This();
     Swapchain.destroy(state, allocator);
     DepthResources.destroy(state, allocator);
     try Swapchain.init(state, allocator);
@@ -33,7 +34,7 @@ pub fn recreate(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void
 }
 
 fn createSwapchain(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
-    var surfaceInfo = Utils.surfaceInfo{};
+    var surfaceInfo = Utils.SurfaceInfo{};
     try surfaceInfo.query(state.physicalDevice, state.surface);
     defer surfaceInfo.free();
 
