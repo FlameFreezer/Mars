@@ -3,6 +3,7 @@ const c = @import("c");
 const buildOpts = @import("buildOpts");
 
 const Utils = @import("utils.zig");
+const Math = @import("math.zig");
 const Window = @import("window.zig");
 const Instance = @import("instance.zig");
 const DebugMessenger = @import("debugMessenger.zig");
@@ -44,28 +45,11 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
     state.meshes = std.ArrayList(Utils.Mesh).init(std.heap.page_allocator);
     state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, 
         Utils.Object.HashContext{.hashModulus = Utils.MAX_OBJECTS});
+    state.transferStagingBuffers = std.ArrayList(Utils.Buffer).init(std.heap.page_allocator);
     state.programStartTime = std.time.milliTimestamp();
     state.time = state.programStartTime;
     state.deltaTimeUs = 0;
-
-    try state.meshes.append(try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null));
-
-    const obj = try Utils.Object.create(state, 
-        Utils.Pos{.x = -25.0, .y = -5.0, .z = -5.0},
-        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
-        Utils.Vec(3).init(.{0.0, 1.0, 0.0}),
-        0.0, &state.meshes.items[0], null
-    );
-    try state.objects.put(obj.id, obj);
-
-    const obj2 = try Utils.Object.create(state,
-        Utils.Pos{.x = 20, .y = -5.0, .z = -5.0},
-        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
-        Utils.Vec(3).init(.{0.0, 1.0, 0.0}),
-        0.0, &state.meshes.items[0], null
-    );
-    try state.objects.put(obj2.id, obj2);
-
+    
     state.camera = .{
         .pos = .{.x = -65.0, .y = 20.0, .z = 0.0},
     };
@@ -73,6 +57,9 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
+    try loadMeshes(state);
+    try loadObjects(state);
+
     while(state.activeFlags & Utils.Flags.WINDOW_SHOULD_CLOSE == 0) {
         const nowUs: i64 = std.time.microTimestamp();
         state.deltaTimeUs = nowUs - state.time * std.time.us_per_ms;
@@ -84,11 +71,10 @@ pub fn mainLoop(state: *Utils.State) !void {
         }
 
         if(state.activeFlags & Utils.Flags.IS_PAUSED == 0) {
-            var it = state.objects.iterator();
-            while(it.next()) |entry| {
-                const obj = entry.value_ptr;
-                obj.angle += std.math.pi / 2000000.0 * @as(f32, @floatFromInt(state.deltaTimeUs));
-            }
+            {var it = state.objects.iterator();
+            while(it.next()) |obj| {
+                obj.value_ptr.*.angle += std.math.pi / 2000000.0 * @as(f32, @floatFromInt(state.deltaTimeUs));
+            }}
 
             try Draw.drawFrame(state);
         }
@@ -97,13 +83,14 @@ pub fn mainLoop(state: *Utils.State) !void {
 }
 
 pub fn cleanup(state: *Utils.State) void {
-    var it = state.objects.iterator();
+    {var it = state.objects.iterator();
     while(it.next()) |entry| {
         entry.value_ptr.destroy(state.device, state.descriptorPool, null);
-    }
+    }}
     state.objects.deinit();
     for(state.meshes.items) |*mesh| mesh.destroy(state.device, null);
     state.meshes.deinit();
+    state.transferStagingBuffers.deinit();
     GraphicsPipeline.destroy(state, null);
     DescriptorSetLayout.destroy(state, null);
     CommandBuffer.destroy(state, null);
@@ -114,6 +101,7 @@ pub fn cleanup(state: *Utils.State) void {
         DebugMessenger.destroy(state, null);
     }
     Device.destroy(state, null);
+    std.heap.page_allocator.free(state.queues.graphicsQueues);
     Window.destroy(state, null);
     Instance.destroy(state, null);
     c.SDL_Quit();
@@ -141,4 +129,42 @@ fn handleEvent(state: *Utils.State) !void {
         },
         else => {}
     }
+}
+
+fn loadMeshes(state: *Utils.State) !void {
+    try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null);
+    if(c.vkEndCommandBuffer(state.*.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT]) != c.VK_SUCCESS) {
+        return error.failedToEndCommandBuffer;
+    }
+    const submitInfo = c.VkSubmitInfo2{
+        .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .waitSemaphoreInfoCount = 0,
+        .signalSemaphoreInfoCount = 0,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &c.VkCommandBufferSubmitInfo{
+            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+            .commandBuffer = state.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT]
+        }
+    };
+    if(c.vkQueueSubmit2(state.queues.transferQueue, 1, &submitInfo, state.*.transferOpFence) != c.VK_SUCCESS) {
+        return error.failedToSubmitToQueue;
+    }
+}
+
+fn loadObjects(state: *Utils.State) !void {
+    const obj = try Utils.Object.create(state, 
+        Utils.Pos{.x = -25.0, .y = -5.0, .z = -5.0},
+        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
+        Math.Vec3.init(.{0.0, 1.0, 0.0}),
+        0.0, &state.meshes.items[0], null
+    );
+    try state.objects.put(obj.id, obj);
+
+    const obj2 = try Utils.Object.create(state,
+        Utils.Pos{.x = 20, .y = -5.0, .z = -5.0},
+        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
+        Math.Vec3.init(.{0.0, 1.0, 0.0}),
+        0.0, &state.meshes.items[0], null
+    );
+    try state.objects.put(obj2.id, obj2);
 }

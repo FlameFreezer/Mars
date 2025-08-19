@@ -13,7 +13,7 @@ const deviceExtensions = [_]*const[c.VK_MAX_EXTENSION_NAME_SIZE]u8{
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     
     try pickPhysicalDevice(&state.physicalDevice, state.surface, state.instance);
-    try createLogicalDevice(&state.device, &state.queues, state.physicalDevice, state.surface, allocator);
+    try createLogicalDevice(&state.device, &state.queues, &state.queueFamilyIndices, state.physicalDevice, state.surface, allocator);
 }
 
 pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
@@ -51,7 +51,7 @@ fn pickPhysicalDevice(physical: *c.VkPhysicalDevice, surface: c.VkSurfaceKHR, in
     var bestDevice: ?c.VkPhysicalDevice = null;
     var bestDeviceScore: u32 = 0;
     findBestDevice:for(physicalDevices) |device| {
-        const deviceQueueFamilyIndices = Utils.findQueueFamilyIndices(device, surface) catch continue:findBestDevice; 
+        const deviceQueueFamilies = Utils.findQueueFamilyIndices(device, surface) catch continue:findBestDevice; 
 
         if(!try checkDeviceExtensionSupport(device)) {
             continue:findBestDevice;
@@ -83,9 +83,10 @@ fn pickPhysicalDevice(physical: *c.VkPhysicalDevice, surface: c.VkSurfaceKHR, in
         }
 
         var currentDeviceScore: u32 = 0;
-        if(deviceQueueFamilyIndices.graphicsIndex.? != deviceQueueFamilyIndices.presentIndex.?) {
-            currentDeviceScore += 1;
-        }
+        //Prefer to use just one queue family
+        if(deviceQueueFamilies.graphicsIndex.? == deviceQueueFamilies.presentIndex.?) currentDeviceScore += 1;
+        //Prefer to have more than one graphics queue
+        if(deviceQueueFamilies.graphicsQueueCount > 1) currentDeviceScore += 1;
 
         findBestPresentMode:for(deviceSurfaceInfo.presentModes.?) |presentMode| {
             if(presentMode == c.VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -108,35 +109,34 @@ fn pickPhysicalDevice(physical: *c.VkPhysicalDevice, surface: c.VkSurfaceKHR, in
     }
 }
 
-fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, physical: c.VkPhysicalDevice, 
+fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, queueFamilyIndices: *Utils.QueueFamilyIndices, physical: c.VkPhysicalDevice, 
     surface: c.VkSurfaceKHR, allocator: ?*c.VkAllocationCallbacks
 ) !void {
-    const indices: Utils.QueueFamilyIndices = try Utils.findQueueFamilyIndices(physical, surface);
-    var queueCreateInfos = std.ArrayList(c.VkDeviceQueueCreateInfo).init(std.heap.page_allocator);
-    defer queueCreateInfos.deinit();
-    //Create a set with each unique queue family index available
-    var uniqueQueueFamilyIndices = std.AutoHashMap(u32, void).init(std.heap.page_allocator);
-    defer uniqueQueueFamilyIndices.deinit();
-
-    //Iterate over the supported queue families by accessing each field of the queueFamilyIndices
-    //  struct
-    inline for(@typeInfo(Utils.QueueFamilyIndices).@"struct".fields) |field| {
-        const currentIndex: u32 = @field(indices, field.name).?;
-        //If the index of the current queue family does not already have a creation struct,
-        //  then we initialize one
-        if(!uniqueQueueFamilyIndices.contains(currentIndex)) {
-            try uniqueQueueFamilyIndices.putNoClobber(currentIndex, void{});
-
-            const queueCreateInfo = c.VkDeviceQueueCreateInfo{
-                .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                .flags = 0,
-                .pQueuePriorities = comptime &[_]f32{1.0},
-                .queueCount = 1,
-                .queueFamilyIndex = currentIndex
-            };
-
-            try queueCreateInfos.append(queueCreateInfo);
-        }
+    queueFamilyIndices.* = try Utils.findQueueFamilyIndices(physical, surface);
+    var queueCreateInfos: [2]c.VkDeviceQueueCreateInfo = undefined;
+    var numQueueInfos: u32 = 1;
+    const graphicsQueuePriorities = try std.heap.page_allocator.alloc(f32, queueFamilyIndices.graphicsQueueCount);
+    defer std.heap.page_allocator.free(graphicsQueuePriorities);
+    const presentQueuePriorities = try std.heap.page_allocator.alloc(f32, queueFamilyIndices.presentQueueCount);
+    defer std.heap.page_allocator.free(presentQueuePriorities);
+    //Graphics Queue Info
+    @memset(graphicsQueuePriorities, 0.0);
+    queueCreateInfos[0] = c.VkDeviceQueueCreateInfo{
+        .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex = queueFamilyIndices.graphicsIndex.?,
+        .queueCount = queueFamilyIndices.graphicsQueueCount,
+        .pQueuePriorities = graphicsQueuePriorities.ptr
+    };
+    //Present Queue Info
+    if(queueFamilyIndices.graphicsIndex.? != queueFamilyIndices.presentIndex.?) {
+        numQueueInfos += 1;
+        @memset(presentQueuePriorities, 0.0);
+        queueCreateInfos[1] = c.VkDeviceQueueCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = queueFamilyIndices.presentIndex.?,
+            .queueCount = 1,
+            .pQueuePriorities = presentQueuePriorities.ptr
+        };
     }
 
     //pNext chain of device features to enable
@@ -158,8 +158,8 @@ fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, physical: c.V
         .sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, 
         .enabledExtensionCount = deviceExtensions.len,
         .ppEnabledExtensionNames = @ptrCast(&deviceExtensions),
-        .queueCreateInfoCount = @intCast(queueCreateInfos.items.len),
-        .pQueueCreateInfos = queueCreateInfos.items.ptr,
+        .queueCreateInfoCount = numQueueInfos,
+        .pQueueCreateInfos = &queueCreateInfos,
         .pNext = &dynamicRenderingLocalRead
     };
 
@@ -167,8 +167,30 @@ fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, physical: c.V
         return error.failedToCreateLogicalDevice;
     }
 
-    c.vkGetDeviceQueue(device.*, indices.graphicsIndex.?, 0, &queues.graphics);
-    c.vkGetDeviceQueue(device.*, indices.computeIndex.?, 0, &queues.compute);
-    c.vkGetDeviceQueue(device.*, indices.presentIndex.?, 0, &queues.present);
-    c.vkGetDeviceQueue(device.*, indices.transferIndex.?, 0, &queues.transfer);
+    try createQueues(device.*, queueFamilyIndices.*, queues);
+}
+
+fn createQueues(device: c.VkDevice, queueFamilyIndices: Utils.QueueFamilyIndices, queues: *Utils.Queues) !void {
+    //  Allocate array of queues
+    queues.*.graphicsQueues = try std.heap.page_allocator.alloc(c.VkQueue, queueFamilyIndices.graphicsQueueCount);
+    //  Fill the array with handles to all the graphics queues
+    for(queues.*.graphicsQueues, 0..) |*queue, i| {
+        c.vkGetDeviceQueue(device, queueFamilyIndices.graphicsIndex.?, @intCast(i), queue);
+    }
+    //  Index to track which queue in the array to access
+    var queueIndex: usize = 0;
+    //  If the present queue family is the same as the graphics queue family, we assign the present
+    //      queue to one in the queue array
+    if(queueFamilyIndices.graphicsIndex.? == queueFamilyIndices.presentIndex.?) {
+        queues.*.presentQueue = queues.*.graphicsQueues[queueIndex];
+        //  Iterating queueIndex like this ensures it never exceeds the amount of queues we
+        //      actually created, allowing queues to be reused for multiple purposes if needed
+        queueIndex = (queueIndex + 1) % queueFamilyIndices.graphicsQueueCount;
+    }
+    //  Otherwise we set the present queue to a separate handle
+    else {
+        c.vkGetDeviceQueue(device, queueFamilyIndices.presentIndex.?, 0, &queues.presentQueue);
+    }
+    //  Get handle to the transfer queue
+    queues.*.transferQueue = queues.*.graphicsQueues[queueIndex];
 }

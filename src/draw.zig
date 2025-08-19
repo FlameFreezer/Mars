@@ -1,6 +1,7 @@
 const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
+const Math = @import("math.zig");
 
 pub fn drawFrame(state: *Utils.State) !void {
     const fenceWaitResult = c.vkWaitForFences(state.device, 1, &state.fences[state.currentFrame], c.VK_TRUE, std.math.maxInt(u64));
@@ -115,7 +116,8 @@ pub fn drawFrame(state: *Utils.State) !void {
             .commandBuffer = currentCommandBuffer
         }
     };
-    if(c.vkQueueSubmit2(state.queues.graphics, 1, &submitInfo, state.fences[state.currentFrame]) != c.VK_SUCCESS) {
+    const queueIndex = getQueueIndex(state, imageViewIndex);
+    if(c.vkQueueSubmit2(state.queues.graphicsQueues[queueIndex], 1, &submitInfo, state.fences[state.currentFrame]) != c.VK_SUCCESS) {
         return error.failedToSubmitToQueue;
     }
     const presentInfo = c.VkPresentInfoKHR{
@@ -127,7 +129,7 @@ pub fn drawFrame(state: *Utils.State) !void {
         .pImageIndices = &imageViewIndex,
         .pResults = null
     };
-    if(c.vkQueuePresentKHR(state.queues.present, &presentInfo) != c.VK_SUCCESS) {
+    if(c.vkQueuePresentKHR(state.queues.presentQueue, &presentInfo) != c.VK_SUCCESS) {
         return error.failedToPresent;
     }
 
@@ -192,6 +194,28 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
     };
     c.vkCmdSetScissorWithCount(currentCommandBuffer, 1, &scissor);
 
+    //Wait on the meshes to finish loading
+    if(state.*.activeFlags & Utils.Flags.BEGAN_MESH_LOADING != 0) {
+        const fenceWaitResult = c.vkWaitForFences(state.device, 1, &state.*.transferOpFence, c.VK_TRUE, std.math.maxInt(u64));
+        if(fenceWaitResult != c.VK_SUCCESS and fenceWaitResult != c.VK_TIMEOUT) {
+            return error.failedWaitingOnFence;
+        }
+        if(c.vkResetFences(state.device, 1, &state.*.transferOpFence) != c.VK_SUCCESS) {
+            return error.failedToResetFence;
+        }
+        //Destroy staging buffers used to load meshes
+        for(state.transferStagingBuffers.items) |*stagingBuffer| {
+            stagingBuffer.*.destroy(state.device, null);
+        }
+        state.transferStagingBuffers.clearRetainingCapacity();
+
+        if(c.vkResetCommandBuffer(state.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT], 0) != c.VK_SUCCESS) {
+            return error.failedToResetCommandBuffer;
+        }
+
+        state.*.activeFlags &= ~Utils.Flags.BEGAN_MESH_LOADING;
+    }
+
     var vertexBuffers =  std.ArrayList(c.VkBuffer).init(std.heap.page_allocator);
     defer vertexBuffers.deinit();
     for(state.meshes.items) |*mesh| try vertexBuffers.append(mesh.buffer.handle);
@@ -230,19 +254,33 @@ fn updateCameraPushConstant(state: *Utils.State) void {
             / @as(f32, @floatFromInt(state.swapchainExtent.width));
 
     state.cameraPushConstant = .{
-        .view = Utils.view(
-            state.camera.dir,
-            state.camera.pos.vector(),
-            Utils.Vec(3).init(.{0.0, 1.0, 0.0})
+        .view = Math.view(
+            state.*.camera.dir,
+            state.*.camera.pos.vector(),
+            Math.Vec3.init(.{0.0, 1.0, 0.0})
         ),
-        .perspective = Utils.perspective(1.0, 1000.0, state.camera.fov, aspectRatio)
+        .perspective = Math.perspective(1.0, 1000.0, state.camera.fov, aspectRatio)
     };
 }
 
 fn updateObjectUniformBuffers(state: *Utils.State) void {
-    var it = state.objects.iterator();
-    while(it.next()) |entry| {
-        const object = entry.value_ptr;
-        object.uniformBuffer.hostMemory[state.currentFrame] = object.getModelMatrix();
+    {var it = state.objects.iterator();
+    while(it.next()) |obj| {
+        obj.value_ptr.*.uniformBuffer.hostMemory[state.currentFrame] = obj.value_ptr.*.getModelMatrix();
+    }}
+}
+
+fn getQueueIndex(state: *const Utils.State, imageViewIndex: u32) usize {
+    //  Add 1 to the imageViewIndex to account for the transfer queue
+    var result: usize = imageViewIndex + 1;
+
+    //  If the graphics and present queues are from the same family, we increase the offset to
+    //      account for the present queue
+    if(state.queueFamilyIndices.graphicsIndex.? == state.queueFamilyIndices.presentIndex.?) {
+        result += 1;
     }
+
+    //  Take the remainder of the index with the queueCount to prevent overrunning the array
+    return result % state.queueFamilyIndices.graphicsQueueCount;
+
 }

@@ -40,16 +40,14 @@ fn createSwapchain(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !v
 
     state.swapchainExtent = try chooseImageExtent(state.window, surfaceInfo.capabilities);
 
-    const queueFamilyIndices = try Utils.findQueueFamilyIndices(state.physicalDevice, state.surface);
-
     //Assume that the graphics and present queue families have different indices
     var imageSharingMode: c.VkSharingMode = c.VK_SHARING_MODE_CONCURRENT;
     var queueFamilyIndicesCount: u32 = 2;
-    const queueFamilyIndicesArr = [_]u32{@intCast(queueFamilyIndices.graphicsIndex.?), @intCast(queueFamilyIndices.presentIndex.?)};
+    const queueFamilyIndicesArr = [_]u32{@intCast(state.queueFamilyIndices.graphicsIndex.?), @intCast(state.queueFamilyIndices.presentIndex.?)};
     var queueFamilyIndicesArrayPtr: ?*const u32 = &queueFamilyIndicesArr[0];
 
     //If the graphics and present queue families have the same index, update the parameters
-    if(queueFamilyIndices.graphicsIndex.? == queueFamilyIndices.presentIndex.?) {
+    if(state.queueFamilyIndices.graphicsIndex.? == state.queueFamilyIndices.presentIndex.?) {
         imageSharingMode = c.VK_SHARING_MODE_EXCLUSIVE;
         queueFamilyIndicesCount = 0;
         queueFamilyIndicesArrayPtr = null;

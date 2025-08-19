@@ -2,49 +2,34 @@ const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
 
-pub fn init(state: *const Utils.State, vertices: []const Utils.Vertex, indices: []const u32, 
+pub fn init(state: *Utils.State, vertices: []const Utils.Vertex, indices: []const u32, 
     allocator: ?*c.VkAllocationCallbacks) 
-!Utils.Mesh {
-    const commandBuffer = try Utils.beginSingleTimeCommandBuffer(state.device, state.commandPool);
-
-    var stagingBuffer: Utils.Buffer = undefined;
-
-    const resultMesh = try createMesh(state, &stagingBuffer, commandBuffer, vertices, indices);
-
-    if(c.vkEndCommandBuffer(commandBuffer) != c.VK_SUCCESS) {
-        return error.failedToEndCommandBuffer;
-    }
-
-    const submitInfo = c.VkSubmitInfo2{
-        .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-        .waitSemaphoreInfoCount = 0,
-        .signalSemaphoreInfoCount = 0,
-        .commandBufferInfoCount = 1,
-        .pCommandBufferInfos = &.{
-            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-            .commandBuffer = commandBuffer
+!void {
+    if(state.activeFlags & Utils.Flags.BEGAN_MESH_LOADING == 0) {
+        state.activeFlags |= Utils.Flags.BEGAN_MESH_LOADING;
+        const cmdBeginInfo = c.VkCommandBufferBeginInfo{
+            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+        };
+        if(c.vkBeginCommandBuffer(state.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT], &cmdBeginInfo) != c.VK_SUCCESS) {
+            return error.failedToBeginCommandBuffer;
         }
-    };
-    if(c.vkQueueSubmit2(state.queues.transfer, 1, &submitInfo, null) != c.VK_SUCCESS) {
-        return error.failedToSubmitToQueue;
     }
 
-    _ = c.vkQueueWaitIdle(state.queues.transfer);
+    const resultMesh = try createMesh(state, vertices, indices, allocator);
 
-    c.vkFreeCommandBuffers(state.device, state.commandPool, 1, &commandBuffer);
-    stagingBuffer.destroy(state.device, allocator);
-    return resultMesh;
+    try state.meshes.append(resultMesh);
 }
 
-pub fn createMesh(state: *const Utils.State, stagingBuffer: *Utils.Buffer, 
-    commandBuffer: c.VkCommandBuffer, vertices: []const Utils.Vertex, indices: []const u32) 
+pub fn createMesh(state: *Utils.State, 
+    vertices: []const Utils.Vertex, indices: []const u32, allocator: ?*c.VkAllocationCallbacks) 
 !Utils.Mesh {
     var result: Utils.Mesh = undefined;
     result.verticesSize = @as(u32, @intCast(vertices.len)) * @sizeOf(Utils.Vertex);
     result.indicesSize = @as(u32, @intCast(indices.len)) * @sizeOf(u32);
     result.objects = try std.ArrayList(u64).initCapacity(std.heap.page_allocator, Utils.MAX_OBJECTS);
 
-    result.buffer = try Utils.Buffer.create(state.physicalDevice, state.device, null, 
+    result.buffer = try Utils.Buffer.create(state.physicalDevice, state.device, allocator, 
         result.verticesSize + result.indicesSize, 
         c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT 
             | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT 
@@ -52,7 +37,7 @@ pub fn createMesh(state: *const Utils.State, stagingBuffer: *Utils.Buffer,
         c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
 
-    stagingBuffer.* = try Utils.Buffer.create(state.physicalDevice, state.device, null,
+    const stagingBuffer = try Utils.Buffer.create(state.physicalDevice, state.device, allocator,
         result.verticesSize + result.indicesSize, 
         c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
@@ -71,14 +56,14 @@ pub fn createMesh(state: *const Utils.State, stagingBuffer: *Utils.Buffer,
     @memcpy(@as([*]u32, @ptrCast(@alignCast(memory))), indices);
     c.vkUnmapMemory(state.device, stagingBuffer.memory);
 
-    c.vkCmdCopyBuffer(commandBuffer, stagingBuffer.handle, result.buffer.handle, 1, 
+    c.vkCmdCopyBuffer(state.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT], stagingBuffer.handle, result.buffer.handle, 1, 
         &.{
             .srcOffset = 0, 
             .dstOffset = 0, 
             .size = result.verticesSize + result.indicesSize
         }
     );
-
+    try state.transferStagingBuffers.append(stagingBuffer);
     return result;
 }
 
