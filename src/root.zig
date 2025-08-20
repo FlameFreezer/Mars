@@ -19,97 +19,119 @@ const Mesh = @import("mesh.zig");
 
 const enableValidationLayers: bool = buildOpts.isDebugBuild;
 
-pub usingnamespace(Utils);
+pub const State = struct {
+    name: []const u8,
+    nextEvent: c.SDL_Event,
+    programStartTime: i64,
+    time: i64,
+    deltaTimeUs: i64,
+    elapsedTime: i64,
+    camera: Utils.Camera,
+    activeFlags: Utils.MarsFlags = 0,
+    GPU: Utils.GPUState,
 
-pub fn init(state: *Utils.State, name: []const u8) !void {
-    if(!c.SDL_Init(c.SDL_INIT_VIDEO)) {
-        return error.failedToInitializeSDL3;
-    }
-    state.currentFrame = 0;
-    state.name = name;
-    state.lastGeneratedId = 0;
-    state.activeFlags = Utils.Flags.NONE;
-
-    try Instance.init(state, enableValidationLayers, null);
-    if(enableValidationLayers) {
-        DebugMessenger.init(state, null);
-    }
-    try Window.init(state, null);
-    try Device.init(state, null);
-    try Swapchain.init(state, null);
-    try DepthResources.init(state, null);
-    try SyncObjects.init(state, null);
-    try CommandBuffer.init(state, null);
-    try DescriptorSetLayout.init(state, null);
-    try GraphicsPipeline.init(state, null);
-    state.meshes = std.ArrayList(Utils.Mesh).init(std.heap.page_allocator);
-    state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, 
-        Utils.Object.HashContext{.hashModulus = Utils.MAX_OBJECTS});
-    state.transferStagingBuffers = std.ArrayList(Utils.Buffer).init(std.heap.page_allocator);
-    state.programStartTime = std.time.milliTimestamp();
-    state.time = state.programStartTime;
-    state.deltaTimeUs = 0;
-    
-    state.camera = .{
-        .pos = .{.x = -65.0, .y = 20.0, .z = 0.0},
-    };
-    state.camera.setTarget(.{.x = 0.0, .y = 0.0, .z = 0.0});
-}
-
-pub fn mainLoop(state: *Utils.State) !void {
-    try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null);
-    try loadObjects(state);
-
-    while(state.notFlagSet(Utils.Flags.WINDOW_SHOULD_CLOSE)) {
-        const nowUs: i64 = std.time.microTimestamp();
-        state.deltaTimeUs = nowUs - state.time * std.time.us_per_ms;
-        state.time = @divFloor(nowUs, std.time.us_per_ms);
-        state.elapsedTime = state.time - state.programStartTime;
-
-        while(c.SDL_PollEvent(&state.nextEvent)) {
-            try handleEvent(state);
+    pub fn init(state: *State, name: []const u8) !void {
+        if(!c.SDL_Init(c.SDL_INIT_VIDEO)) {
+            return error.failedToInitializeSDL3;
         }
+        state.name = name;
+        state.activeFlags = Utils.Flags.NONE;
+        try state.initGPU(state.name);
+        state.programStartTime = std.time.milliTimestamp();
+        state.time = state.programStartTime;
+        state.deltaTimeUs = 0;
+        state.camera = .{
+            .pos = .{.x = -65.0, .y = 20.0, .z = 0.0},
+        };
+        state.camera.setTarget(.{.x = 0.0, .y = 0.0, .z = 0.0});
+    }
 
-        try loadMeshes(state);
+    pub fn mainLoop(state: *State) !void {
+        try Mesh.init(&state.GPU, &Mesh.cubeVertices, &Mesh.cubeIndices, null);
+        try loadObjects(&state.GPU);
 
-        if(state.notFlagSet(Utils.Flags.IS_PAUSED)) {
-            {var it = state.objects.iterator();
-            while(it.next()) |obj| {
-                obj.value_ptr.*.angle += std.math.pi / 2000000.0 * @as(f32, @floatFromInt(state.deltaTimeUs));
-            }}
+        while(state.notFlagSet(Utils.Flags.WINDOW_SHOULD_CLOSE)) {
+            const nowUs: i64 = std.time.microTimestamp();
+            state.deltaTimeUs = nowUs - state.time * std.time.us_per_ms;
+            state.time = @divFloor(nowUs, std.time.us_per_ms);
+            state.elapsedTime = state.time - state.programStartTime;
 
-            try Draw.drawFrame(state);
+            while(c.SDL_PollEvent(&state.nextEvent)) {
+                try handleEvent(state);
+            }
+
+            try loadMeshes(&state.GPU);
+
+            if(state.notFlagSet(Utils.Flags.IS_PAUSED)) {
+                {var it = state.GPU.objects.iterator();
+                while(it.next()) |obj| {
+                    obj.value_ptr.*.angle += std.math.pi / 2000000.0 * @as(f32, @floatFromInt(state.deltaTimeUs));
+                }}
+
+                try Draw.drawFrame(&state.GPU, state.camera);
+            }
         }
+        _ = c.vkDeviceWaitIdle(state.GPU.device);
     }
-    _ = c.vkDeviceWaitIdle(state.device);
-}
 
-pub fn cleanup(state: *Utils.State) void {
-    {var it = state.objects.iterator();
-    while(it.next()) |entry| {
-        entry.value_ptr.destroy(state.device, state.descriptorPool, null);
-    }}
-    state.objects.deinit();
-    for(state.meshes.items) |*mesh| mesh.destroy(state.device, null);
-    state.meshes.deinit();
-    state.transferStagingBuffers.deinit();
-    GraphicsPipeline.destroy(state, null);
-    DescriptorSetLayout.destroy(state, null);
-    CommandBuffer.destroy(state, null);
-    SyncObjects.destroy(state, null);
-    DepthResources.destroy(state, null);
-    Swapchain.destroy(state, null);
-    if(enableValidationLayers) {
-        DebugMessenger.destroy(state, null);
+    pub fn cleanup(state: *State) void {
+        {var it = state.GPU.objects.iterator();
+        while(it.next()) |entry| {
+            entry.value_ptr.destroy(state.GPU.device, state.GPU.descriptorPool, null);
+        }}
+        state.GPU.objects.deinit();
+        for(state.GPU.meshes.items) |*mesh| mesh.destroy(state.GPU.device, null);
+        state.GPU.meshes.deinit();
+        state.GPU.transferStagingBuffers.deinit();
+        GraphicsPipeline.destroy(&state.GPU, null);
+        DescriptorSetLayout.destroy(&state.GPU, null);
+        CommandBuffer.destroy(&state.GPU, null);
+        SyncObjects.destroy(&state.GPU, null);
+        DepthResources.destroy(&state.GPU, null);
+        Swapchain.destroy(&state.GPU, null);
+        if(enableValidationLayers) {
+            DebugMessenger.destroy(&state.GPU, null);
+        }
+        Device.destroy(&state.GPU, null);
+        std.heap.page_allocator.free(state.GPU.queues.graphicsQueues);
+        Window.destroy(&state.GPU, null);
+        Instance.destroy(&state.GPU, null);
+        c.SDL_Quit();
     }
-    Device.destroy(state, null);
-    std.heap.page_allocator.free(state.queues.graphicsQueues);
-    Window.destroy(state, null);
-    Instance.destroy(state, null);
-    c.SDL_Quit();
-}
 
-fn loadMeshes(state: *Utils.State) !void {
+    /// Returns true is the provided flags are set, since zig is so anal about truthy values
+    pub fn isFlagSet(Self: *State, flag: Utils.MarsFlags) bool {
+        return Self.*.activeFlags & flag != 0;
+    }
+    /// Returns true if the provided flags are not set, since zig is so anal about truthy values
+    pub fn notFlagSet(Self: *State, flag: Utils.MarsFlags) bool {
+        return Self.*.activeFlags & flag == 0;
+    }
+
+    fn initGPU(Self: *State, windowName: []const u8) !void {
+        const state: *Utils.GPUState = &Self.*.GPU;
+        try Instance.init(state, enableValidationLayers, null);
+        if(enableValidationLayers) {
+            DebugMessenger.init(state, null);
+        }
+        try Window.init(state, windowName, null);
+        try Device.init(state, null);
+        try Swapchain.init(state, null);
+        try DepthResources.init(state, null);
+        try SyncObjects.init(state, null);
+        try CommandBuffer.init(state, null);
+        try DescriptorSetLayout.init(state, null);
+        try GraphicsPipeline.init(state, null);
+        state.meshes = std.ArrayList(Utils.Mesh).init(std.heap.page_allocator);
+        state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, 
+            Utils.Object.HashContext{.hashModulus = Utils.MAX_OBJECTS});
+        state.transferStagingBuffers = std.ArrayList(Utils.Buffer).init(std.heap.page_allocator);
+        state.currentFrame = 0;
+        state.lastGeneratedId = 0;
+    }
+};
+
+fn loadMeshes(state: *Utils.GPUState) !void {
     if(state.*.notFlagSet(Utils.Flags.BEGAN_MESH_LOADING)) return;
 
     if(c.vkEndCommandBuffer(state.*.transferCommandBuffer) != c.VK_SUCCESS) {
@@ -130,7 +152,7 @@ fn loadMeshes(state: *Utils.State) !void {
     }
 }
 
-fn loadObjects(state: *Utils.State) !void {
+fn loadObjects(state: *Utils.GPUState) !void {
     const obj = try Utils.Object.create(state, 
         Utils.Pos{.x = -25.0, .y = -5.0, .z = -5.0},
         Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
@@ -148,12 +170,12 @@ fn loadObjects(state: *Utils.State) !void {
     try state.objects.put(obj2.id, obj2);
 }
 
-fn handleEvent(state: *Utils.State) !void {
+fn handleEvent(state: *State) !void {
     switch(state.nextEvent.type) {
         c.SDL_EVENT_QUIT => state.activeFlags |= Utils.Flags.WINDOW_SHOULD_CLOSE,
         c.SDL_EVENT_WINDOW_CLOSE_REQUESTED => state.activeFlags 
             |= Utils.Flags.WINDOW_SHOULD_CLOSE,
-        c.SDL_EVENT_WINDOW_RESIZED => try Swapchain.recreate(state, null),
+        c.SDL_EVENT_WINDOW_RESIZED => try Swapchain.recreate(&state.GPU, null),
         c.SDL_EVENT_WINDOW_MINIMIZED => {
             state.activeFlags |= Utils.Flags.WINDOW_IS_MINIMIZED | Utils.Flags.IS_PAUSED;
             state.activeFlags &= ~Utils.Flags.WINDOW_IS_MAXIMIZED;
@@ -166,7 +188,7 @@ fn handleEvent(state: *Utils.State) !void {
             state.activeFlags &= ~Utils.Flags.WINDOW_IS_MAXIMIZED;
             state.activeFlags &= ~Utils.Flags.WINDOW_IS_MINIMIZED;
             state.activeFlags &= ~Utils.Flags.IS_PAUSED;
-            try Swapchain.recreate(state, null);
+            try Swapchain.recreate(&state.GPU, null);
         },
         else => {}
     }

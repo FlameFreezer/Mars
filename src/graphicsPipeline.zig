@@ -7,7 +7,7 @@ const shaderModule = struct {
     code: []const u8
 };
 
-pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+pub fn init(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     //These dynamic states will be configured during the render pass
     const dynamicStates = [_]c.VkDynamicState{
         c.VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT, 
@@ -139,7 +139,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     }
 }
 
-pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
+pub fn destroy(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) void {
     c.vkDestroyPipeline(state.device, state.graphicsPipeline, allocator);
     c.vkDestroyPipelineLayout(state.device, state.graphicsPipelineLayout, allocator);
 }

@@ -3,7 +3,7 @@ const std = @import("std");
 const Utils = @import("utils.zig");
 const Math = @import("math.zig");
 
-pub fn drawFrame(state: *Utils.State) !void {
+pub fn drawFrame(state: *Utils.GPUState, camera: Utils.Camera) !void {
     const fenceWaitResult = c.vkWaitForFences(state.device, 1, &state.fences[state.currentFrame], c.VK_TRUE, std.math.maxInt(u64));
     if(fenceWaitResult != c.VK_SUCCESS and fenceWaitResult != c.VK_TIMEOUT) {
         return error.failedWaitingOnFence;
@@ -27,7 +27,7 @@ pub fn drawFrame(state: *Utils.State) !void {
         return error.failedToAcquireSwapchainImage;
     }
 
-    updateCameraPushConstant(state);
+    updateCameraPushConstant(state, camera);
     updateObjectUniformBuffers(state);
 
     const currentCommandBuffer = state.commandBuffers[state.currentFrame];
@@ -136,7 +136,7 @@ pub fn drawFrame(state: *Utils.State) !void {
     state.currentFrame = (state.currentFrame + 1) % Utils.MAX_FRAMES_IN_FLIGHT;
 }
 
-fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
+fn doRenderPass(state: *Utils.GPUState, imageViewIndex: u32) !void {
     const currentCommandBuffer = state.commandBuffers[state.currentFrame];
     const renderingInfo = c.VkRenderingInfo{
         .sType = c.VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -249,28 +249,28 @@ fn doRenderPass(state: *Utils.State, imageViewIndex: u32) !void {
     c.vkCmdEndRendering(currentCommandBuffer);
 }
 
-fn updateCameraPushConstant(state: *Utils.State) void {
+fn updateCameraPushConstant(state: *Utils.GPUState, camera: Utils.Camera) void {
     const aspectRatio: f32 = @as(f32, @floatFromInt(state.swapchainExtent.height)) 
             / @as(f32, @floatFromInt(state.swapchainExtent.width));
 
     state.cameraPushConstant = .{
         .view = Math.view(
-            state.*.camera.dir,
-            state.*.camera.pos.vector(),
+            camera.dir,
+            camera.pos.vector(),
             Math.Vec3.init(.{0.0, 1.0, 0.0})
         ),
-        .perspective = Math.perspective(1.0, 1000.0, state.camera.fov, aspectRatio)
+        .perspective = Math.perspective(1.0, 1000.0, camera.fov, aspectRatio)
     };
 }
 
-fn updateObjectUniformBuffers(state: *Utils.State) void {
+fn updateObjectUniformBuffers(state: *Utils.GPUState) void {
     {var it = state.objects.iterator();
     while(it.next()) |obj| {
         obj.value_ptr.*.uniformBuffer.hostMemory[state.currentFrame] = obj.value_ptr.*.getModelMatrix();
     }}
 }
 
-fn getQueueIndex(state: *const Utils.State, imageViewIndex: u32) usize {
+fn getQueueIndex(state: *const Utils.GPUState, imageViewIndex: u32) usize {
     //  Add 1 to the imageViewIndex to account for the transfer queue
     var result: usize = imageViewIndex + 1;
 

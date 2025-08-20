@@ -10,12 +10,12 @@ const deviceExtensions = [_]*const[c.VK_MAX_EXTENSION_NAME_SIZE]u8{
     @ptrCast(c.VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME)
 };
 
-pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+pub fn init(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     try pickPhysicalDevice(&state.physicalDevice, state.surface, state.instance);
     try createLogicalDevice(&state.device, &state.queues, &state.queueFamilyIndices, state.physicalDevice, state.surface, allocator);
 }
 
-pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
+pub fn destroy(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) void {
     _ = c.vkDeviceWaitIdle(state.device);
     c.vkDestroyDevice(state.device, allocator);
 }

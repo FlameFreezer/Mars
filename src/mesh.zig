@@ -2,10 +2,10 @@ const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
 
-pub fn init(state: *Utils.State, vertices: []const Utils.Vertex, indices: []const u32, 
+pub fn init(state: *Utils.GPUState, vertices: []const Utils.Vertex, indices: []const u32, 
     allocator: ?*c.VkAllocationCallbacks) 
 !void {
-    if(state.activeFlags & Utils.Flags.BEGAN_MESH_LOADING == 0) {
+    if(state.notFlagSet(Utils.Flags.BEGAN_MESH_LOADING)) {
         state.activeFlags |= Utils.Flags.BEGAN_MESH_LOADING;
         const cmdBeginInfo = c.VkCommandBufferBeginInfo{
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -21,7 +21,7 @@ pub fn init(state: *Utils.State, vertices: []const Utils.Vertex, indices: []cons
     try state.meshes.append(resultMesh);
 }
 
-pub fn createMesh(state: *Utils.State, 
+pub fn createMesh(state: *Utils.GPUState, 
     vertices: []const Utils.Vertex, indices: []const u32, allocator: ?*c.VkAllocationCallbacks) 
 !Utils.Mesh {
     var result: Utils.Mesh = undefined;

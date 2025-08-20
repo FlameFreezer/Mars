@@ -15,15 +15,8 @@ pub const Flags = struct {
     pub const BEGAN_MESH_LOADING: MarsFlags = 1 << 4;
 };
 
-pub const State = struct {
-    name: []const u8,
-    nextEvent: c.SDL_Event,
-    programStartTime: i64,
-    time: i64,
-    deltaTimeUs: i64,
-    elapsedTime: i64,
-    camera: Camera,
-    activeFlags: MarsFlags = 0,
+pub const GPUState = struct {
+    activeFlags: MarsFlags,
     window: *c.SDL_Window,
     instance: c.VkInstance,
     debugMessenger: c.VkDebugUtilsMessengerEXT,
@@ -58,14 +51,13 @@ pub const State = struct {
     transferStagingBuffers: std.ArrayList(Buffer),
 
     /// Returns true is the provided flags are set, since zig is so anal about truthy values
-    pub fn isFlagSet(Self: *State, flag: MarsFlags) bool {
+    pub fn isFlagSet(Self: *GPUState, flag: MarsFlags) bool {
         return Self.*.activeFlags & flag != 0;
     }
     /// Returns true if the provided flags are not set, since zig is so anal about truthy values
-    pub fn notFlagSet(Self: *State, flag: MarsFlags) bool {
+    pub fn notFlagSet(Self: *GPUState, flag: MarsFlags) bool {
         return Self.*.activeFlags & flag == 0;
     }
-
 };
 
 pub const ObjectArrayHashMap = std.ArrayHashMap(u64, Object, Object.HashContext, true);
@@ -117,7 +109,7 @@ pub const UniformBuffer = struct {
     deviceMemory: c.VkDeviceMemory,
     hostMemory: []align(16) Math.Mat4,
 
-    pub fn create(state: *const State, allocator: ?*c.VkAllocationCallbacks) !UniformBuffer {
+    pub fn create(state: *const GPUState, allocator: ?*c.VkAllocationCallbacks) !UniformBuffer {
         var result: UniformBuffer = undefined;
         const buffer = try Buffer.create(state.physicalDevice, state.device, allocator, @sizeOf(Math.Mat4) * MAX_FRAMES_IN_FLIGHT,
             c.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
@@ -416,7 +408,7 @@ pub const Object = struct {
         return rotation.mult(translation).mult(scale);
     }
 
-    pub fn create(state: *State, pos: Pos, scaling: Pos, orientation: Math.Vec3, angle: f32, 
+    pub fn create(state: *GPUState, pos: Pos, scaling: Pos, orientation: Math.Vec3, angle: f32, 
         mesh: *Mesh, allocator: ?*c.VkAllocationCallbacks) 
     !Object {
         var result: Object = undefined;

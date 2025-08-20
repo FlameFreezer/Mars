@@ -2,7 +2,7 @@ const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
 
-pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+pub fn init(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     //  Each swapchain image gets its own presentation semaphore
     //  Each frame gets its own image acquisition semaphore
     state.semaphores = try std.heap.page_allocator.alloc(c.VkSemaphore, state.swapchainImages.len + Utils.MAX_FRAMES_IN_FLIGHT);
@@ -32,7 +32,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
      }
 }
 
-pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
+pub fn destroy(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) void {
     for(state.fences) |fence| {
         c.vkDestroyFence(state.device, fence, allocator);
     }

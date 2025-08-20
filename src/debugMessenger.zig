@@ -16,26 +16,18 @@ pub fn createInfo() c.VkDebugUtilsMessengerCreateInfoEXT {
     };
 }
 
-pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
+pub fn init(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) void {
     var debugMessengerInfo: c.VkDebugUtilsMessengerCreateInfoEXT = createInfo();
-    const createFn: 
-    ?*const fn
-    (
-        c.VkInstance, 
-        ?*c.VkDebugUtilsMessengerCreateInfoEXT, 
-        ?*c.VkAllocationCallbacks, 
-        ?*c.VkDebugUtilsMessengerEXT
-    ) callconv(.c) c.VkResult = @ptrCast(c.vkGetInstanceProcAddr(state.instance, "vkCreateDebugUtilsMessengerEXT"));
+    const createFn: ?*const fn(c.VkInstance, ?*c.VkDebugUtilsMessengerCreateInfoEXT, 
+        ?*c.VkAllocationCallbacks, ?*c.VkDebugUtilsMessengerEXT) callconv(.c) c.VkResult 
+        = @ptrCast(c.vkGetInstanceProcAddr(state.instance, "vkCreateDebugUtilsMessengerEXT"));
     _ = createFn.?(state.instance, &debugMessengerInfo, allocator, &state.debugMessenger);
 }
 
-pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
-    const destroyFn: ?*const fn
-    (
-        c.VkInstance, 
-        c.VkDebugUtilsMessengerEXT, 
-        ?*c.VkAllocationCallbacks
-    ) callconv(.c) void = @ptrCast(c.vkGetInstanceProcAddr(state.instance, "vkDestroyDebugUtilsMessengerEXT"));
+pub fn destroy(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) void {
+    const destroyFn: ?*const fn(c.VkInstance, c.VkDebugUtilsMessengerEXT, 
+        ?*c.VkAllocationCallbacks) callconv(.c) void 
+        = @ptrCast(c.vkGetInstanceProcAddr(state.instance, "vkDestroyDebugUtilsMessengerEXT"));
     destroyFn.?(state.instance, state.debugMessenger, allocator);
 }
 

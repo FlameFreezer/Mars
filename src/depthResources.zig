@@ -6,7 +6,7 @@ const candidateDepthFormats = [_]c.VkFormat{
     c.VK_FORMAT_D32_SFLOAT, c.VK_FORMAT_D32_SFLOAT_S8_UINT, c.VK_FORMAT_D24_UNORM_S8_UINT
 };
 
-pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+pub fn init(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     const depthFormatIndex = try chooseDepthFormat(state.physicalDevice);
     const depthImageInfo = c.VkImageCreateInfo{
         .sType = c.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -67,7 +67,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     }
 }
 
-pub fn destroy(state: *const Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
+pub fn destroy(state: *const Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) void {
     c.vkDestroyImageView(state.device, state.depthImageView, allocator);
     c.vkDestroyImage(state.device, state.depthImage, allocator);
     c.vkFreeMemory(state.device, state.depthImageMemory, allocator);

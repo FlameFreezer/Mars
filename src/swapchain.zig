@@ -5,7 +5,7 @@ const DepthResources = @import("depthResources.zig");
 
 const Swapchain = @This();
 
-pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+pub fn init(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     try createSwapchain(state, allocator);
     
     var imageCount: u32 = 0;
@@ -16,7 +16,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     try createSwapchainImageViews(&state.swapchainImageViews, state.swapchainImages, state.device, allocator);
 }
 
-pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
+pub fn destroy(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) void {
     std.heap.page_allocator.free(state.swapchainImages);
     for(state.swapchainImageViews) |imageView| {
         c.vkDestroyImageView(state.device, imageView, allocator);
@@ -25,7 +25,7 @@ pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
     c.vkDestroySwapchainKHR(state.device, state.swapchain, allocator);
 }
 
-pub fn recreate(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+pub fn recreate(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     _ = c.vkDeviceWaitIdle(state.device);
     Swapchain.destroy(state, allocator);
     DepthResources.destroy(state, allocator);
@@ -33,7 +33,7 @@ pub fn recreate(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void
     try DepthResources.init(state, allocator);
 }
 
-fn createSwapchain(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+fn createSwapchain(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     var surfaceInfo = Utils.SurfaceInfo{};
     try surfaceInfo.query(state.physicalDevice, state.surface);
     defer surfaceInfo.free();

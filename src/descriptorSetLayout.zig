@@ -2,7 +2,7 @@ const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
 
-pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
+pub fn init(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     const descriptorSetLayoutBindings = [_]c.VkDescriptorSetLayoutBinding{
         .{
             .binding = 0,
@@ -45,7 +45,7 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
     }
 }
 
-pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
+pub fn destroy(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) void {
     c.vkDestroyDescriptorPool(state.device, state.descriptorPool, allocator);
     c.vkDestroyDescriptorSetLayout(state.device, state.descriptorSetLayout, allocator);
 }
