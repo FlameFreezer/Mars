@@ -57,10 +57,10 @@ pub fn init(state: *Utils.State, name: []const u8) !void {
 }
 
 pub fn mainLoop(state: *Utils.State) !void {
-    try loadMeshes(state);
+    try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null);
     try loadObjects(state);
 
-    while(state.activeFlags & Utils.Flags.WINDOW_SHOULD_CLOSE == 0) {
+    while(state.notFlagSet(Utils.Flags.WINDOW_SHOULD_CLOSE)) {
         const nowUs: i64 = std.time.microTimestamp();
         state.deltaTimeUs = nowUs - state.time * std.time.us_per_ms;
         state.time = @divFloor(nowUs, std.time.us_per_ms);
@@ -70,7 +70,9 @@ pub fn mainLoop(state: *Utils.State) !void {
             try handleEvent(state);
         }
 
-        if(state.activeFlags & Utils.Flags.IS_PAUSED == 0) {
+        try loadMeshes(state);
+
+        if(state.notFlagSet(Utils.Flags.IS_PAUSED)) {
             {var it = state.objects.iterator();
             while(it.next()) |obj| {
                 obj.value_ptr.*.angle += std.math.pi / 2000000.0 * @as(f32, @floatFromInt(state.deltaTimeUs));
@@ -107,6 +109,45 @@ pub fn cleanup(state: *Utils.State) void {
     c.SDL_Quit();
 }
 
+fn loadMeshes(state: *Utils.State) !void {
+    if(state.*.notFlagSet(Utils.Flags.BEGAN_MESH_LOADING)) return;
+
+    if(c.vkEndCommandBuffer(state.*.transferCommandBuffer) != c.VK_SUCCESS) {
+        return error.failedToEndCommandBuffer;
+    }
+    const submitInfo = c.VkSubmitInfo2{
+        .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .waitSemaphoreInfoCount = 0,
+        .signalSemaphoreInfoCount = 0,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &c.VkCommandBufferSubmitInfo{
+            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+            .commandBuffer = state.*.transferCommandBuffer
+        }
+    };
+    if(c.vkQueueSubmit2(state.*.queues.transferQueue, 1, &submitInfo, state.*.transferOpFence) != c.VK_SUCCESS) {
+        return error.failedToSubmitToQueue;
+    }
+}
+
+fn loadObjects(state: *Utils.State) !void {
+    const obj = try Utils.Object.create(state, 
+        Utils.Pos{.x = -25.0, .y = -5.0, .z = -5.0},
+        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
+        Math.Vec3.init(.{0.0, 1.0, 0.0}),
+        0.0, &state.meshes.items[0], null
+    );
+    try state.objects.put(obj.id, obj);
+
+    const obj2 = try Utils.Object.create(state,
+        Utils.Pos{.x = 20, .y = -5.0, .z = -5.0},
+        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
+        Math.Vec3.init(.{0.0, 1.0, 0.0}),
+        0.0, &state.meshes.items[0], null
+    );
+    try state.objects.put(obj2.id, obj2);
+}
+
 fn handleEvent(state: *Utils.State) !void {
     switch(state.nextEvent.type) {
         c.SDL_EVENT_QUIT => state.activeFlags |= Utils.Flags.WINDOW_SHOULD_CLOSE,
@@ -129,42 +170,4 @@ fn handleEvent(state: *Utils.State) !void {
         },
         else => {}
     }
-}
-
-fn loadMeshes(state: *Utils.State) !void {
-    try Mesh.init(state, &Mesh.cubeVertices, &Mesh.cubeIndices, null);
-    if(c.vkEndCommandBuffer(state.*.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT]) != c.VK_SUCCESS) {
-        return error.failedToEndCommandBuffer;
-    }
-    const submitInfo = c.VkSubmitInfo2{
-        .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-        .waitSemaphoreInfoCount = 0,
-        .signalSemaphoreInfoCount = 0,
-        .commandBufferInfoCount = 1,
-        .pCommandBufferInfos = &c.VkCommandBufferSubmitInfo{
-            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-            .commandBuffer = state.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT]
-        }
-    };
-    if(c.vkQueueSubmit2(state.queues.transferQueue, 1, &submitInfo, state.*.transferOpFence) != c.VK_SUCCESS) {
-        return error.failedToSubmitToQueue;
-    }
-}
-
-fn loadObjects(state: *Utils.State) !void {
-    const obj = try Utils.Object.create(state, 
-        Utils.Pos{.x = -25.0, .y = -5.0, .z = -5.0},
-        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
-        Math.Vec3.init(.{0.0, 1.0, 0.0}),
-        0.0, &state.meshes.items[0], null
-    );
-    try state.objects.put(obj.id, obj);
-
-    const obj2 = try Utils.Object.create(state,
-        Utils.Pos{.x = 20, .y = -5.0, .z = -5.0},
-        Utils.Pos{.x = 10.0, .y = 10.0, .z = 10.0},
-        Math.Vec3.init(.{0.0, 1.0, 0.0}),
-        0.0, &state.meshes.items[0], null
-    );
-    try state.objects.put(obj2.id, obj2);
 }

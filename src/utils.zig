@@ -39,6 +39,7 @@ pub const State = struct {
     commandPool: c.VkCommandPool,
     /// Each frame gets a command buffer, alongside one for transfer operations
     commandBuffers: [MAX_FRAMES_IN_FLIGHT + 1]c.VkCommandBuffer,
+    transferCommandBuffer: c.VkCommandBuffer,
     cameraPushConstant: CameraPushConstant,
     graphicsPipelineLayout: c.VkPipelineLayout,
     graphicsPipeline: c.VkPipeline,
@@ -55,6 +56,16 @@ pub const State = struct {
     objects: ObjectArrayHashMap,
     lastGeneratedId: u64,
     transferStagingBuffers: std.ArrayList(Buffer),
+
+    /// Returns true is the provided flags are set, since zig is so anal about truthy values
+    pub fn isFlagSet(Self: *State, flag: MarsFlags) bool {
+        return Self.*.activeFlags & flag != 0;
+    }
+    /// Returns true if the provided flags are not set, since zig is so anal about truthy values
+    pub fn notFlagSet(Self: *State, flag: MarsFlags) bool {
+        return Self.*.activeFlags & flag == 0;
+    }
+
 };
 
 pub const ObjectArrayHashMap = std.ArrayHashMap(u64, Object, Object.HashContext, true);

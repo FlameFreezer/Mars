@@ -11,7 +11,7 @@ pub fn init(state: *Utils.State, vertices: []const Utils.Vertex, indices: []cons
             .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
         };
-        if(c.vkBeginCommandBuffer(state.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT], &cmdBeginInfo) != c.VK_SUCCESS) {
+        if(c.vkBeginCommandBuffer(state.*.transferCommandBuffer, &cmdBeginInfo) != c.VK_SUCCESS) {
             return error.failedToBeginCommandBuffer;
         }
     }
@@ -56,7 +56,7 @@ pub fn createMesh(state: *Utils.State,
     @memcpy(@as([*]u32, @ptrCast(@alignCast(memory))), indices);
     c.vkUnmapMemory(state.device, stagingBuffer.memory);
 
-    c.vkCmdCopyBuffer(state.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT], stagingBuffer.handle, result.buffer.handle, 1, 
+    c.vkCmdCopyBuffer(state.*.transferCommandBuffer, stagingBuffer.handle, result.buffer.handle, 1, 
         &.{
             .srcOffset = 0, 
             .dstOffset = 0, 

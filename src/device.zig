@@ -2,16 +2,15 @@ const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
 
-//VkDeviceCreateInfo.ppEnabledExtensionNames assumes each name has an alignment of
-//  VK_MAX_EXTENSION_NAME_SIZE, so the string literal pointers have to be casted to fit into this 
-//  space to prevent a segmentation fault
+//  VkDeviceCreateInfo.ppEnabledExtensionNames assumes each name has an alignment of
+//      VK_MAX_EXTENSION_NAME_SIZE, so the string literal pointers have to be casted to fit into this 
+//      space to prevent a segmentation fault
 const deviceExtensions = [_]*const[c.VK_MAX_EXTENSION_NAME_SIZE]u8{ 
     @ptrCast(c.VK_KHR_SWAPCHAIN_EXTENSION_NAME),
     @ptrCast(c.VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME)
 };
 
 pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
-    
     try pickPhysicalDevice(&state.physicalDevice, state.surface, state.instance);
     try createLogicalDevice(&state.device, &state.queues, &state.queueFamilyIndices, state.physicalDevice, state.surface, allocator);
 }

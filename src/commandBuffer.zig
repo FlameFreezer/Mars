@@ -21,10 +21,11 @@ pub fn init(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) !void {
         .level = c.VK_COMMAND_BUFFER_LEVEL_PRIMARY
     };
 
-    if(c.vkAllocateCommandBuffers(state.device, &commandBufferInfo, &state.commandBuffers[0]) != c.VK_SUCCESS) {
+    if(c.vkAllocateCommandBuffers(state.device, &commandBufferInfo, &state.commandBuffers) != c.VK_SUCCESS) {
         return error.failedToAllocateCommandBuffers;
     }
 
+    state.*.transferCommandBuffer = state.*.commandBuffers[Utils.MAX_FRAMES_IN_FLIGHT];
 }
 
 pub fn destroy(state: *Utils.State, allocator: ?*c.VkAllocationCallbacks) void {
