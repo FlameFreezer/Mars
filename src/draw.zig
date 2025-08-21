@@ -3,6 +3,9 @@ const std = @import("std");
 const Utils = @import("utils.zig");
 const Math = @import("math.zig");
 
+const NEAR_CLIPPING_PLANE: f32 = 1.0;
+const FAR_CLIPPING_PLANE: f32 = 1000.0;
+
 pub fn drawFrame(state: *Utils.GPUState, camera: Utils.Camera) !void {
     const fenceWaitResult = c.vkWaitForFences(state.device, 1, &state.fences[state.currentFrame], c.VK_TRUE, std.math.maxInt(u64));
     if(fenceWaitResult != c.VK_SUCCESS and fenceWaitResult != c.VK_TIMEOUT) {
@@ -257,9 +260,9 @@ fn updateCameraPushConstant(state: *Utils.GPUState, camera: Utils.Camera) void {
         .view = Math.view(
             camera.dir,
             camera.pos.vector(),
-            Math.Vec3.init(.{0.0, 1.0, 0.0})
+            camera.upVector
         ),
-        .perspective = Math.perspective(1.0, 1000.0, camera.fov, aspectRatio)
+        .perspective = Math.perspective(NEAR_CLIPPING_PLANE, FAR_CLIPPING_PLANE, camera.fov, aspectRatio)
     };
 }
 

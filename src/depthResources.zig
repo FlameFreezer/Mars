@@ -29,7 +29,7 @@ pub fn init(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void 
     }
 
     var memRequirements: c.VkMemoryRequirements = undefined;
-    _ = c.vkGetImageMemoryRequirements(state.device, state.depthImage, &memRequirements);
+    c.vkGetImageMemoryRequirements(state.device, state.depthImage, &memRequirements);
 
     const allocInfo = c.VkMemoryAllocateInfo{
         .sType = c.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,

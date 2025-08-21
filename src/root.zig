@@ -31,18 +31,17 @@ pub const State = struct {
     GPU: Utils.GPUState,
 
     pub fn init(state: *State, name: []const u8) !void {
+        state.programStartTime = std.time.milliTimestamp();
+        state.time = state.programStartTime;
+        state.deltaTimeUs = 0;
         if(!c.SDL_Init(c.SDL_INIT_VIDEO)) {
             return error.failedToInitializeSDL3;
         }
         state.name = name;
         state.activeFlags = Utils.Flags.NONE;
         try state.initGPU(state.name);
-        state.programStartTime = std.time.milliTimestamp();
-        state.time = state.programStartTime;
-        state.deltaTimeUs = 0;
-        state.camera = .{
-            .pos = .{.x = -65.0, .y = 20.0, .z = 0.0},
-        };
+        state.camera = Utils.Camera.default;
+        state.camera.pos = .{.x = -65.0, .y = 20.0, .z = 0.0};
         state.camera.setTarget(.{.x = 0.0, .y = 0.0, .z = 0.0});
     }
 

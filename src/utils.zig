@@ -348,11 +348,19 @@ pub const Pos = struct {
     }
 };
 
+
 pub const Camera = struct {
-    pos: Pos = .{.x = 0.0, .y = 0.0, .z = 0.0},
-    dir: Math.Vec3 = .init(.{0.0, 0.0, 1.0}),
-    angle: f32 = 0.0,
-    fov: f32 = std.math.pi / 2.0,
+    pos: Pos,
+    dir: Math.Vec3,
+    upVector: Math.Vec3,
+    fov: f32,
+
+    pub const default = Camera{
+        .pos = .{.x = 0.0, .y = 0.0, .z = 0.0},
+        .dir = Math.Vec3.init(.{0.0, 0.0, 1.0}),
+        .upVector = Math.Vec3.init(.{0.0, 1.0, 0.0}),
+        .fov = std.math.pi / 2.0,
+    };
 
     pub fn setTarget(Self: *Camera, targetPos: Pos) void {
         Self.dir = targetPos.vector().subtract(Self.pos.vector());

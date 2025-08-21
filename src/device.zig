@@ -116,8 +116,6 @@ fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, queueFamilyIn
     var numQueueInfos: u32 = 1;
     const graphicsQueuePriorities = try std.heap.page_allocator.alloc(f32, queueFamilyIndices.graphicsQueueCount);
     defer std.heap.page_allocator.free(graphicsQueuePriorities);
-    const presentQueuePriorities = try std.heap.page_allocator.alloc(f32, queueFamilyIndices.presentQueueCount);
-    defer std.heap.page_allocator.free(presentQueuePriorities);
     //Graphics Queue Info
     @memset(graphicsQueuePriorities, 0.0);
     queueCreateInfos[0] = c.VkDeviceQueueCreateInfo{
@@ -129,12 +127,11 @@ fn createLogicalDevice(device: *c.VkDevice, queues: *Utils.Queues, queueFamilyIn
     //Present Queue Info
     if(queueFamilyIndices.graphicsIndex.? != queueFamilyIndices.presentIndex.?) {
         numQueueInfos += 1;
-        @memset(presentQueuePriorities, 0.0);
         queueCreateInfos[1] = c.VkDeviceQueueCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .queueFamilyIndex = queueFamilyIndices.presentIndex.?,
             .queueCount = 1,
-            .pQueuePriorities = presentQueuePriorities.ptr
+            .pQueuePriorities = &[1]f32{0.0}
         };
     }
 
