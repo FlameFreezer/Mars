@@ -86,7 +86,7 @@ pub const State = struct {
         DescriptorSetLayout.destroy(&state.GPU, null);
         CommandBuffer.destroy(&state.GPU, null);
         SyncObjects.destroy(&state.GPU, null);
-        DepthResources.destroy(&state.GPU, null);
+        state.GPU.depthImage.destroy(state.GPU.device, null);
         Swapchain.destroy(&state.GPU, null);
         if(enableValidationLayers) {
             DebugMessenger.destroy(&state.GPU, null);

@@ -151,7 +151,7 @@ fn doRenderPass(state: *Utils.GPUState, imageViewIndex: u32) !void {
         .viewMask = 0,
         .pDepthAttachment = &c.VkRenderingAttachmentInfo{
             .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = state.depthImageView,
+            .imageView = state.depthImage.view,
             .imageLayout = c.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             .loadOp = c.VK_ATTACHMENT_LOAD_OP_CLEAR,
             .clearValue = c.VkClearValue{

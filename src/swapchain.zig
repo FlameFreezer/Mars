@@ -28,7 +28,7 @@ pub fn destroy(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) voi
 pub fn recreate(state: *Utils.GPUState, allocator: ?*c.VkAllocationCallbacks) !void {
     _ = c.vkDeviceWaitIdle(state.device);
     Swapchain.destroy(state, allocator);
-    DepthResources.destroy(state, allocator);
+    state.depthImage.destroy(state.device, allocator);
     try Swapchain.init(state, allocator);
     try DepthResources.init(state, allocator);
 }
