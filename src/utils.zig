@@ -1,6 +1,22 @@
 const std = @import("std");
 const c = @import("c");
+const buildOpts = @import("buildOpts");
+
 const Math = @import("math.zig");
+const Window = @import("window.zig");
+const Instance = @import("instance.zig");
+const DebugMessenger = @import("debugMessenger.zig");
+const Device = @import("device.zig");
+const Swapchain = @import("swapchain.zig");
+const GraphicsPipeline = @import("graphicsPipeline.zig");
+const CommandBuffer = @import("commandBuffer.zig");
+const SyncObjects = @import("syncObjects.zig");
+const Draw = @import("draw.zig");
+const DescriptorSetLayout = @import("descriptorSetLayout.zig");
+const DepthResources = @import("depthResources.zig");
+const TexutreSampler = @import("textureSampler.zig");
+
+const enableValidationLayers: bool = buildOpts.isDebugBuild;
 
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
 pub const MAX_OBJECTS: usize = 512;
@@ -13,9 +29,63 @@ pub const Flags = struct {
     pub const WINDOW_SHOULD_CLOSE: MarsFlags = 1 << 2;
     pub const IS_PAUSED: MarsFlags = 1 << 3;
     pub const BEGAN_MESH_LOADING: MarsFlags = 1 << 4;
+    pub const RECREATE_SWAPCHAIN: MarsFlags = 1 << 5;
+};
+
+pub const State = struct {
+    name: []const u8,
+    nextEvent: c.SDL_Event,
+    programStartTime: i64,
+    time: i64,
+    deltaTimeUs: i64,
+    elapsedTime: i64,
+    camera: Camera,
+    activeFlags: MarsFlags,
+    GPU: GPUState,
+    objects: ObjectArrayHashMap,
+    lastGeneratedId: u64,
+
+    pub fn init(self: *State, name: []const u8) !void {
+        self.programStartTime = std.time.milliTimestamp();
+        self.time = self.programStartTime;
+        self.deltaTimeUs = 0;
+        if(!c.SDL_Init(c.SDL_INIT_VIDEO)) {
+            return error.failedToInitializeSDL3;
+        }
+        self.name = name;
+        self.activeFlags = Flags.NONE;
+        self.objects = ObjectArrayHashMap.initContext(std.heap.page_allocator, 
+            Object.HashContext{.hashModulus = MAX_OBJECTS});
+        try self.GPU.init(self);
+        self.camera = .default;
+        self.camera.pos = .{.x = -65.0, .y = 20.0, .z = 0.0};
+        self.camera.setTarget(.{.x = 0.0, .y = 0.0, .z = 0.0});
+        self.lastGeneratedId = 0;
+    }
+
+    pub fn cleanup(self: *State) void {
+        _ = c.vkDeviceWaitIdle(self.GPU.device);
+        {var it = self.objects.iterator();
+        while(it.next()) |entry| {
+            entry.value_ptr.destroy(self.GPU.device, self.GPU.descriptorPool, null);
+        }}
+        self.objects.deinit();
+        self.GPU.cleanup();
+        c.SDL_Quit();
+    }
+
+    /// Returns true is the provided flags are set, since zig is so anal about truthy values
+    pub fn isFlagSet(self: *const State, flag: MarsFlags) bool {
+        return self.*.activeFlags & flag != 0;
+    }
+    /// Returns true if the provided flags are not set, since zig is so anal about truthy values
+    pub fn notFlagSet(self: *const State, flag: MarsFlags) bool {
+        return self.*.activeFlags & flag == 0;
+    }
 };
 
 pub const GPUState = struct {
+    appState: *const State,
     activeFlags: MarsFlags,
     window: *c.SDL_Window,
     instance: c.VkInstance,
@@ -44,18 +114,55 @@ pub const GPUState = struct {
     descriptorPool: c.VkDescriptorPool,
     depthImage: Image,
     meshes: std.ArrayList(Mesh),
-    objects: ObjectArrayHashMap,
-    lastGeneratedId: u64,
     transferStagingBuffers: std.ArrayList(Buffer),
     textureSampler: c.VkSampler,
 
     /// Returns true is the provided flags are set, since zig is so anal about truthy values
-    pub fn isFlagSet(Self: *GPUState, flag: MarsFlags) bool {
-        return Self.*.activeFlags & flag != 0;
+    pub fn isFlagSet(self: *const GPUState, flag: MarsFlags) bool {
+        return self.*.activeFlags & flag != 0;
     }
     /// Returns true if the provided flags are not set, since zig is so anal about truthy values
-    pub fn notFlagSet(Self: *GPUState, flag: MarsFlags) bool {
-        return Self.*.activeFlags & flag == 0;
+    pub fn notFlagSet(self: *const GPUState, flag: MarsFlags) bool {
+        return self.*.activeFlags & flag == 0;
+    }
+
+    pub fn init(self: *GPUState, parent: *const State) !void {
+        self.appState = parent;
+        try Instance.init(self, enableValidationLayers, null);
+        if(enableValidationLayers) {
+            DebugMessenger.init(self, null);
+        }
+        try Window.init(self, parent.name, null);
+        try Device.init(self, null);
+        try Swapchain.init(self, null);
+        try DepthResources.init(self, null);
+        try SyncObjects.init(self, null);
+        try CommandBuffer.init(self, null);
+        try DescriptorSetLayout.init(self, null);
+        try GraphicsPipeline.init(self, null);
+        try TexutreSampler.init(self, null); 
+        self.meshes = std.ArrayList(Mesh).init(std.heap.page_allocator);
+        self.transferStagingBuffers = std.ArrayList(Buffer).init(std.heap.page_allocator);
+        self.currentFrame = 0;
+    }
+    pub fn cleanup(self: *GPUState) void {
+        for(self.meshes.items) |*mesh| mesh.destroy(self.device, null);
+        self.meshes.deinit();
+        self.transferStagingBuffers.deinit();
+        TexutreSampler.destroy(self, null);
+        GraphicsPipeline.destroy(self, null);
+        DescriptorSetLayout.destroy(self, null);
+        CommandBuffer.destroy(self, null);
+        SyncObjects.destroy(self, null);
+        self.depthImage.destroy(self.device, null);
+        Swapchain.destroy(self, null);
+        if(enableValidationLayers) {
+            DebugMessenger.destroy(self, null);
+        }
+        Device.destroy(self, null);
+        std.heap.page_allocator.free(self.queues.graphicsQueues);
+        Window.destroy(self, null);
+        Instance.destroy(self, null);
     }
 };
 
@@ -85,9 +192,9 @@ pub const Buffer = struct {
         return result;
     }
 
-    pub fn destroy(Self: *Buffer, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
-        c.vkDestroyBuffer(device, Self.*.handle, allocator);
-        c.vkFreeMemory(device, Self.*.memory, allocator);
+    pub fn destroy(self: *Buffer, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
+        c.vkDestroyBuffer(device, self.*.handle, allocator);
+        c.vkFreeMemory(device, self.*.memory, allocator);
     }
 };
 
@@ -109,10 +216,10 @@ pub const UniformBuffer = struct {
         return result;
     }
 
-    pub fn destroy(Self: *UniformBuffer, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
-        c.vkUnmapMemory(device, Self.deviceMemory);
-        c.vkDestroyBuffer(device, Self.handle, allocator);
-        c.vkFreeMemory(device, Self.deviceMemory, allocator);
+    pub fn destroy(self: *UniformBuffer, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
+        c.vkUnmapMemory(device, self.deviceMemory);
+        c.vkDestroyBuffer(device, self.handle, allocator);
+        c.vkFreeMemory(device, self.deviceMemory, allocator);
     }
 };
 
@@ -184,10 +291,10 @@ pub const Image = struct {
         return result;
     }
 
-    pub fn destroy(Self: *const Image, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
-        c.vkDestroyImageView(device, Self.view, allocator);
-        c.vkFreeMemory(device, Self.memory, allocator);
-        c.vkDestroyImage(device, Self.handle, allocator);
+    pub fn destroy(self: *const Image, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
+        c.vkDestroyImageView(device, self.view, allocator);
+        c.vkFreeMemory(device, self.memory, allocator);
+        c.vkDestroyImage(device, self.handle, allocator);
     }
 };
 
@@ -224,8 +331,8 @@ pub const QueueFamilyIndices = struct {
     graphicsQueueCount: u32 = 0,
     presentQueueCount: u32 = 0,
 
-    pub fn isComplete(Self: *QueueFamilyIndices) bool {
-        return Self.*.graphicsIndex != null and Self.*.presentIndex != null;
+    pub fn isComplete(self: *QueueFamilyIndices) bool {
+        return self.*.graphicsIndex != null and self.*.presentIndex != null;
     }
 };
 
@@ -272,29 +379,29 @@ pub const SurfaceInfo = struct {
     formats: ?[]c.VkSurfaceFormatKHR = null,
     presentModes: ?[]c.VkPresentModeKHR = null,
 
-    pub fn query(Self: *SurfaceInfo, device: c.VkPhysicalDevice, surface: c.VkSurfaceKHR) !void {
-        _ = c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &Self.*.capabilities);
+    pub fn query(self: *SurfaceInfo, device: c.VkPhysicalDevice, surface: c.VkSurfaceKHR) !void {
+        _ = c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &self.*.capabilities);
 
         var surfaceFormatCount: usize = 0;
         _ = c.vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, @ptrCast(&surfaceFormatCount), null);
         if (surfaceFormatCount != 0) {
-            Self.*.formats = try std.heap.page_allocator.alloc(c.VkSurfaceFormatKHR, surfaceFormatCount);
-            _ = c.vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, @ptrCast(&surfaceFormatCount), Self.*.formats.?.ptr);
+            self.*.formats = try std.heap.page_allocator.alloc(c.VkSurfaceFormatKHR, surfaceFormatCount);
+            _ = c.vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, @ptrCast(&surfaceFormatCount), self.*.formats.?.ptr);
         }
 
         var presentModeCount: usize = 0;
         _ = c.vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, @ptrCast(&presentModeCount), null);
         if (presentModeCount != 0) {
-            Self.*.presentModes = try std.heap.page_allocator.alloc(c.VkPresentModeKHR, presentModeCount);
-            _ = c.vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, @ptrCast(&presentModeCount), Self.*.presentModes.?.ptr);
+            self.*.presentModes = try std.heap.page_allocator.alloc(c.VkPresentModeKHR, presentModeCount);
+            _ = c.vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, @ptrCast(&presentModeCount), self.*.presentModes.?.ptr);
         }
     }
 
-    pub fn free(Self: *SurfaceInfo) void {
-        if (Self.*.formats) |formats| {
+    pub fn free(self: *SurfaceInfo) void {
+        if (self.*.formats) |formats| {
             std.heap.page_allocator.free(formats);
         }
-        if (Self.*.presentModes) |presentModes| {
+        if (self.*.presentModes) |presentModes| {
             std.heap.page_allocator.free(presentModes);
         }
     }
@@ -372,13 +479,13 @@ pub const Camera = struct {
 
     pub const default = Camera{
         .pos = .{ .x = 0.0, .y = 0.0, .z = 0.0 },
-        .dir = Math.Vec3.init(.{ 0.0, 0.0, 1.0 }),
-        .upVector = Math.Vec3.init(.{ 0.0, 1.0, 0.0 }),
+        .dir = .init(.{ 0.0, 0.0, 1.0 }),
+        .upVector = .init(.{ 0.0, 1.0, 0.0 }),
         .fov = std.math.pi / 2.0,
     };
 
-    pub fn setTarget(Self: *Camera, targetPos: Pos) void {
-        Self.dir = targetPos.vector().subtract(Self.pos.vector());
+    pub fn setTarget(self: *Camera, targetPos: Pos) void {
+        self.dir = targetPos.vector().subtract(self.pos.vector());
     }
 };
 
@@ -390,9 +497,68 @@ pub const Mesh = struct {
     indicesSize: u32,
     objects: std.ArrayList(u64),
 
-    pub fn destroy(Self: *Mesh, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
-        Self.buffer.destroy(device, allocator);
-        Self.objects.deinit();
+    pub fn create(state: *GPUState, vertices: []const Vertex, indices: []const u32, allocator: ?*c.VkAllocationCallbacks) !Mesh {
+        //  Set flag that we began loading meshes if needed
+        if(state.notFlagSet(Flags.BEGAN_MESH_LOADING)) {
+            state.activeFlags |= Flags.BEGAN_MESH_LOADING;
+            const cmdBeginInfo = c.VkCommandBufferBeginInfo{
+                .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+            };
+            if(c.vkBeginCommandBuffer(state.*.transferCommandBuffer, &cmdBeginInfo) != c.VK_SUCCESS) {
+                return error.failedToBeginCommandBuffer;
+            }
+        }
+
+        //  Initialize the Mesh object
+        var result: Mesh = undefined;
+        result.verticesSize = @as(u32, @intCast(vertices.len)) * @sizeOf(Vertex);
+        result.indicesSize = @as(u32, @intCast(indices.len)) * @sizeOf(u32);
+        result.objects = try std.ArrayList(u64).initCapacity(std.heap.page_allocator, MAX_OBJECTS);
+        result.buffer = try Buffer.create(state.physicalDevice, state.device, allocator, 
+            result.verticesSize + result.indicesSize, 
+            c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT 
+                | c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT 
+                | c.VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+
+        //  Initialize the staging buffer for this Mesh's loading operation
+        const stagingBuffer = try Buffer.create(state.physicalDevice, state.device, allocator,
+            result.verticesSize + result.indicesSize, 
+            c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        );
+
+        var memory: ?*anyopaque = null;
+        if(c.vkMapMemory(state.device, stagingBuffer.memory, 0, result.verticesSize, 0, &memory) != c.VK_SUCCESS) {
+            return error.failedToMapMemory;
+        }
+        @memcpy(@as([*]Vertex, @ptrCast(@alignCast(memory))), vertices);
+        c.vkUnmapMemory(state.device, stagingBuffer.memory);
+
+        if(c.vkMapMemory(state.device, stagingBuffer.memory, result.verticesSize, result.indicesSize, 0, &memory) != c.VK_SUCCESS) {
+            return error.failedToMapMemory;
+        }
+        @memcpy(@as([*]u32, @ptrCast(@alignCast(memory))), indices);
+        c.vkUnmapMemory(state.device, stagingBuffer.memory);
+
+        c.vkCmdCopyBuffer(state.*.transferCommandBuffer, stagingBuffer.handle, result.buffer.handle, 1, 
+            &.{
+                .srcOffset = 0, 
+                .dstOffset = 0, 
+                .size = result.verticesSize + result.indicesSize
+            }
+        );
+        //  Add the staging buffer to the state's list so that it can be used and freed later
+        try state.transferStagingBuffers.append(stagingBuffer);
+
+        return result;
+    }
+
+    pub fn destroy(self: *Mesh, device: c.VkDevice, allocator: ?*c.VkAllocationCallbacks) void {
+        self.buffer.destroy(device, allocator);
+        self.objects.deinit();
     }
 };
 
@@ -420,28 +586,29 @@ pub const Object = struct {
         hashModulus: u32,
 
         ///This hashing function must match the signature demanded by the zig standard library ArrayHashMap.
-        pub fn hash(Self: HashContext, key: u64) u32 {
-            return @intCast(key % Self.hashModulus);
+        pub fn hash(self: HashContext, key: u64) u32 {
+            return @intCast(key % self.hashModulus);
         }
 
         ///This equality function must match the signature demanded by the zig standard library ArrayHashMap.
-        pub fn eql(Self: HashContext, key1: u64, key2: u64, inMap: usize) bool {
-            _ = Self;
+        pub fn eql(self: HashContext, key1: u64, key2: u64, inMap: usize) bool {
+            _ = self;
             _ = inMap;
             return key1 == key2;
         }
     };
 
-    pub fn getModelMatrix(Self: *const Object) Math.Mat4 {
-        const scale = Math.scaleMatrix(.{ Self.scale.x, Self.scale.y, Self.scale.z });
-        const translation = Math.translate(Self.pos.vector());
-        const centerPos = Self.pos.vector().add(Self.scale.vector().scale(0.5));
-        const rotation = Math.translate(centerPos).mult(Math.rotate(Self.angle, Self.orientation))
+    pub fn getModelMatrix(self: *const Object) Math.Mat4 {
+        const scale = Math.scaleMatrix(.{ self.scale.x, self.scale.y, self.scale.z });
+        const translation = Math.translate(self.pos.vector());
+        const centerPos = self.pos.vector().add(self.scale.vector().scale(0.5));
+        const rotation = Math.translate(centerPos).mult(Math.rotate(self.angle, self.orientation))
             .mult(Math.translate(centerPos.scale(-1.0)));
         return rotation.mult(translation).mult(scale);
     }
 
-    pub fn create(state: *GPUState, pos: Pos, scaling: Pos, orientation: Math.Vec3, angle: f32, mesh: *Mesh, allocator: ?*c.VkAllocationCallbacks) !Object {
+    pub fn create(state: *State, pos: Pos, scaling: Pos, orientation: Math.Vec3, angle: f32, mesh: *Mesh, allocator: ?*c.VkAllocationCallbacks) !Object {
+        const gpu = &state.GPU;
         var result: Object = undefined;
         result.pos = pos;
         result.scale = scaling;
@@ -454,28 +621,44 @@ pub const Object = struct {
         }
         state.lastGeneratedId = result.id;
         result.mesh.objects.appendAssumeCapacity(result.id);
-        result.uniformBuffer = try UniformBuffer.create(state, allocator);
+        result.uniformBuffer = try UniformBuffer.create(gpu, allocator);
         for (result.uniformBuffer.hostMemory) |*modelMatrix| modelMatrix.* = Math.Mat4.identity;
 
-        const layouts: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSetLayout = .{state.descriptorSetLayout} ** MAX_FRAMES_IN_FLIGHT;
-        const allocInfo = c.VkDescriptorSetAllocateInfo{ .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = state.descriptorPool, .descriptorSetCount = result.descriptorSets.len, .pSetLayouts = layouts[0..] };
-        if (c.vkAllocateDescriptorSets(state.device, &allocInfo, &result.descriptorSets) != c.VK_SUCCESS) {
+        const layouts: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSetLayout = .{gpu.descriptorSetLayout} ** MAX_FRAMES_IN_FLIGHT;
+        const allocInfo = c.VkDescriptorSetAllocateInfo{ 
+            .sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, 
+            .descriptorPool = gpu.descriptorPool, 
+            .descriptorSetCount = result.descriptorSets.len, 
+            .pSetLayouts = layouts[0..] 
+        };
+        if (c.vkAllocateDescriptorSets(gpu.device, &allocInfo, &result.descriptorSets) != c.VK_SUCCESS) {
             return error.failedToAllocateDescriptorSets;
         }
 
         for (0..result.descriptorSets.len) |i| {
-            const writeDescriptorSet = c.VkWriteDescriptorSet{ .sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = result.descriptorSets[i], .dstBinding = 0, .descriptorCount = 1, .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &.{ .buffer = result.uniformBuffer.handle, .offset = @sizeOf(Math.Mat4) * i, .range = @sizeOf(Math.Mat4) } };
-            c.vkUpdateDescriptorSets(state.device, 1, &writeDescriptorSet, 0, null);
+            const writeDescriptorSet = c.VkWriteDescriptorSet{ 
+                .sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
+                .dstSet = result.descriptorSets[i], 
+                .dstBinding = 0, 
+                .descriptorCount = 1, 
+                .descriptorType = c.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 
+                .pBufferInfo = &.{ 
+                    .buffer = result.uniformBuffer.handle, 
+                    .offset = @sizeOf(Math.Mat4) * i, 
+                    .range = @sizeOf(Math.Mat4) 
+                } 
+            };
+            c.vkUpdateDescriptorSets(gpu.device, 1, &writeDescriptorSet, 0, null);
         }
         return result;
     }
 
-    pub fn destroy(Self: *Object, device: c.VkDevice, pool: c.VkDescriptorPool, allocator: ?*c.VkAllocationCallbacks) void {
-        Self.uniformBuffer.destroy(device, allocator);
-        _ = c.vkFreeDescriptorSets(device, pool, Self.descriptorSets.len, &Self.descriptorSets);
-        for (0..Self.mesh.objects.items.len) |i| {
-            if (Self.mesh.objects.items[i] == Self.id) {
-                _ = Self.mesh.objects.swapRemove(i);
+    pub fn destroy(self: *Object, device: c.VkDevice, pool: c.VkDescriptorPool, allocator: ?*c.VkAllocationCallbacks) void {
+        self.uniformBuffer.destroy(device, allocator);
+        _ = c.vkFreeDescriptorSets(device, pool, self.descriptorSets.len, &self.descriptorSets);
+        for (0..self.mesh.objects.items.len) |i| {
+            if (self.mesh.objects.items[i] == self.id) {
+                _ = self.mesh.objects.swapRemove(i);
                 break;
             }
         }

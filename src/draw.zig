@@ -2,6 +2,7 @@ const c = @import("c");
 const std = @import("std");
 const Utils = @import("utils.zig");
 const Math = @import("math.zig");
+const Swapchain = @import("swapchain.zig");
 
 const NEAR_CLIPPING_PLANE: f32 = 1.0;
 const FAR_CLIPPING_PLANE: f32 = 1000.0;
@@ -14,6 +15,7 @@ pub fn drawFrame(state: *Utils.GPUState, camera: Utils.Camera) !void {
     if(c.vkResetFences(state.device, 1, &state.fences[state.currentFrame]) != c.VK_SUCCESS) {
         return error.failedToResetFence;
     }
+    if(state.appState.isFlagSet(Utils.Flags.RECREATE_SWAPCHAIN)) try Swapchain.recreate(state, null);
 
     //The image acquisition semaphores are stored at the front of this array. Each frame has one
     //  semaphore for this purpose
@@ -238,7 +240,7 @@ fn doRenderPass(state: *Utils.GPUState, imageViewIndex: u32) !void {
             c.VK_INDEX_TYPE_UINT32);
 
         for(mesh.objects.items) |i| {
-            const object: *Utils.Object = state.objects.getPtr(i) orelse return error.failedToFindObject;
+            const object: *Utils.Object = state.appState.objects.getPtr(i) orelse return error.failedToFindObject;
             c.vkCmdBindDescriptorSets(currentCommandBuffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS,
                 state.graphicsPipelineLayout, 0, 1,
                 &object.descriptorSets[state.currentFrame], 0, null);
@@ -267,7 +269,7 @@ fn updateCameraPushConstant(state: *Utils.GPUState, camera: Utils.Camera) void {
 }
 
 fn updateObjectUniformBuffers(state: *Utils.GPUState) void {
-    {var it = state.objects.iterator();
+    {var it = state.appState.objects.iterator();
     while(it.next()) |obj| {
         obj.value_ptr.*.uniformBuffer.hostMemory[state.currentFrame] = obj.value_ptr.*.getModelMatrix();
     }}
