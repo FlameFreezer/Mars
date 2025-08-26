@@ -47,6 +47,7 @@ pub const GPUState = struct {
     objects: ObjectArrayHashMap,
     lastGeneratedId: u64,
     transferStagingBuffers: std.ArrayList(Buffer),
+    textureSampler: c.VkSampler,
 
     /// Returns true is the provided flags are set, since zig is so anal about truthy values
     pub fn isFlagSet(Self: *GPUState, flag: MarsFlags) bool {
@@ -312,16 +313,17 @@ pub fn beginSingleTimeCommandBuffer(device: c.VkDevice, commandPool: c.VkCommand
     return commandBuffer;
 }
 
-const VertexAttributes: type = enum(u32) { COLOR = 0, POSITION };
 
 pub const Vertex = struct {
     color: [3]f32,
     position: [3]f32,
+    texCoord: [2]f32,
 
-    const numAttribs: usize = @typeInfo(@This()).@"struct".fields.len;
+    const Attributes = enum(u32) { COLOR, POSITION, TEXCOORD };
+    const numAttribs: usize = @typeInfo(Attributes).@"enum".fields.len;
 
-    pub fn create(inColor: [3]f32, inPosition: [3]f32) Vertex {
-        return .{ .position = inPosition, .color = inColor };
+    pub fn create(inColor: [3]f32, inPosition: [3]f32, inTexCoord: [2]f32) Vertex {
+        return .{ .position = inPosition, .color = inColor, .texCoord = inTexCoord };
     }
 
     pub fn inputBindingDescription() c.VkVertexInputBindingDescription {
@@ -330,8 +332,24 @@ pub const Vertex = struct {
 
     pub fn inputAttributeDescriptions() [numAttribs]c.VkVertexInputAttributeDescription {
         var attributes: [numAttribs]c.VkVertexInputAttributeDescription = undefined;
-        attributes[@intFromEnum(VertexAttributes.COLOR)] = .{ .location = @intFromEnum(VertexAttributes.COLOR), .binding = 0, .format = c.VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 };
-        attributes[@intFromEnum(VertexAttributes.POSITION)] = .{ .location = @intFromEnum(VertexAttributes.POSITION), .binding = 0, .format = c.VK_FORMAT_R32G32B32_SFLOAT, .offset = @offsetOf(Vertex, "position") };
+        attributes[@intFromEnum(Attributes.COLOR)] = .{ 
+            .location = @intFromEnum(Attributes.COLOR), 
+            .binding = 0, 
+            .format = c.VK_FORMAT_R32G32B32_SFLOAT, 
+            .offset = 0 
+        };
+        attributes[@intFromEnum(Attributes.POSITION)] = .{ 
+            .location = @intFromEnum(Attributes.POSITION), 
+            .binding = 0, 
+            .format = c.VK_FORMAT_R32G32B32_SFLOAT, 
+            .offset = @offsetOf(Vertex, "position") 
+        };
+        attributes[@intFromEnum(Attributes.TEXCOORD)] = .{
+            .location = @intFromEnum(Attributes.TEXCOORD),
+            .binding = 0,
+            .format = c.VK_FORMAT_R32G32_SFLOAT,
+            .offset = @offsetOf(Vertex, "texCoord")
+        };
         return attributes;
     }
 };

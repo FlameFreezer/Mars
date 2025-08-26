@@ -16,6 +16,7 @@ const Draw = @import("draw.zig");
 const DescriptorSetLayout = @import("descriptorSetLayout.zig");
 const DepthResources = @import("depthResources.zig");
 const Mesh = @import("mesh.zig");
+const TexutreSampler = @import("textureSampler.zig");
 
 const enableValidationLayers: bool = buildOpts.isDebugBuild;
 
@@ -82,6 +83,7 @@ pub const State = struct {
         for(state.GPU.meshes.items) |*mesh| mesh.destroy(state.GPU.device, null);
         state.GPU.meshes.deinit();
         state.GPU.transferStagingBuffers.deinit();
+        TexutreSampler.destroy(&state.GPU, null);
         GraphicsPipeline.destroy(&state.GPU, null);
         DescriptorSetLayout.destroy(&state.GPU, null);
         CommandBuffer.destroy(&state.GPU, null);
@@ -121,6 +123,7 @@ pub const State = struct {
         try CommandBuffer.init(state, null);
         try DescriptorSetLayout.init(state, null);
         try GraphicsPipeline.init(state, null);
+        try TexutreSampler.init(state, null); 
         state.meshes = std.ArrayList(Utils.Mesh).init(std.heap.page_allocator);
         state.objects = Utils.ObjectArrayHashMap.initContext(std.heap.page_allocator, 
             Utils.Object.HashContext{.hashModulus = Utils.MAX_OBJECTS});

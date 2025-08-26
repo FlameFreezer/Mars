@@ -28,7 +28,6 @@ pub fn createMesh(state: *Utils.GPUState,
     result.verticesSize = @as(u32, @intCast(vertices.len)) * @sizeOf(Utils.Vertex);
     result.indicesSize = @as(u32, @intCast(indices.len)) * @sizeOf(u32);
     result.objects = try std.ArrayList(u64).initCapacity(std.heap.page_allocator, Utils.MAX_OBJECTS);
-
     result.buffer = try Utils.Buffer.create(state.physicalDevice, state.device, allocator, 
         result.verticesSize + result.indicesSize, 
         c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT 
@@ -87,38 +86,39 @@ pub const cubeVertices = makeVertices:{
         .{1.0, 0.0, 1.0},
         .{0.0, 0.0, 1.0}
     };
+    const noMap = [2]f32{0.0, 0.0};
 
     break:makeVertices [_]Utils.Vertex{
         //FRONT FACE
-        .create(white,frontFace[0]),
-        .create(white,frontFace[1]),
-        .create(white,frontFace[2]),
-        .create(white,frontFace[3]),
+        .create(white,frontFace[0],noMap),
+        .create(white,frontFace[1],noMap),
+        .create(white,frontFace[2],noMap),
+        .create(white,frontFace[3],noMap),
         //BACK FACE
-        .create(purple,backFace[0]),
-        .create(purple,backFace[1]),
-        .create(purple,backFace[2]),
-        .create(purple,backFace[3]),
+        .create(purple,backFace[0],noMap),
+        .create(purple,backFace[1],noMap),
+        .create(purple,backFace[2],noMap),
+        .create(purple,backFace[3],noMap),
         //RIGHT FACE
-        .create(yellow,frontFace[1]),
-        .create(yellow,backFace[1]),
-        .create(yellow,backFace[2]),
-        .create(yellow,frontFace[2]),
+        .create(yellow,frontFace[1],noMap),
+        .create(yellow,backFace[1],noMap),
+        .create(yellow,backFace[2],noMap),
+        .create(yellow,frontFace[2],noMap),
         //LEFT FACE
-        .create(green,frontFace[0]),
-        .create(green,backFace[0]),
-        .create(green,backFace[3]),
-        .create(green,frontFace[3]),
+        .create(green,frontFace[0],noMap),
+        .create(green,backFace[0],noMap),
+        .create(green,backFace[3],noMap),
+        .create(green,frontFace[3],noMap),
         //TOP FACE
-        .create(red,backFace[0]),
-        .create(red,backFace[1]),
-        .create(red,frontFace[1]),
-        .create(red,frontFace[0]),
+        .create(red,backFace[0],noMap),
+        .create(red,backFace[1],noMap),
+        .create(red,frontFace[1],noMap),
+        .create(red,frontFace[0],noMap),
         //BOTTOM FACE
-        .create(blue,backFace[3]),
-        .create(blue,backFace[2]),
-        .create(blue,frontFace[2]),
-        .create(blue,frontFace[3]),
+        .create(blue,backFace[3],noMap),
+        .create(blue,backFace[2],noMap),
+        .create(blue,frontFace[2],noMap),
+        .create(blue,frontFace[3],noMap),
     };
 };
 
