@@ -42,8 +42,8 @@ pub const State = struct {
     camera: Camera,
     activeFlags: MarsFlags,
     GPU: GPUState,
-    objects: ObjectArrayHashMap,
-    lastGeneratedId: u64,
+    objects: IDArrayHashMap(Object),
+    IDGen: IDGenerator,
 
     pub fn init(self: *State, name: []const u8) !void {
         self.programStartTime = std.time.milliTimestamp();
@@ -54,13 +54,13 @@ pub const State = struct {
         }
         self.name = name;
         self.activeFlags = Flags.NONE;
-        self.objects = ObjectArrayHashMap.initContext(std.heap.page_allocator, 
+        self.objects = IDArrayHashMap(Object).initContext(std.heap.page_allocator, 
             Object.HashContext{.hashModulus = MAX_OBJECTS});
         try self.GPU.init(self);
         self.camera = .default;
         self.camera.pos = .{.x = -65.0, .y = 20.0, .z = 0.0};
         self.camera.setTarget(.{.x = 0.0, .y = 0.0, .z = 0.0});
-        self.lastGeneratedId = 0;
+        self.IDGen = .default;
     }
 
     pub fn cleanup(self: *State) void {
@@ -113,9 +113,11 @@ pub const GPUState = struct {
     descriptorSetLayout: c.VkDescriptorSetLayout,
     descriptorPool: c.VkDescriptorPool,
     depthImage: Image,
-    meshes: std.ArrayList(Mesh),
     transferStagingBuffers: std.ArrayList(Buffer),
     textureSampler: c.VkSampler,
+    meshes: IDHashMap(Mesh),
+    textures: IDHashMap(Image),
+    models: IDArrayHashMap(Model),
 
     /// Returns true is the provided flags are set, since zig is so anal about truthy values
     pub fn isFlagSet(self: *const GPUState, flag: MarsFlags) bool {
@@ -141,13 +143,24 @@ pub const GPUState = struct {
         try DescriptorSetLayout.init(self, null);
         try GraphicsPipeline.init(self, null);
         try TexutreSampler.init(self, null); 
-        self.meshes = std.ArrayList(Mesh).init(std.heap.page_allocator);
+        self.meshes = IDHashMap(Mesh).initContext(std.heap.page_allocator, IDHashContext{.hashModulus = MAX_OBJECTS});
+        self.textures = IDHashMap(Image).initContext(std.heap.page_allocator, IDHashContext{.hashModulus = MAX_OBJECTS});
+        self.models = IDArrayHashMap(Model).initContext(std.heap.page_allocator, IDArrayHashContext{.hashModulus = MAX_OBJECTS});
         self.transferStagingBuffers = std.ArrayList(Buffer).init(std.heap.page_allocator);
         self.currentFrame = 0;
     }
+
     pub fn cleanup(self: *GPUState) void {
-        for(self.meshes.items) |*mesh| mesh.destroy(self.device, null);
+        {var it = self.meshes.valueIterator();
+        while(it.next()) |mesh| {
+            mesh.destroy(self.device, null);
+        }}
         self.meshes.deinit();
+        {var it = self.textures.valueIterator();
+        while(it.next()) |texture| {
+            texture.destroy(self.device, null);
+        }}
+        self.textures.deinit();
         self.transferStagingBuffers.deinit();
         TexutreSampler.destroy(self, null);
         GraphicsPipeline.destroy(self, null);
@@ -166,7 +179,58 @@ pub const GPUState = struct {
     }
 };
 
-pub const ObjectArrayHashMap = std.ArrayHashMap(u64, Object, Object.HashContext, true);
+pub fn IDHashMap(comptime valueType: type) type {
+    return std.HashMap(u64, valueType, IDHashContext, 80);
+}
+pub fn IDArrayHashMap(comptime valueType: type) type {
+    return std.ArrayHashMap(u64, valueType, IDArrayHashContext, true);
+}
+
+pub const IDHashContext = struct {
+    hashModulus: u32,
+
+    pub fn hash(self: @This(), key: u64) u32 {
+        return key % self.hashModulus;
+    }
+
+    pub fn eql(self: @This(), key1: u64, key2: u64) bool {
+        _ = self;
+        return key1 == key2;
+    }
+};
+
+pub const IDArrayHashContext = struct {
+    hashModulus: u32,
+
+    pub fn hash(self: @This(), key: u64) u32 {
+        return key % self.hashModulus;
+    }
+
+    pub fn eql(self: @This(), key1: u64, key2: u64, inMap: u64) bool {
+        _ = self; _ = inMap;
+        return key1 == key2;
+    }
+};
+
+pub const IDGenerator = struct {
+    lastGeneratedID: u64,
+    timeout: u64,
+
+    pub const Self = @This();
+    pub const default = Self{.lastGeneratedID = 0, .timeout = MAX_OBJECTS};    
+
+    pub fn nextID(self: *@This(), hashMap: *anyopaque) ?u64 {
+        var ID = self.lastGeneratedID; 
+        var timeout = 0;
+        while(hashMap.*.contains(ID) and timeout < self.timeout) {
+            ID +%= 1;
+            timeout += 1;
+        }
+        if(timeout >= self.timeout) return null;
+        self.lastGeneratedID = ID;
+        return ID;
+    }
+};
 
 pub const Buffer = struct {
     handle: c.VkBuffer,
@@ -495,7 +559,7 @@ pub const Mesh = struct {
     verticesSize: u32,
     /// The size of the chunk of buffer memory containing index data, in bytes.
     indicesSize: u32,
-    objects: std.ArrayList(u64),
+    id: u64,
 
     pub fn create(state: *GPUState, vertices: []const Vertex, indices: []const u32, allocator: ?*c.VkAllocationCallbacks) !Mesh {
         //  Set flag that we began loading meshes if needed
@@ -514,7 +578,7 @@ pub const Mesh = struct {
         var result: Mesh = undefined;
         result.verticesSize = @as(u32, @intCast(vertices.len)) * @sizeOf(Vertex);
         result.indicesSize = @as(u32, @intCast(indices.len)) * @sizeOf(u32);
-        result.objects = try std.ArrayList(u64).initCapacity(std.heap.page_allocator, MAX_OBJECTS);
+        result.id = state.appState.IDGen.nextID(&state.meshes) orelse unreachable;
         result.buffer = try Buffer.create(state.physicalDevice, state.device, allocator, 
             result.verticesSize + result.indicesSize, 
             c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT 
@@ -563,11 +627,23 @@ pub const Mesh = struct {
 };
 
 pub const Model = struct {
-    mesh: *Mesh,
-    texture: *const Image,
+    mesh: u64,
+    texture: u64,
+    id: u64,
+    objects: std.ArrayList(u64),
 
-    pub fn create(mesh: *Mesh, texture: *const Image) Model {
-        return .{ .mesh = mesh, .texture = texture };
+    pub fn create(state: *GPUState, mesh: u64, texture: u64) Model {
+        return .{
+            .mesh = mesh,
+            .texture = texture,
+            .id = state.appState.IDGen.nextID(state.models) orelse return error.failedToGenerateID,
+            .objects = std.ArrayList(u64).init(std.heap.page_allocator)
+        };
+    }
+
+    pub fn destroy(self: *Model, state: *GPUState) void {
+        self.objects.deinit();
+        state.models.swapRemove(self.id);
     }
 };
 
@@ -577,26 +653,9 @@ pub const Object = struct {
     orientation: Math.Vec3,
     angle: f32,
     id: u64,
-    mesh: *Mesh,
+    model: u64,
     uniformBuffer: UniformBuffer,
     descriptorSets: [MAX_FRAMES_IN_FLIGHT]c.VkDescriptorSet,
-
-    ///This structure contains information that the zig standard library ArrayHashMap needs.
-    pub const HashContext = struct {
-        hashModulus: u32,
-
-        ///This hashing function must match the signature demanded by the zig standard library ArrayHashMap.
-        pub fn hash(self: HashContext, key: u64) u32 {
-            return @intCast(key % self.hashModulus);
-        }
-
-        ///This equality function must match the signature demanded by the zig standard library ArrayHashMap.
-        pub fn eql(self: HashContext, key1: u64, key2: u64, inMap: usize) bool {
-            _ = self;
-            _ = inMap;
-            return key1 == key2;
-        }
-    };
 
     pub fn getModelMatrix(self: *const Object) Math.Mat4 {
         const scale = Math.scaleMatrix(.{ self.scale.x, self.scale.y, self.scale.z });
@@ -607,20 +666,16 @@ pub const Object = struct {
         return rotation.mult(translation).mult(scale);
     }
 
-    pub fn create(state: *State, pos: Pos, scaling: Pos, orientation: Math.Vec3, angle: f32, mesh: *Mesh, allocator: ?*c.VkAllocationCallbacks) !Object {
+    pub fn create(state: *State, pos: Pos, scaling: Pos, orientation: Math.Vec3, angle: f32, model: u64, allocator: ?*c.VkAllocationCallbacks) !Object {
         const gpu = &state.GPU;
         var result: Object = undefined;
         result.pos = pos;
         result.scale = scaling;
         result.orientation = orientation;
         result.angle = angle;
-        result.mesh = mesh;
-        result.id = state.lastGeneratedId + 1;
-        while (state.objects.contains(result.id)) {
-            result.id += 1;
-        }
-        state.lastGeneratedId = result.id;
-        result.mesh.objects.appendAssumeCapacity(result.id);
+        result.model = model;
+        result.id = state.IDGen.nextID(&state.objects) orelse return error.outOfObjectSpace;
+        state.GPU.models.getPtr(model).?.objects.append(result.id);
         result.uniformBuffer = try UniformBuffer.create(gpu, allocator);
         for (result.uniformBuffer.hostMemory) |*modelMatrix| modelMatrix.* = Math.Mat4.identity;
 
@@ -653,12 +708,14 @@ pub const Object = struct {
         return result;
     }
 
-    pub fn destroy(self: *Object, device: c.VkDevice, pool: c.VkDescriptorPool, allocator: ?*c.VkAllocationCallbacks) void {
+    pub fn destroy(self: *Object, state: *State, device: c.VkDevice, pool: c.VkDescriptorPool, allocator: ?*c.VkAllocationCallbacks) void {
         self.uniformBuffer.destroy(device, allocator);
         _ = c.vkFreeDescriptorSets(device, pool, self.descriptorSets.len, &self.descriptorSets);
-        for (0..self.mesh.objects.items.len) |i| {
-            if (self.mesh.objects.items[i] == self.id) {
-                _ = self.mesh.objects.swapRemove(i);
+        state.objects.swapRemove(self.id);
+        //  Remove ID of the object from the list held by its model
+        for(state.GPU.models.getPtr(self.model).?.objects.items, 0..) |objectId, i| {
+            if(objectId == self.id) {
+                state.GPU.models.getPtr(self.model).?.objects.swapRemove(i);
                 break;
             }
         }
