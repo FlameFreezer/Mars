@@ -9,10 +9,9 @@ const Self = @This();
 
 state: Utils.State,
 
-pub fn createMesh(self: *Self, vertices: []const Utils.Vertex, indices: []const u32) !u64 {
+pub fn createMesh(self: *Self, vertices: []const Utils.Vertex, indices: []const u32) !void {
     const mesh = try Utils.Mesh.create(&self.state.GPU, vertices, indices, null);
     try self.state.GPU.meshes.put(mesh.id, mesh);
-    return mesh.id;
 }
 
 pub fn loadMeshes(self: *Self) !void {

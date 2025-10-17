@@ -221,16 +221,10 @@ fn doRenderPass(state: *Utils.GPUState, imageViewIndex: u32) !void {
         state.*.activeFlags &= ~Utils.Flags.BEGAN_MESH_LOADING;
     }
 
-    //  Create list of the vertex buffers to be bound for his render pass
     var vertexBuffers =  std.ArrayList(c.VkBuffer).init(std.heap.page_allocator);
     defer vertexBuffers.deinit();
-    //  Append the vertex buffer for each unique mesh to the list
-    {var it = state.meshes.iterator();
-    while(it.next()) |entry| {
-        const mesh = entry.value_ptr;
-        try vertexBuffers.append(mesh.buffer.handle);
-    }}
-    //  Create list of zero-offsets for each vertex buffer
+    for(state.meshes.items) |*mesh| try vertexBuffers.append(mesh.buffer.handle);
+
     var offsets = try std.ArrayList(u64).initCapacity(std.heap.page_allocator, 
         vertexBuffers.items.len);
 
@@ -241,34 +235,21 @@ fn doRenderPass(state: *Utils.GPUState, imageViewIndex: u32) !void {
         vertexBuffers.items.ptr, offsets.items.ptr);
 
     var vertexOffset: i32 = 0;
-    {var modelIt = state.models.iterator();
-    while(modelIt.next()) |entry| {
-        //  Pointers to the current model and its associated texture and mesh
-        const model = entry.value_ptr;
-        const mesh = state.meshes.getPtr(model.mesh) orelse return error.failedToFindMesh;
-        //const texture = state.textures.getPtr(model.texture);
-        //_ = texture;
-
-        //  Bind the index buffer for the current model's mesh
-        c.vkCmdBindIndexBuffer(currentCommandBuffer, mesh.buffer.handle, mesh.verticesSize,
+    for(state.meshes.items) |mesh| {
+        c.vkCmdBindIndexBuffer(currentCommandBuffer, mesh.buffer.handle, mesh.verticesSize, 
             c.VK_INDEX_TYPE_UINT32);
 
-        //  Iterate through each object which uses the current model
-        for(model.objects.items) |id| {
-            const object = state.appState.objects.getPtr(id) orelse return error.failedToFindObject;
-
-            //  Bind the descriptor sets used by the current object
+        for(mesh.objects.items) |i| {
+            const object: *Utils.Object = state.appState.objects.getPtr(i) orelse return error.failedToFindObject;
             c.vkCmdBindDescriptorSets(currentCommandBuffer, c.VK_PIPELINE_BIND_POINT_GRAPHICS,
                 state.graphicsPipelineLayout, 0, 1,
                 &object.descriptorSets[state.currentFrame], 0, null);
 
-            //  Draw call
             c.vkCmdDrawIndexed(currentCommandBuffer, mesh.indicesSize / @sizeOf(u32), 1, 0, vertexOffset, 0);
         }
 
-        //  Increase the offset into the list of vertex buffers
         vertexOffset += @intCast(mesh.verticesSize / @sizeOf(Utils.Vertex));
-    }}
+    }
 
     c.vkCmdEndRendering(currentCommandBuffer);
 }

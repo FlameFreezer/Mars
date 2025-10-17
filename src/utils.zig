@@ -55,7 +55,7 @@ pub const State = struct {
         self.name = name;
         self.activeFlags = Flags.NONE;
         self.objects = IDArrayHashMap(Object).initContext(std.heap.page_allocator, 
-            IDArrayHashContext{.hashModulus = MAX_OBJECTS});
+            Object.HashContext{.hashModulus = MAX_OBJECTS});
         try self.GPU.init(self);
         self.camera = .default;
         self.camera.pos = .{.x = -65.0, .y = 20.0, .z = 0.0};
@@ -85,7 +85,7 @@ pub const State = struct {
 };
 
 pub const GPUState = struct {
-    appState: *State,
+    appState: *const State,
     activeFlags: MarsFlags,
     window: *c.SDL_Window,
     instance: c.VkInstance,
@@ -115,7 +115,7 @@ pub const GPUState = struct {
     depthImage: Image,
     transferStagingBuffers: std.ArrayList(Buffer),
     textureSampler: c.VkSampler,
-    meshes: IDArrayHashMap(Mesh),
+    meshes: IDHashMap(Mesh),
     textures: IDHashMap(Image),
     models: IDArrayHashMap(Model),
 
@@ -128,7 +128,7 @@ pub const GPUState = struct {
         return self.*.activeFlags & flag == 0;
     }
 
-    pub fn init(self: *GPUState, parent: *State) !void {
+    pub fn init(self: *GPUState, parent: *const State) !void {
         self.appState = parent;
         try Instance.init(self, enableValidationLayers, null);
         if(enableValidationLayers) {
@@ -143,7 +143,7 @@ pub const GPUState = struct {
         try DescriptorSetLayout.init(self, null);
         try GraphicsPipeline.init(self, null);
         try TexutreSampler.init(self, null); 
-        self.meshes = IDArrayHashMap(Mesh).initContext(std.heap.page_allocator, IDArrayHashContext{.hashModulus = MAX_OBJECTS});
+        self.meshes = IDHashMap(Mesh).initContext(std.heap.page_allocator, IDHashContext{.hashModulus = MAX_OBJECTS});
         self.textures = IDHashMap(Image).initContext(std.heap.page_allocator, IDHashContext{.hashModulus = MAX_OBJECTS});
         self.models = IDArrayHashMap(Model).initContext(std.heap.page_allocator, IDArrayHashContext{.hashModulus = MAX_OBJECTS});
         self.transferStagingBuffers = std.ArrayList(Buffer).init(std.heap.page_allocator);
@@ -151,9 +151,9 @@ pub const GPUState = struct {
     }
 
     pub fn cleanup(self: *GPUState) void {
-        {var it = self.meshes.iterator();
-        while(it.next()) |entry| {
-            entry.value_ptr.destroy(self.device, null);
+        {var it = self.meshes.valueIterator();
+        while(it.next()) |mesh| {
+            mesh.destroy(self.device, null);
         }}
         self.meshes.deinit();
         {var it = self.textures.valueIterator();
@@ -190,7 +190,7 @@ pub const IDHashContext = struct {
     hashModulus: u32,
 
     pub fn hash(self: @This(), key: u64) u32 {
-        return @as(u32, key % self.hashModulus);
+        return key % self.hashModulus;
     }
 
     pub fn eql(self: @This(), key1: u64, key2: u64) bool {
@@ -203,7 +203,7 @@ pub const IDArrayHashContext = struct {
     hashModulus: u32,
 
     pub fn hash(self: @This(), key: u64) u32 {
-        return @as(u32, key % self.hashModulus);
+        return key % self.hashModulus;
     }
 
     pub fn eql(self: @This(), key1: u64, key2: u64, inMap: u64) bool {
