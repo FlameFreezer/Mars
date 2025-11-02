@@ -1,6 +1,6 @@
 import mars;
 
 int main() {
-	mars::sayHello();
+	mars::runApp("Mars Test");
 	return 0;
 }
