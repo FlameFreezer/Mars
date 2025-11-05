@@ -1,6 +1,7 @@
 import mars;
 
 int main() {
-	mars::runApp("Mars Test");
-	return 0;
+    mars::Game game("Mars Test");
+    game.Run();
+    return 0;
 }

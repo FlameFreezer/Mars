@@ -3,13 +3,19 @@ module;
 #include <string>
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
 
 export module mars;
+import vulkan_hpp;
 export namespace mars {
-	void runApp(const std::string& windowName) {
-		SDL_Init(SDL_INIT_VIDEO);
-		SDL_Window* window = SDL_CreateWindow(windowName.c_str(), 800, 600, SDL_WINDOW_VULKAN);
-		SDL_DestroyWindow(window);	
-		SDL_Quit();
-	}
+    class Game {
+    public:
+	Game() = delete;
+	Game(const std::string& inWindowName);
+	~Game();
+	void Run();
+    private:
+	std::string mWindowName;
+	SDL_Window* mWindow;
+    };
 }
