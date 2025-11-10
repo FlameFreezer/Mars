@@ -1,20 +1,24 @@
 module;
 
 #include <string>
+#include <stdexcept>
 
 #include <SDL3/SDL.h>
 
 module mars;
 namespace mars {
-    Game::Game(const std::string& windowName) : mWindowName(windowName), mWindow(nullptr) {
-	SDL_Init(SDL_INIT_VIDEO);
-	mWindow = SDL_CreateWindow(mWindowName.c_str(), 800, 600, SDL_WINDOW_VULKAN);	
+    void init() {
+	if(!SDL_Init(SDL_INIT_VIDEO)) {
+	   throw std::runtime_error(SDL_GetError());
+	}
     }
-    Game::~Game() {
-	SDL_DestroyWindow(mWindow);
+    void quit() {
 	SDL_Quit();
     }
+    Game::Game(const std::string& inWindowName) : mRenderer(inWindowName) {
+    }
+    Game::~Game() {
+    }
     void Game::Run() {
-	
     }
 }

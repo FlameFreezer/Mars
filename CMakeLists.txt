@@ -10,13 +10,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_library(Mars)
 target_sources(Mars PUBLIC
     FILE_SET cxx_modules TYPE CXX_MODULES
-    FILES src/mars.cppm
+    FILES src/mars.cppm src/renderer.cppm
     PRIVATE src/mars.cpp)
 
 # Set up Vulkan module
 find_package(Vulkan REQUIRED)
 add_library(VulkanCppModule)
 add_library(Vulkan::cppm ALIAS VulkanCppModule)
+
+target_compile_definitions(VulkanCppModule PUBLIC VULKAN_HPP_NO_CONSTRUCTORS)
 
 set(VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
 
@@ -33,9 +35,8 @@ target_sources(VulkanCppModule
 add_subdirectory(include/SDL EXCLUDE_FROM_ALL)
 
 # Link libraries to mars
-target_link_libraries(Mars PRIVATE Vulkan::cppm PRIVATE SDL3::SDL3)
-target_include_directories(Mars 
-    PRIVATE include/SDL/include)
+target_link_libraries(Mars PRIVATE Vulkan::cppm SDL3::SDL3)
+target_include_directories(Mars PRIVATE include/SDL/include)
 
 # Test Application
 add_executable(marsTest app/main.cpp)

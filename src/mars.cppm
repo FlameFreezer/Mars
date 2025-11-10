@@ -6,8 +6,10 @@ module;
 #include <SDL3/SDL_vulkan.h>
 
 export module mars;
-import vulkan_hpp;
+export import :renderer;
 export namespace mars {
+    void init();
+    void quit();
     class Game {
     public:
 	Game() = delete;
@@ -15,7 +17,6 @@ export namespace mars {
 	~Game();
 	void Run();
     private:
-	std::string mWindowName;
-	SDL_Window* mWindow;
+	Renderer mRenderer;	
     };
 }
