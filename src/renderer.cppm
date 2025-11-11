@@ -2,6 +2,7 @@ module;
 #include <string>
 #include <stdexcept>
 #include <cstdint>
+#include <iostream>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -37,6 +38,7 @@ namespace mars {
 	std::string mWindowName;
 	SDL_Window* mWindow;
 	vk::Instance mInstance;
+	vk::DebugUtilsMessengerEXT mVulkanDebugMessenger;
 
 	static void createVkInstance(vk::Instance& inst) {
 	    uint32_t sdlExtensionCount = 0;
@@ -72,6 +74,29 @@ namespace mars {
 	    inst = vk::createInstance(instanceInfo);
 
 	    delete[] extensionNames;
+	}
+
+	static void createVulkanDebugMessenger(vk::Instance const& inst, vk::DebugUtilsMessengerEXT& vulkanDebugMessenger) {
+	    vk::DebugUtilsMessengerCreateInfoEXT const messengerInfo{
+		.pNext = nullptr,
+		.flags = {},
+		.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+		    vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+		    vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+		    vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+		.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation,
+		.pfnUserCallback = [](
+		    vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, 
+		    vk::DebugUtilsMessageTypeFlagsEXT messageTypes, 
+		    vk::DebugUtilsMessengerCallbackDataEXT const* pCallbackData, 
+		    void* pUserData
+		) -> vk::Bool32 {
+		    std::cerr << pCallbackData->pMessage << std::endl;
+		    return vk::True;
+		},
+		.pUserData = nullptr
+	    };
+	    vulkanDebugMessenger = inst.createDebugUtilsMessengerEXT(messengerInfo);
 	}
     };
 }
