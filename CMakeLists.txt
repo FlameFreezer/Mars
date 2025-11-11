@@ -18,7 +18,10 @@ find_package(Vulkan REQUIRED)
 add_library(VulkanCppModule)
 add_library(Vulkan::cppm ALIAS VulkanCppModule)
 
-target_compile_definitions(VulkanCppModule PUBLIC VULKAN_HPP_NO_CONSTRUCTORS)
+target_compile_definitions(VulkanCppModule PUBLIC 
+    VULKAN_HPP_NO_CONSTRUCTORS=1
+#    VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
+)
 
 set(VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
 

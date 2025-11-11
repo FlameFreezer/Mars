@@ -6,7 +6,6 @@ import mars;
 int main() {
     int exitCode = 0;
     try {
-	mars::init();
 	mars::Game game("Mars Test");
 	game.Run();
     }
@@ -14,6 +13,5 @@ int main() {
 	std::cerr << e.what() << std::endl;
 	exitCode = 1;
     }
-    mars::quit();
     return exitCode;
 }

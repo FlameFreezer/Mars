@@ -8,11 +8,9 @@ module;
 export module mars;
 export import :renderer;
 export namespace mars {
-    void init();
-    void quit();
     class Game {
     public:
-	Game() = delete;
+	Game();
 	Game(const std::string& inWindowName);
 	~Game();
 	void Run();
