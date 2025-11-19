@@ -1,15 +1,25 @@
 #include "mars.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 
 int const WIDTH = 800;
 int const HEIGHT = 600;
 
+PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = NULL;
+PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = NULL;
+
+VkBool32 debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT 		messageSeverity,
+		       VkDebugUtilsMessageTypeFlagsEXT			messageTypes,
+		       VkDebugUtilsMessengerCallbackDataEXT const*	pCallbackData,
+		       void*						pUserData) {
+    printf("VUID: %s, %s\n", pCallbackData->pMessageIdName, pCallbackData->pMessage); 
+    return VK_FALSE;
+}
+
 void marsInitRenderer(MarsRenderer* marsRenderer, char* appName) {
     Uint32 extCount = 0;
     char const * const * sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
-    char const** extNames = malloc(sizeof(char*) * extCount + 1);
+    char const** extNames = SDL_malloc(sizeof(char*) * extCount + 1);
     extNames[0] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
     memcpy(&extNames[1], sdlExtNames, extCount++ * sizeof(char*));
 
@@ -34,12 +44,31 @@ void marsInitRenderer(MarsRenderer* marsRenderer, char* appName) {
     };
 
     VkResult result = vkCreateInstance(&instanceInfo, NULL, &marsRenderer->instance);
-    free(extNames);
+    SDL_free(extNames);
+    VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
+	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+	.pNext = NULL,
+	.flags = 0,
+	.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+	.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+	.pfnUserCallback = debugCallback,
+	.pUserData = NULL,
+    };
+    createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(marsRenderer->instance, "vkCreateDebugUtilsMessengerEXT");
+    if(createVkDebugUtilsMessengerEXT != NULL) {
+	createVkDebugUtilsMessengerEXT(marsRenderer->instance, &debugMessengerInfo, NULL, &marsRenderer->debugMessenger);
+    }
+    destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+	marsRenderer->instance, "vkDestroyDebugUtilsMessengerEXT");
 }
 
 int marsInit(MarsGame* marsGame, char* name) {
     if(!SDL_Init(SDL_INIT_VIDEO)) {
-	printf("Failed to Init SDL3!");
 	return 1;
     }
     if(name == NULL) {
@@ -53,10 +82,9 @@ int marsInit(MarsGame* marsGame, char* name) {
     return 0;
 }
 
-
-
 void marsQuit(MarsGame* marsGame) {
     SDL_DestroyWindow(marsGame->renderer.window);
+    destroyVkDebugUtilsMessengerEXT(marsGame->renderer.instance, marsGame->renderer.debugMessenger, NULL);
     vkDestroyInstance(marsGame->renderer.instance, NULL);
     SDL_Quit();
 }

@@ -9,6 +9,7 @@
 typedef struct {
     VkInstance instance;
     SDL_Window* window;
+    VkDebugUtilsMessengerEXT debugMessenger;
 } MarsRenderer;
 
 typedef struct {
