@@ -1,7 +1,6 @@
 #include "mars.h"
 
 #include <stdio.h>
-#include <string.h>
 
 int const WIDTH = 800;
 int const HEIGHT = 600;
@@ -12,11 +11,6 @@ MarsError marsMakeError(enum MarsErrorType key, char const* message) {
     result.message = message;
     return result;
 }
-
-#define MARS_SUCCESS marsMakeError(MARS_ALL_OKAY, "")
-
-#define MARS_TRY(proc) marsGlobalErrorResult = proc;\
-    if(marsGlobalErrorResult.key != MARS_ALL_OKAY) return marsGlobalErrorResult
 
 PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = NULL;
 PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = NULL;
@@ -33,6 +27,9 @@ MarsError marsInitVkInstance(VkInstance* instance, char* appName) {
     Uint32 extCount = 0;
     char const * const * sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
     char const** extNames = SDL_malloc(sizeof(char*) * extCount + 1);
+    if(!extNames) {
+	return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
+    }
     extNames[0] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
     memcpy(&extNames[1], sdlExtNames, extCount++ * sizeof(char*));
 
@@ -57,7 +54,7 @@ MarsError marsInitVkInstance(VkInstance* instance, char* appName) {
     };
 
     if(vkCreateInstance(&instanceInfo, NULL, instance) != VK_SUCCESS) {
-	return marsMakeError(MARS_INSTANCE_CREATION_FAIL, "");
+	return marsMakeError(MARS_INSTANCE_CREATION_FAIL, "Failed to create VkInstance!");
     }
     SDL_free(extNames);
     return MARS_SUCCESS;
@@ -81,7 +78,7 @@ MarsError marsInitVkDebugUtilsMessenger(VkInstance const instance, VkDebugUtilsM
     createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if(createVkDebugUtilsMessengerEXT != NULL) {
 	if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, NULL, debugMessenger) != VK_SUCCESS) {
-	    return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "");
+	    return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessenger!");
 	}
     }
     destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(

@@ -6,9 +6,11 @@
 #include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
+// Error Handling
 enum MarsErrorType {
     MARS_ALL_OKAY = 0,
     MARS_MISC_ERROR,
+    MARS_MEMORY_ALLOC_FAIL,
     MARS_VULKAN_VALIDATION_LAYER,
     MARS_INIT_SDL_FAIL,
     MARS_WINDOW_CREATION_FAIL,
@@ -20,6 +22,14 @@ typedef struct {
     enum MarsErrorType key;
     char const* message;
 } MarsError;
+
+static MarsError marsGlobalErrorResult;
+
+MarsError makeMarsError(enum MarsErrorType key, char const* message);
+
+#define MARS_SUCCESS marsMakeError(MARS_ALL_OKAY, "")
+#define MARS_TRY(proc) marsGlobalErrorResult = proc;\
+    if(marsGlobalErrorResult.key != MARS_ALL_OKAY) return marsGlobalErrorResult
 
 typedef struct {
     VkInstance instance;
@@ -33,7 +43,6 @@ typedef struct {
     MarsRenderer renderer;
 } MarsGame;
 
-static MarsError marsGlobalErrorResult;
 
 MarsError marsInit(MarsGame* marsGame, char* name); 
 void marsQuit(MarsGame* marsGame);
