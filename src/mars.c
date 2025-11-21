@@ -19,8 +19,38 @@ VkBool32 debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT 		messageSeverity,
 		       VkDebugUtilsMessageTypeFlagsEXT			messageTypes,
 		       VkDebugUtilsMessengerCallbackDataEXT const*	pCallbackData,
 		       void*						pUserData) {
-    printf("Validation Layer: %s", pCallbackData->pMessage);
+    printf("Validation Layer: %s\n", pCallbackData->pMessage);
     return VK_FALSE;
+}
+
+MarsError marsInitVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice, VkInstance const instance) {
+    uint32_t physicalDeviceCount = 0;
+    vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, NULL);
+    VkPhysicalDevice* physicalDevices = SDL_malloc(sizeof(VkPhysicalDevice) * physicalDeviceCount);
+    if(!physicalDevices) {
+	return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
+    }
+    if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices) != VK_SUCCESS) {
+	return marsMakeError(MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL, "Failed to enumerate physical devices!");
+    }
+    //For now, just pick the first phsyical device found
+    *physicalDevice = physicalDevices[0];
+    SDL_free(physicalDevices);
+
+    VkDeviceCreateInfo deviceInfo = {
+	.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+	.pNext = NULL,
+	.flags = 0,
+	.queueCreateInfoCount = 0,
+	.pQueueCreateInfos = NULL,
+	.enabledExtensionCount = 0,
+	.ppEnabledExtensionNames = NULL,
+	.pEnabledFeatures = NULL
+    };
+    if(vkCreateDevice(*physicalDevice, &deviceInfo, NULL, device) != VK_SUCCESS) {
+	return marsMakeError(MARS_DEVICE_CREATION_FAIL, "Failed to create VkDevice!");
+    }
+    return MARS_SUCCESS;
 }
 
 MarsError marsInitVkInstance(VkInstance* instance, char* appName) {
@@ -60,7 +90,7 @@ MarsError marsInitVkInstance(VkInstance* instance, char* appName) {
     return MARS_SUCCESS;
 }
 
-MarsError marsInitVkDebugUtilsMessenger(VkInstance const instance, VkDebugUtilsMessengerEXT* debugMessenger) {
+MarsError marsInitVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debugMessenger, VkInstance const instance) {
     VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
 	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 	.pNext = NULL,
@@ -88,7 +118,8 @@ MarsError marsInitVkDebugUtilsMessenger(VkInstance const instance, VkDebugUtilsM
 
 MarsError marsInitRenderer(MarsRenderer* marsRenderer, char* appName) {
     MARS_TRY(marsInitVkInstance(&marsRenderer->instance, appName));
-    MARS_TRY(marsInitVkDebugUtilsMessenger(marsRenderer->instance, &marsRenderer->debugMessenger));
+    MARS_TRY(marsInitVkDebugUtilsMessenger(&marsRenderer->debugMessenger, marsRenderer->instance));
+    MARS_TRY(marsInitVkDevice(&marsRenderer->device, &marsRenderer->physicalDevice, marsRenderer->instance));
     
     return MARS_SUCCESS;
 }
@@ -116,6 +147,7 @@ MarsError marsInit(MarsGame* marsGame, char* name) {
 
 void marsQuit(MarsGame* marsGame) {
     SDL_DestroyWindow(marsGame->renderer.window);
+    vkDestroyDevice(marsGame->renderer.device, NULL);
     destroyVkDebugUtilsMessengerEXT(marsGame->renderer.instance, marsGame->renderer.debugMessenger, NULL);
     vkDestroyInstance(marsGame->renderer.instance, NULL);
     SDL_Quit();
