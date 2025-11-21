@@ -9,9 +9,6 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 # Set up mars target library
 add_library(Mars)
 target_sources(Mars PRIVATE src/mars.c)
-target_compile_definitions(Mars PUBLIC
-    MARS_VULKAN_PATH="$ENV{VULKAN_SDK}/lib"
-)
 
 # Set up SDL3
 add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)

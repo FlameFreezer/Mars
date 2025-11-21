@@ -1,9 +1,22 @@
 #include "mars.h"
 
 #include <stdio.h>
+#include <string.h>
 
 int const WIDTH = 800;
 int const HEIGHT = 600;
+
+MarsError marsMakeError(enum MarsErrorType key, char const* message) {
+    MarsError result;
+    result.key = key;
+    result.message = message;
+    return result;
+}
+
+#define MARS_SUCCESS marsMakeError(MARS_ALL_OKAY, "")
+
+#define MARS_TRY(proc) marsGlobalErrorResult = proc;\
+    if(marsGlobalErrorResult.key != MARS_ALL_OKAY) return marsGlobalErrorResult
 
 PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = NULL;
 PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = NULL;
@@ -12,11 +25,11 @@ VkBool32 debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT 		messageSeverity,
 		       VkDebugUtilsMessageTypeFlagsEXT			messageTypes,
 		       VkDebugUtilsMessengerCallbackDataEXT const*	pCallbackData,
 		       void*						pUserData) {
-    printf("VUID: %s, %s\n", pCallbackData->pMessageIdName, pCallbackData->pMessage); 
+    printf("Validation Layer: %s", pCallbackData->pMessage);
     return VK_FALSE;
 }
 
-void marsInitRenderer(MarsRenderer* marsRenderer, char* appName) {
+MarsError marsInitVkInstance(VkInstance* instance, char* appName) {
     Uint32 extCount = 0;
     char const * const * sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
     char const** extNames = SDL_malloc(sizeof(char*) * extCount + 1);
@@ -43,8 +56,14 @@ void marsInitRenderer(MarsRenderer* marsRenderer, char* appName) {
 	.ppEnabledExtensionNames = extNames
     };
 
-    VkResult result = vkCreateInstance(&instanceInfo, NULL, &marsRenderer->instance);
+    if(vkCreateInstance(&instanceInfo, NULL, instance) != VK_SUCCESS) {
+	return marsMakeError(MARS_INSTANCE_CREATION_FAIL, "");
+    }
     SDL_free(extNames);
+    return MARS_SUCCESS;
+}
+
+MarsError marsInitVkDebugUtilsMessenger(VkInstance const instance, VkDebugUtilsMessengerEXT* debugMessenger) {
     VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
 	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 	.pNext = NULL,
@@ -59,17 +78,27 @@ void marsInitRenderer(MarsRenderer* marsRenderer, char* appName) {
 	.pfnUserCallback = debugCallback,
 	.pUserData = NULL,
     };
-    createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(marsRenderer->instance, "vkCreateDebugUtilsMessengerEXT");
+    createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if(createVkDebugUtilsMessengerEXT != NULL) {
-	createVkDebugUtilsMessengerEXT(marsRenderer->instance, &debugMessengerInfo, NULL, &marsRenderer->debugMessenger);
+	if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, NULL, debugMessenger) != VK_SUCCESS) {
+	    return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "");
+	}
     }
     destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-	marsRenderer->instance, "vkDestroyDebugUtilsMessengerEXT");
+	instance, "vkDestroyDebugUtilsMessengerEXT");
+    return MARS_SUCCESS;
 }
 
-int marsInit(MarsGame* marsGame, char* name) {
+MarsError marsInitRenderer(MarsRenderer* marsRenderer, char* appName) {
+    MARS_TRY(marsInitVkInstance(&marsRenderer->instance, appName));
+    MARS_TRY(marsInitVkDebugUtilsMessenger(marsRenderer->instance, &marsRenderer->debugMessenger));
+    
+    return MARS_SUCCESS;
+}
+
+MarsError marsInit(MarsGame* marsGame, char* name) {
     if(!SDL_Init(SDL_INIT_VIDEO)) {
-	return 1;
+	return marsMakeError(MARS_INIT_SDL_FAIL, SDL_GetError());
     }
     if(name == NULL) {
 	marsGame->name = "My Mars App";
@@ -78,8 +107,14 @@ int marsInit(MarsGame* marsGame, char* name) {
 	marsGame->name = name;
     }
     marsGame->renderer.window = SDL_CreateWindow(name, WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
-    marsInitRenderer(&marsGame->renderer, name);
-    return 0;
+    if(marsGame->renderer.window == NULL) {
+	return marsMakeError(MARS_WINDOW_CREATION_FAIL, SDL_GetError());
+    }
+    MarsError result = marsInitRenderer(&marsGame->renderer, name);
+    if(result.key != MARS_ALL_OKAY) {
+	return result;
+    }
+    return result;
 }
 
 void marsQuit(MarsGame* marsGame) {
