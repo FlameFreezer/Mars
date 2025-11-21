@@ -29,7 +29,7 @@ typedef struct {
 
 static MarsError marsGlobalErrorResult;
 
-MarsError makeMarsError(enum MarsErrorType key, char const* message);
+MarsError marsMakeError(enum MarsErrorType key, char const* message);
 
 #define MARS_SUCCESS marsMakeError(MARS_ALL_OKAY, "")
 #define MARS_TRY(proc) marsGlobalErrorResult = proc;\

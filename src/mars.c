@@ -5,8 +5,73 @@
 
 int const WIDTH = 800;
 int const HEIGHT = 600;
-
 char const* deviceExtensionNames[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+int const deviceExtensionNameCount = 1;
+
+struct MarsNode {
+    char const* name;
+    struct MarsNode* next;
+    struct MarsNode* prev;
+};
+
+typedef struct {
+    struct MarsNode* head;
+    struct MarsNode* tail;
+} MarsLinkedList;
+
+MarsError marsPush(MarsLinkedList* list, char const* name) {
+    if(!list || !name) return marsMakeError(MARS_MISC_ERROR, "Bad call to function: marsPush");
+    struct MarsNode* newNode = SDL_malloc(sizeof(struct MarsNode));
+    if(!newNode) {
+	return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
+    }
+    newNode->name = name;
+    newNode->prev = list->tail;
+    newNode->next = NULL;
+    if(!list->head) {
+	list->head = newNode;
+	list->tail = newNode;
+    }
+    else {
+	list->tail->next = newNode;
+    }
+    return MARS_SUCCESS;
+}
+
+void marsRemove(MarsLinkedList* list, char const* name) {
+    if(!list || !name) return;
+    //Find the desired node
+    struct MarsNode* iterator = list->head;
+    while(iterator && strcmp(iterator->name, name) != 0) {
+	iterator = iterator->next;
+    }
+    if(!iterator) return;
+    if(iterator->prev) {
+	iterator->prev->next = iterator->next;
+    }
+    else {
+	list->head = iterator->next;
+    }
+    if(iterator->next) {
+	iterator->next->prev = iterator->prev;
+    }
+    else {
+	list->tail = iterator->prev;
+    }
+    SDL_free(iterator);
+}
+
+void marsClear(MarsLinkedList* list) {
+    if(!list) return;
+    struct MarsNode* iterator = list->head;
+    while(iterator) {
+	iterator = iterator->next;
+	SDL_free(iterator->prev);
+    }
+    list->head = NULL;
+    list->tail = NULL;
+}
+
 
 MarsError marsMakeError(enum MarsErrorType key, char const* message) {
     MarsError result;
@@ -28,6 +93,9 @@ VkBool32 debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT 		messageSeverity,
 
 MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice, VkInstance const instance, VkSurfaceKHR const surface) {
     uint32_t physicalDeviceCount = 0;
+    uint32_t queueFamilyIndex;
+    uint32_t queueCount;
+
     vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, NULL);
     VkPhysicalDevice* physicalDevices = SDL_malloc(sizeof(VkPhysicalDevice) * physicalDeviceCount);
     if(!physicalDevices) {
@@ -36,9 +104,6 @@ MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice,
     if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices) != VK_SUCCESS) {
 	return marsMakeError(MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL, "Failed to enumerate physical devices!");
     }
-    uint32_t queueFamilyIndex;
-    uint32_t queueCount;
-    uint32_t queueFamilyPropertyCount = 0;
 
     for(int i = 0; i < physicalDeviceCount; i++) {
 	uint32_t deviceExtensionPropertyCount = 0;
@@ -53,16 +118,30 @@ MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice,
 	    SDL_free(extensionProperties);
 	    return marsMakeError(MARS_MISC_ERROR, "Failed to enumerate physical device extension properties!");
 	}
+	//Construct linked list of extension names
+	MarsLinkedList deviceExtensions = {0};
+	for(int j = 0; j < deviceExtensionNameCount; j++) {
+	   MARS_TRY(marsPush(&deviceExtensions, deviceExtensionNames[j])); 
+	}
+	//Check if we have every needed extension
 	for(int j = 0; j < deviceExtensionPropertyCount; j++) {
-	    if(strcmp(extensionProperties[j].extensionName, deviceExtensionNames[0]) == 0) {
+	    //Remove the current extension name from the list, if we have it
+	    marsRemove(&deviceExtensions, extensionProperties[j].extensionName);
+	    //Once we've "ticked off" each name from the list, we know the device supports all the needed
+	    //	extensions
+	    if(deviceExtensions.head == NULL) {
+		marsClear(&deviceExtensions);
 		goto Queue_Check;
 	    }
 	}
+	marsClear(&deviceExtensions);
 	SDL_free(extensionProperties);
 	return marsMakeError(MARS_FIND_SUITABLE_GPU_FAIL, "Failed to find a GPU supporting needed extensions!");
 
     Queue_Check:
 	SDL_free(extensionProperties);
+
+	uint32_t queueFamilyPropertyCount = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevices[i], &queueFamilyPropertyCount, NULL);
 	VkQueueFamilyProperties2* queueFamilyProperties = SDL_malloc(sizeof(VkQueueFamilyProperties2) * queueFamilyPropertyCount);
 	if(!queueFamilyProperties) {
@@ -111,7 +190,7 @@ Device_Creation:
 	.flags = 0,
 	.queueCreateInfoCount = 1,
 	.pQueueCreateInfos = &queueInfo,
-	.enabledExtensionCount = sizeof(deviceExtensionNames) / sizeof(char*),
+	.enabledExtensionCount = deviceExtensionNameCount,
 	.ppEnabledExtensionNames = deviceExtensionNames,
 	.pEnabledFeatures = NULL
     };
