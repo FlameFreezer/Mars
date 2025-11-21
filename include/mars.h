@@ -15,6 +15,7 @@ enum MarsErrorType {
     MARS_INIT_SDL_FAIL,
     MARS_WINDOW_CREATION_FAIL,
     MARS_INSTANCE_CREATION_FAIL,
+    MARS_SURFACE_CREATION_FAIL,
     MARS_DEBUG_MESSENGER_CREATION_FAIL,
     MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL,
     MARS_DEVICE_CREATION_FAIL,
@@ -37,6 +38,7 @@ typedef struct {
     VkInstance instance;
     SDL_Window* window;
     VkDebugUtilsMessengerEXT debugMessenger;
+    VkSurfaceKHR surface;
     VkDevice device;
     VkPhysicalDevice physicalDevice;
 } MarsRenderer;

@@ -23,7 +23,7 @@ VkBool32 debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT 		messageSeverity,
     return VK_FALSE;
 }
 
-MarsError marsInitVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice, VkInstance const instance) {
+MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice, VkInstance const instance) {
     uint32_t physicalDeviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, NULL);
     VkPhysicalDevice* physicalDevices = SDL_malloc(sizeof(VkPhysicalDevice) * physicalDeviceCount);
@@ -53,7 +53,7 @@ MarsError marsInitVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice, V
     return MARS_SUCCESS;
 }
 
-MarsError marsInitVkInstance(VkInstance* instance, char* appName) {
+MarsError marsCreateVkInstance(VkInstance* instance, char* appName) {
     Uint32 extCount = 0;
     char const * const * sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
     char const** extNames = SDL_malloc(sizeof(char*) * extCount + 1);
@@ -90,7 +90,7 @@ MarsError marsInitVkInstance(VkInstance* instance, char* appName) {
     return MARS_SUCCESS;
 }
 
-MarsError marsInitVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debugMessenger, VkInstance const instance) {
+MarsError marsCreateVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debugMessenger, VkInstance const instance) {
     VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
 	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 	.pNext = NULL,
@@ -99,7 +99,7 @@ MarsError marsInitVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debugMessenger
 	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
 	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
 	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-	.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+	.messageType = /*VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |*/
 	    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
 	    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 	.pfnUserCallback = debugCallback,
@@ -117,9 +117,12 @@ MarsError marsInitVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debugMessenger
 }
 
 MarsError marsInitRenderer(MarsRenderer* marsRenderer, char* appName) {
-    MARS_TRY(marsInitVkInstance(&marsRenderer->instance, appName));
-    MARS_TRY(marsInitVkDebugUtilsMessenger(&marsRenderer->debugMessenger, marsRenderer->instance));
-    MARS_TRY(marsInitVkDevice(&marsRenderer->device, &marsRenderer->physicalDevice, marsRenderer->instance));
+    MARS_TRY(marsCreateVkInstance(&marsRenderer->instance, appName));
+    MARS_TRY(marsCreateVkDebugUtilsMessenger(&marsRenderer->debugMessenger, marsRenderer->instance));
+    if(!SDL_Vulkan_CreateSurface(marsRenderer->window, marsRenderer->instance, NULL, &marsRenderer->surface)) {
+	return marsMakeError(MARS_SURFACE_CREATION_FAIL, SDL_GetError());
+    }
+    MARS_TRY(marsCreateVkDevice(&marsRenderer->device, &marsRenderer->physicalDevice, marsRenderer->instance));
     
     return MARS_SUCCESS;
 }
@@ -146,6 +149,7 @@ MarsError marsInit(MarsGame* marsGame, char* name) {
 }
 
 void marsQuit(MarsGame* marsGame) {
+    SDL_Vulkan_DestroySurface(marsGame->renderer.instance, marsGame->renderer.surface, NULL);
     SDL_DestroyWindow(marsGame->renderer.window);
     vkDestroyDevice(marsGame->renderer.device, NULL);
     destroyVkDebugUtilsMessengerEXT(marsGame->renderer.instance, marsGame->renderer.debugMessenger, NULL);
