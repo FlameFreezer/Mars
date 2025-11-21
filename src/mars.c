@@ -96,6 +96,7 @@ MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice,
     uint32_t queueFamilyIndex;
     uint32_t queueCount;
 
+    //Get all the physical devices installed on the system
     vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, NULL);
     VkPhysicalDevice* physicalDevices = SDL_malloc(sizeof(VkPhysicalDevice) * physicalDeviceCount);
     if(!physicalDevices) {
@@ -105,7 +106,9 @@ MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice,
 	return marsMakeError(MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL, "Failed to enumerate physical devices!");
     }
 
+    //Iterate through each of these devices
     for(int i = 0; i < physicalDeviceCount; i++) {
+	//Check that the device supports the extensions needed by the application
 	uint32_t deviceExtensionPropertyCount = 0;
 	if(vkEnumerateDeviceExtensionProperties(physicalDevices[i], NULL, &deviceExtensionPropertyCount, NULL) != VK_SUCCESS) {
 	    return marsMakeError(MARS_MISC_ERROR, "Failed to enumerate physical device extension properties!");
@@ -134,13 +137,16 @@ MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice,
 		goto Queue_Check;
 	    }
 	}
+	//If we got here, the current physical device does not support the needed extensions, so we
+	// continue searching
 	marsClear(&deviceExtensions);
 	SDL_free(extensionProperties);
-	return marsMakeError(MARS_FIND_SUITABLE_GPU_FAIL, "Failed to find a GPU supporting needed extensions!");
+	continue;
 
     Queue_Check:
 	SDL_free(extensionProperties);
 
+	//Get queue family properties for the current physical device
 	uint32_t queueFamilyPropertyCount = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevices[i], &queueFamilyPropertyCount, NULL);
 	VkQueueFamilyProperties2* queueFamilyProperties = SDL_malloc(sizeof(VkQueueFamilyProperties2) * queueFamilyPropertyCount);
@@ -148,6 +154,7 @@ MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice,
 	    return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
 	}
 	vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevices[i], &queueFamilyPropertyCount, queueFamilyProperties);
+	//Check each queue family index for needed support
 	for(int j = 0; j < queueFamilyPropertyCount; j++) {
 	    if(queueFamilyProperties[j].queueFamilyProperties.queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
 		VkBool32 surfaceSupport;
@@ -156,6 +163,7 @@ MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice,
 		    return marsMakeError(MARS_MISC_ERROR, "Failed to get physical device surface support!");
 		}
 		if(surfaceSupport == VK_TRUE) {
+		    //At this point, we have found our desired physical device and queue family index
 		    queueFamilyIndex = j;
 		    queueCount = queueFamilyProperties[j].queueFamilyProperties.queueCount;
 		    *physicalDevice = physicalDevices[i];
@@ -165,7 +173,8 @@ MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice,
 	    }
 	}
     }
-    return marsMakeError(MARS_FIND_SUITABLE_GPU_FAIL, "Failed to find a GPU with needed queue families!");
+    //If we got here, none of the physical devices supported the features we needed
+    return marsMakeError(MARS_FIND_SUITABLE_GPU_FAIL, "Failed to find a suitable GPU!");
 
 Device_Creation:
     SDL_free(physicalDevices);
@@ -202,8 +211,34 @@ Device_Creation:
     return MARS_SUCCESS;
 }
 
+MarsError marsCreateVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debugMessenger, VkInstance const instance) {
+    VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
+	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+	.pNext = NULL,
+	.flags = 0,
+	.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+	.messageType = /*VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |*/
+	    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+	    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+	.pfnUserCallback = debugCallback,
+	.pUserData = NULL,
+    };
+    createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    if(createVkDebugUtilsMessengerEXT != NULL) {
+	if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, NULL, debugMessenger) != VK_SUCCESS) {
+	    return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessenger!");
+	}
+    }
+    destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+	instance, "vkDestroyDebugUtilsMessengerEXT");
+    return MARS_SUCCESS;
+}
+
 MarsError marsCreateVkInstance(VkInstance* instance, char* appName) {
-    Uint32 extCount = 0;
+    uint32_t extCount = 0;
     char const * const * sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
     char const** extNames = SDL_malloc(sizeof(char*) * extCount + 1);
     if(!extNames) {
@@ -240,32 +275,6 @@ MarsError marsCreateVkInstance(VkInstance* instance, char* appName) {
 	return marsMakeError(MARS_INSTANCE_CREATION_FAIL, "Failed to create VkInstance!");
     }
     SDL_free(extNames);
-    return MARS_SUCCESS;
-}
-
-MarsError marsCreateVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debugMessenger, VkInstance const instance) {
-    VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
-	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-	.pNext = NULL,
-	.flags = 0,
-	.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-	    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-	.messageType = /*VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |*/
-	    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-	    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-	.pfnUserCallback = debugCallback,
-	.pUserData = NULL,
-    };
-    createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-    if(createVkDebugUtilsMessengerEXT != NULL) {
-	if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, NULL, debugMessenger) != VK_SUCCESS) {
-	    return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessenger!");
-	}
-    }
-    destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-	instance, "vkDestroyDebugUtilsMessengerEXT");
     return MARS_SUCCESS;
 }
 
