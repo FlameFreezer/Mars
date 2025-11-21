@@ -20,6 +20,7 @@ enum MarsErrorType {
     MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL,
     MARS_FIND_SUITABLE_GPU_FAIL,
     MARS_DEVICE_CREATION_FAIL,
+    MARS_SWAPCHAIN_CREATION_FAIL,
 };
 
 typedef struct {
@@ -42,6 +43,7 @@ typedef struct {
     VkSurfaceKHR surface;
     VkDevice device;
     VkPhysicalDevice physicalDevice;
+    VkSwapchainKHR swapchain;
 } MarsRenderer;
 
 typedef struct {

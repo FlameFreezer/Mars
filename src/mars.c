@@ -91,13 +91,67 @@ VkBool32 debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT 		messageSeverity,
     return VK_FALSE;
 }
 
+MarsError marsCreateVkSwapchainKHR(VkSwapchainKHR* swapchain, VkPhysicalDevice const physicalDevice, VkDevice const device, VkSurfaceKHR const surface) {
+    VkSurfaceCapabilitiesKHR surfaceCapabilities = {0};
+    if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities) != VK_SUCCESS) {
+	return marsMakeError(MARS_MISC_ERROR, "Failed to get physical device surface capabilities!");
+    }
+    uint32_t presentModeCount = 0;
+    if(vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, NULL) != VK_SUCCESS) {
+	return marsMakeError(MARS_MISC_ERROR, "Failed to get physical device surface present modes!");
+    }
+    VkPresentModeKHR* presentModes = SDL_malloc(sizeof(VkPresentModeKHR) * presentModeCount);
+    if(!presentModes) {
+	return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
+    }
+    if(vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes) != VK_SUCCESS) {
+	return marsMakeError(MARS_MISC_ERROR, "Failed to get physical device surface present modes!");
+    }
+    VkPresentModeKHR presentMode = 0;
+    for(int i = 0; i < presentModeCount; i++) {
+	if(presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+	    presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+	    break;
+	}
+	else if(presentModes[i] == VK_PRESENT_MODE_FIFO_KHR) {
+	    presentMode = VK_PRESENT_MODE_FIFO_KHR;
+	}
+    }
+    if(!presentMode) {
+	return marsMakeError(MARS_SWAPCHAIN_CREATION_FAIL, "Failed to find valid presentation support!");
+    }
+
+    SDL_free(presentModes);
+
+    VkSwapchainCreateInfoKHR swapchainInfo = {
+	.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+	.pNext = NULL,
+	.flags = 0,
+	.surface = surface,
+	.minImageCount = surfaceCapabilities.minImageCount + 1,
+	.imageFormat = VK_FORMAT_B8G8R8_SRGB,
+	.imageColorSpace = 0,
+	.imageExtent = surfaceCapabilities.currentExtent,
+	.imageArrayLayers = 1,
+	.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+	.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+	.queueFamilyIndexCount = 1,
+	.pQueueFamilyIndices = NULL,
+	.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+	.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+	.presentMode = presentMode,
+    };
+}
+
 MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice, VkInstance const instance, VkSurfaceKHR const surface) {
     uint32_t physicalDeviceCount = 0;
     uint32_t queueFamilyIndex;
     uint32_t queueCount;
 
     //Get all the physical devices installed on the system
-    vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, NULL);
+    if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, NULL) != VK_SUCCESS) {
+	return marsMakeError(MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL, "Failed to enumerate physical devices!");
+    }
     VkPhysicalDevice* physicalDevices = SDL_malloc(sizeof(VkPhysicalDevice) * physicalDeviceCount);
     if(!physicalDevices) {
 	return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
