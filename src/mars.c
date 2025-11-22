@@ -96,6 +96,7 @@ MarsError marsCreateVkSwapchainKHR(VkSwapchainKHR* swapchain, VkPhysicalDevice c
     if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities) != VK_SUCCESS) {
 	return marsMakeError(MARS_MISC_ERROR, "Failed to get physical device surface capabilities!");
     }
+
     uint32_t presentModeCount = 0;
     if(vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, NULL) != VK_SUCCESS) {
 	return marsMakeError(MARS_MISC_ERROR, "Failed to get physical device surface present modes!");
@@ -107,6 +108,7 @@ MarsError marsCreateVkSwapchainKHR(VkSwapchainKHR* swapchain, VkPhysicalDevice c
     if(vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes) != VK_SUCCESS) {
 	return marsMakeError(MARS_MISC_ERROR, "Failed to get physical device surface present modes!");
     }
+    //Pick Present Mode
     VkPresentModeKHR presentMode = 0;
     for(int i = 0; i < presentModeCount; i++) {
 	if(presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -141,6 +143,11 @@ MarsError marsCreateVkSwapchainKHR(VkSwapchainKHR* swapchain, VkPhysicalDevice c
 	.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 	.presentMode = presentMode,
     };
+
+    if(vkCreateSwapchainKHR(device, &swapchainInfo, NULL, swapchain) != VK_SUCCESS) {
+	return marsMakeError(MARS_SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!");
+    }
+    return MARS_SUCCESS;
 }
 
 MarsError marsCreateVkDevice(VkDevice* device, VkPhysicalDevice* physicalDevice, VkInstance const instance, VkSurfaceKHR const surface) {
@@ -365,6 +372,7 @@ MarsError marsInit(MarsGame* marsGame, char* name) {
 }
 
 void marsQuit(MarsGame* marsGame) {
+    vkDestroySwapchainKHR(marsGame->renderer.device, marsGame->renderer.swapchain, NULL);
     SDL_Vulkan_DestroySurface(marsGame->renderer.instance, marsGame->renderer.surface, NULL);
     SDL_DestroyWindow(marsGame->renderer.window);
     vkDestroyDevice(marsGame->renderer.device, NULL);
