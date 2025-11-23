@@ -11,6 +11,7 @@ enum MarsErrorType {
     MARS_ALL_OKAY = 0,
     MARS_MISC_ERROR,
     MARS_MEMORY_ALLOC_FAIL,
+    MARS_VULKAN_QUERY_ERROR,
     MARS_VULKAN_VALIDATION_LAYER,
     MARS_INIT_SDL_FAIL,
     MARS_WINDOW_CREATION_FAIL,
@@ -47,11 +48,11 @@ typedef struct {
 } MarsRenderer;
 
 typedef struct {
-    char* name;
-    char* appName;
+    char const* name;
+    char const* appName;
     MarsRenderer renderer;
 } MarsGame;
 
 
-MarsError marsInit(MarsGame* marsGame, char* name); 
+MarsError marsInit(MarsGame* marsGame, char const* name); 
 void marsQuit(MarsGame* marsGame);
