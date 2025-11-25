@@ -14,11 +14,14 @@ target_sources(Mars PRIVATE src/mars.c)
 add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)
 
 # Link libraries to mars
-target_link_libraries(Mars PRIVATE SDL3::SDL3 vulkan)
-target_include_directories(Mars PRIVATE 
-    libraries/SDL/include 
+target_link_libraries(Mars PUBLIC SDL3::SDL3 vulkan)
+target_include_directories(Mars PUBLIC 
+    "${CMAKE_SOURCE_DIR}/libraries/SDL/include" 
     "$ENV{VULKAN_SDK}/include" 
-    include
+    "${CMAKE_SOURCE_DIR}/include"
+)
+target_link_directories(Mars PUBLIC
+    "$ENV{VULKAN_SDK}/lib"
 )
 
 # Test Application

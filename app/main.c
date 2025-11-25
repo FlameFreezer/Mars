@@ -1,4 +1,6 @@
+#ifndef MARS_H
 #include "mars.h"
+#endif
 
 #include <stdio.h>
 
