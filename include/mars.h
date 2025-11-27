@@ -28,7 +28,7 @@ typedef struct {
     char const* message;
 } MarsError;
 
-static MarsError marsGlobalErrorResult;
+static MarsError marsGlobalErrorResult = {};
 
 MarsError marsMakeError(enum MarsErrorType key, char const* message);
 
