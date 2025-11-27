@@ -10,6 +10,13 @@ int const HEIGHT = 600;
 char const* deviceExtensionNames[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 int const deviceExtensionNameCount = 1;
 
+MarsError marsMakeError(enum MarsErrorType key, char const* message) {
+    MarsError result;
+    result.key = key;
+    result.message = message;
+    return result;
+}
+
 struct MarsNode {
     char const* name;
     struct MarsNode* next;
@@ -74,14 +81,6 @@ void marsClear(MarsLinkedList* list) {
     list->tail = nullptr;
 }
 
-
-MarsError marsMakeError(enum MarsErrorType key, char const* message) {
-    MarsError result;
-    result.key = key;
-    result.message = message;
-    return result;
-}
-
 PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = nullptr;
 PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = nullptr;
 
@@ -99,36 +98,6 @@ struct MarsSurfaceInfo {
 	VkSurfaceFormatKHR format;
     VkSurfaceKHR surface;
 };
-
-MarsError marsCreateVkSwapchainKHR(
-    VkSwapchainKHR* swapchain, 
-    VkDevice const device, 
-    struct MarsSurfaceInfo const* surfaceInfo
-) {
-    VkSwapchainCreateInfoKHR swapchainInfo = {
-    	.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-    	.pNext = nullptr,
-    	.flags = 0,
-    	.surface = surfaceInfo->surface,
-    	.minImageCount = surfaceInfo->capabilities.minImageCount + 1,
-    	.imageFormat = surfaceInfo->format.format,
-    	.imageColorSpace = surfaceInfo->format.colorSpace,
-    	.imageExtent = surfaceInfo->capabilities.currentExtent,
-    	.imageArrayLayers = 1,
-    	.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-    	.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    	.queueFamilyIndexCount = 1,
-    	.pQueueFamilyIndices = nullptr,
-    	.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-    	.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    	.presentMode = surfaceInfo->presentMode,
-    };
-
-    if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, swapchain) != VK_SUCCESS) {
-		return marsMakeError(MARS_SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!");
-    }
-    return MARS_SUCCESS;
-}
 
 MarsError marsPickQueueFamilyIndex(uint32_t* queueFamilyIndex, uint32_t* queueCount, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
 	//Get queue family properties for the current physical device
@@ -354,6 +323,7 @@ MarsError marsCreateVkDeviceAndSwapchain(
     } 
     //If we got here, none of the physical devices supported the features we needed
     return marsMakeError(MARS_FIND_SUITABLE_GPU_FAIL, "Failed to find a suitable GPU!");
+
 Device_Creation:
     queuePriorities = SDL_calloc(queueCount, sizeof(float));
     if(!queuePriorities) {
@@ -384,7 +354,31 @@ Device_Creation:
 		return marsMakeError(MARS_DEVICE_CREATION_FAIL, "Failed to create VkDevice!");
     }
     SDL_free(queuePriorities);
-    MARS_TRY(marsCreateVkSwapchainKHR(swapchain, *device, &surfaceInfo));
+
+	VkSwapchainCreateInfoKHR swapchainInfo = {
+    	.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+    	.pNext = nullptr,
+    	.flags = 0,
+    	.surface = surfaceInfo.surface,
+    	.minImageCount = surfaceInfo.capabilities.minImageCount + 1,
+    	.imageFormat = surfaceInfo.format.format,
+    	.imageColorSpace = surfaceInfo.format.colorSpace,
+    	.imageExtent = surfaceInfo.capabilities.currentExtent,
+    	.imageArrayLayers = 1,
+    	.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    	.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    	.queueFamilyIndexCount = 1,
+    	.pQueueFamilyIndices = nullptr,
+    	.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+    	.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+    	.presentMode = surfaceInfo.presentMode,
+		.clipped = VK_FALSE,
+		.oldSwapchain = nullptr
+    };
+
+    if(vkCreateSwapchainKHR(*device, &swapchainInfo, nullptr, swapchain) != VK_SUCCESS) {
+		return marsMakeError(MARS_SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!");
+    }
     return MARS_SUCCESS;
 }
 
