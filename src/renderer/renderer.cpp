@@ -10,9 +10,17 @@
 
 static int const WIDTH = 800;
 static int const HEIGHT = 600;
-static std::array<char const*, 1> deviceExtensions = {
+static std::array<char const*, 1> const deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
+static std::array<char const*, 1> const validationLayers = {
+    "VK_LAYER_KHRONOS_validation"
+};
+#ifdef NDEBUG
+static bool const enableValidationLayers = false;
+#else
+static bool const enableValidationLayers = true;
+#endif
 
 static PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = nullptr;
 static PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = nullptr;
@@ -45,6 +53,9 @@ namespace mars {
         uint32_t queueFamilyPropertyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, nullptr);
         std::vector<VkQueueFamilyProperties2> queueFamilyProperties(queueFamilyPropertyCount);
+        for(VkQueueFamilyProperties2& prop : queueFamilyProperties) {
+            prop.sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+        }
         vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties.data());
         //Check each queue family index for needed support
         for(int i = 0; i < queueFamilyPropertyCount; i++) {
@@ -318,18 +329,42 @@ namespace mars {
     }
 
     Error<noreturn> createVkInstance(VkInstance& instance, const std::string& appName)  {
+        if(enableValidationLayers) {
+            uint32_t layerPropertyCount = 0;
+            if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
+                return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
+            }
+            std::vector<VkLayerProperties> layerProperties(layerPropertyCount);
+            if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, layerProperties.data()) != VK_SUCCESS) {
+                return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
+            }
+            std::cout << "Available Layers:\n";
+            for(char const* layer : validationLayers) {
+                for(VkLayerProperties const& property : layerProperties) {
+                    std::cout << '\t' << property.layerName << '\n';
+                    if(strcmp(layer, property.layerName) == 0) {
+                        goto Next_Layer;
+                    }
+                }
+                return {ErrorKey::INSTANCE_CREATION_FAIL, "Needed instance layers not found!"};
+                Next_Layer:
+            }
+        }
         uint32_t extCount = 0;
-        char const * const * sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
+        char const*const* sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
         std::vector<char const*> extNames;
         extNames.reserve(extCount);
         extNames.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         for(int i = 0; i < extCount; i++) {
             extNames.push_back(sdlExtNames[i]);
         }
-        std::cout << "Instance Extensions:\n";
-    	for(char const* extName : extNames) {
-            std::cout << '\t' << extName << '\n';
-    	}
+
+        if(enableValidationLayers) {
+            std::cout << "Enabled Instance Extensions:\n";
+        	for(char const* extName : extNames) {
+                std::cout << '\t' << extName << '\n';
+        	}
+        }
 
         VkApplicationInfo appInfo = {
         	.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -350,6 +385,10 @@ namespace mars {
         	.enabledExtensionCount = static_cast<uint32_t>(extNames.size()),
         	.ppEnabledExtensionNames = extNames.data()
         };
+        if(enableValidationLayers) {
+            instanceInfo.enabledLayerCount = validationLayers.size();
+            instanceInfo.ppEnabledLayerNames = validationLayers.data();
+        }
 
         if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS) {
             return {ErrorKey::INSTANCE_CREATION_FAIL, "Failed to create VkInstance!"};
@@ -358,13 +397,15 @@ namespace mars {
     }
 
     Error<noreturn> Renderer::init(const std::string& name)  {
+        Error<noreturn> procResult;
+        MARS_TRY(createVkInstance(instance, name));
+        if(enableValidationLayers) {
+            MARS_TRY(createVkDebugUtilsMessenger(debugMessenger, instance));
+        }
         window = SDL_CreateWindow(name.c_str(), WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
         if(window == nullptr) {
             return {ErrorKey::WINDOW_CREATION_FAIL, SDL_GetError()};
         }
-        Error<noreturn> procResult;
-        MARS_TRY(createVkInstance(instance, name));
-        MARS_TRY(createVkDebugUtilsMessenger(debugMessenger, instance));
         if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
             return {ErrorKey::SURFACE_CREATION_FAIL, SDL_GetError()};
         }
@@ -390,10 +431,12 @@ namespace mars {
 
     Renderer::~Renderer() noexcept {
         vkDestroySwapchainKHR(device, swapchain, nullptr);
+        vkDestroyDevice(device, nullptr);
         SDL_Vulkan_DestroySurface(instance, surface, nullptr);
         SDL_DestroyWindow(window);
-        vkDestroyDevice(device, nullptr);
-        destroyVkDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        if(enableValidationLayers) {
+            destroyVkDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        }
         vkDestroyInstance(instance, nullptr);
     }
 }

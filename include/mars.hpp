@@ -81,7 +81,7 @@ namespace mars {
     if(!procResult.okay()) return procResult
 
     Error<noreturn> init();
-    void quit() noexcept;
+    int quit() noexcept;
 
     class Renderer {
         public:

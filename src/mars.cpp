@@ -15,8 +15,9 @@ namespace mars {
         }
         return success();
     }
-    void quit() noexcept {
+    int quit() noexcept {
         SDL_Quit();
+        return 0;
     }
 
     Error<noreturn> Game::init(const std::string& appName) {
