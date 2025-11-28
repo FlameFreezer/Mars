@@ -4,13 +4,21 @@
 
 #include <iostream>
 
+#define MARS_REPORT(proc) procResult = proc;\
+if(!procResult.okay()) {\
+    std::cout << procResult.getMessage() << '\n';\
+    return 1;\
+}
+
 int main(int argc, char** argv) {
-    MarsGame g;
-    MarsError result = marsInit(g, nullptr);
-    if(result.key != MARS_ALL_OKAY) {
-        std::cout << result.message << '\n';
+    mars::Error<mars::noreturn> procResult;
+    MARS_REPORT(mars::init());
+    mars::Game g(procResult);
+    if(!procResult.okay()) {
+        std::cout << procResult.getMessage() << '\n';
         return 1;
     }
-    marsQuit(g);
+    mars::quit();
+    mars::success();
     return 0;
 }

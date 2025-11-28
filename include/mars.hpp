@@ -4,54 +4,110 @@
 #include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
-// Error Handling
-enum MarsErrorType {
-    MARS_ALL_OKAY = 0,
-    MARS_MISC_ERROR,
-    MARS_BAD_FUNCTION_CALL,
-    MARS_SEARCH_FAIL,
-    MARS_MEMORY_ALLOC_FAIL,
-    MARS_VULKAN_QUERY_ERROR,
-    MARS_VULKAN_VALIDATION_LAYER,
-    MARS_INIT_SDL_FAIL,
-    MARS_WINDOW_CREATION_FAIL,
-    MARS_INSTANCE_CREATION_FAIL,
-    MARS_SURFACE_CREATION_FAIL,
-    MARS_DEBUG_MESSENGER_CREATION_FAIL,
-    MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL,
-    MARS_FIND_SUITABLE_GPU_FAIL,
-    MARS_DEVICE_CREATION_FAIL,
-    MARS_SWAPCHAIN_CREATION_FAIL,
+#include <string>
+
+namespace mars {
+    enum class ErrorKey : uint32_t {
+        ALL_OKAY = 0,
+        MISC_ERROR,
+        BAD_FUNCTION_CALL,
+        SEARCH_FAIL,
+        MEMORY_ALLOC_FAIL,
+        VULKAN_QUERY_ERROR,
+        VULKAN_VALIDATION_LAYER,
+        INIT_SDL_FAIL,
+        WINDOW_CREATION_FAIL,
+        INSTANCE_CREATION_FAIL,
+        SURFACE_CREATION_FAIL,
+        DEBUG_MESSENGER_CREATION_FAIL,
+        FIND_SUITABLE_GPU_FAIL,
+        DEVICE_CREATION_FAIL,
+        SWAPCHAIN_CREATION_FAIL,
+    };
+
+    using noreturn = int32_t;
+
+    template <class T>
+    union ErrorUnion {
+        T data;
+        std::string message;
+        ErrorUnion() noexcept : data(T{0}) {}
+        ErrorUnion(const T& inData) noexcept : data(inData) {}
+        ErrorUnion(const std::string& inMessage) noexcept : message(inMessage) {}
+        ErrorUnion(const ErrorUnion<T>& errU) noexcept : message(errU.message) {}
+        ~ErrorUnion() noexcept {}
+    };
+
+    template <class T>
+    class [[nodiscard("Potentially unhandled error value")]] Error {
+        public:
+        Error() noexcept : key(ErrorKey::ALL_OKAY), content() {}
+        Error(const T& data) noexcept : key(ErrorKey::ALL_OKAY), content(data) {}
+        Error(ErrorKey inKey, const std::string& message) noexcept : key(inKey), content(message) {}
+        Error(const Error<T>& err) noexcept : key(err.key), content(err.content) {}
+        Error(const Error<T>&& err) noexcept : key(err.key), content(std::move(err.content)) {}
+        Error<T>& operator=(const Error<T>& rhs) {
+            key = rhs.key;
+            if(key == ErrorKey::ALL_OKAY) {
+                content.data = rhs.content.data;
+            }
+            else {
+                content.message = rhs.content.message;
+            }
+            return *this;
+        }
+        ~Error() {}
+        ErrorKey getKey()  {
+            return key;
+        }
+        bool okay()  {
+            return key == ErrorKey::ALL_OKAY;
+        }
+        T getData()  {
+            return content.data;
+        }
+        std::string getMessage()  {
+            return content.message;
+        }
+        private:
+        ErrorKey key;
+        ErrorUnion<T> content;
+    };
+
+    Error<noreturn> success();
+
+    //Make sure to declare an Error<T> named procResult inside your function before using this macro
+    #define MARS_TRY(proc) procResult = proc;\
+    if(!procResult.okay()) return procResult
+
+    Error<noreturn> init();
+    void quit() noexcept;
+
+    class Renderer {
+        public:
+        Renderer() noexcept;
+        virtual ~Renderer() noexcept;
+        Error<noreturn> init(const std::string& name);
+        private:
+        VkInstance instance;
+        SDL_Window* window;
+        VkDebugUtilsMessengerEXT debugMessenger;
+        VkSurfaceKHR surface;
+        VkDevice device;
+        VkPhysicalDevice physicalDevice;
+        VkSwapchainKHR swapchain;
+    };
+
+    class Game {
+        public:
+        Game() = delete;
+        Game(Error<noreturn>& result) noexcept;
+        Game(Error<noreturn>& result, const std::string& name) noexcept;
+        virtual ~Game() noexcept;
+        Error<noreturn> init(const std::string& appName);
+        private:
+        std::string windowName;
+        std::string appName;
+        Renderer renderer;
+    };
 };
-
-typedef struct {
-    enum MarsErrorType key;
-    char const* message;
-} MarsError;
-
-static MarsError marsGlobalErrorResult = {};
-
-MarsError marsMakeError(enum MarsErrorType key, char const* message);
-
-#define MARS_SUCCESS marsMakeError(MARS_ALL_OKAY, "")
-#define MARS_TRY(proc) marsGlobalErrorResult = proc;\
-    if(marsGlobalErrorResult.key != MARS_ALL_OKAY) return marsGlobalErrorResult
-
-typedef struct {
-    VkInstance instance;
-    SDL_Window* window;
-    VkDebugUtilsMessengerEXT debugMessenger;
-    VkSurfaceKHR surface;
-    VkDevice device;
-    VkPhysicalDevice physicalDevice;
-    VkSwapchainKHR swapchain;
-} MarsRenderer;
-
-typedef struct {
-    char const* name;
-    char const* appName;
-    MarsRenderer renderer;
-} MarsGame;
-
-MarsError marsInit(MarsGame& marsGame, char const* name); 
-void marsQuit(MarsGame& marsGame);

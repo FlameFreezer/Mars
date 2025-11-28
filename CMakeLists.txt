@@ -5,6 +5,8 @@ project(MarsEngine)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+#set(CMAKE_COMPILE_WARNING_AS_ERROR True)
+#set(CMAKE_LINK_WARNING_AS_ERROR True)
 
 # Ensure all build objects are placed in the same directory
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
@@ -14,7 +16,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 # Set up mars target library
 add_library(Mars)
-target_sources(Mars PRIVATE src/mars.cpp)
+target_sources(Mars PUBLIC src/mars.cpp)
 
 # Set up SDL3
 add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)

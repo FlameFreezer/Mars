@@ -4,33 +4,31 @@
 
 #include "renderer/renderer.cpp"
 
-MarsError marsMakeError(enum MarsErrorType key, char const* message) {
-    MarsError result;
-    result.key = key;
-    result.message = message;
-    return result;
-}
+namespace mars {
+    Error<noreturn> success()  {
+        return Error<noreturn>();
+    }
 
-MarsError marsInit(MarsGame& marsGame, char const* name) {
-    if(!SDL_Init(SDL_INIT_VIDEO)) {
-        return marsMakeError(MARS_INIT_SDL_FAIL, SDL_GetError());
+    Error<noreturn> init() {
+        if(!SDL_Init(SDL_INIT_VIDEO)) {
+            return Error<noreturn>(ErrorKey::INIT_SDL_FAIL, SDL_GetError());
+        }
+        return success();
     }
-    if(name == nullptr) {
-        marsGame.name = "My Mars App";
+    void quit() noexcept {
+        SDL_Quit();
     }
-    else {
-        marsGame.name = name;
-    }
-    MARS_TRY(marsInitRenderer(marsGame.renderer, name));
-    return MARS_SUCCESS;
-}
 
-void marsQuit(MarsGame& marsGame) {
-    vkDestroySwapchainKHR(marsGame.renderer.device, marsGame.renderer.swapchain, nullptr);
-    SDL_Vulkan_DestroySurface(marsGame.renderer.instance, marsGame.renderer.surface, nullptr);
-    SDL_DestroyWindow(marsGame.renderer.window);
-    vkDestroyDevice(marsGame.renderer.device, nullptr);
-    destroyVkDebugUtilsMessengerEXT(marsGame.renderer.instance, marsGame.renderer.debugMessenger, nullptr);
-    vkDestroyInstance(marsGame.renderer.instance, nullptr);
-    SDL_Quit();
+    Error<noreturn> Game::init(const std::string& appName) {
+        Error<noreturn> procResult;
+        MARS_TRY(renderer.init(appName));
+        return success();
+    }
+    Game::Game(Error<noreturn>& result) noexcept : windowName("My Mars Game"), appName("My Mars Game") {
+        result = this->init(appName);
+    }
+    Game::Game(Error<noreturn>& result, const std::string& name) noexcept : windowName(name), appName(name) {
+        result = this->init(appName);
+    }
+    Game::~Game() noexcept {}
 }
