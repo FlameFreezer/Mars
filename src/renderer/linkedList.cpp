@@ -1,14 +1,6 @@
 #ifndef MARS_H
-#include <mars.h>
+#include <mars.hpp>
 #endif
-
-struct MarsNode_T {
-    char const* name;
-    struct MarsNode_T* next;
-    struct MarsNode_T* prev;
-};
-
-typedef struct MarsNode_T MarsNode;
 
 typedef struct {
     MarsNode* head;

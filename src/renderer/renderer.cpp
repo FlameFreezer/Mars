@@ -1,18 +1,18 @@
 #ifndef MARS_H
-#include <mars.h>
+#include <mars.hpp>
 #endif
 
-#include "linkedList.c"
-
-#include <stdio.h>
-#include <string.h>
+#include <iostream>
+#include <array>
+#include <vector>
+#include <string>
+#include <set>
 
 static int const WIDTH = 800;
 static int const HEIGHT = 600;
-static char const* deviceExtensionNames[] = {
+static std::array<char const*, 1> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-static int const deviceExtensionNameCount = sizeof(deviceExtensionNames) / sizeof(char const*);
 
 static PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = nullptr;
 static PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = nullptr;
@@ -23,59 +23,52 @@ static VkBool32 debugCallback(
 	VkDebugUtilsMessengerCallbackDataEXT const*	pCallbackData,
 	void* pUserData
 ) {
-    printf("Validation Layer: %s\n", pCallbackData->pMessage);
+    std::cout << "Validation Layer: " << pCallbackData->pMessage << "\n";
     return VK_FALSE;
 }
 
-typedef struct {
+struct SurfaceInfo {
     VkSurfaceCapabilitiesKHR capabilities;
     VkPresentModeKHR presentMode;
 	VkSurfaceFormatKHR format;
     VkSurfaceKHR surface;
-} MarsSurfaceInfo;
+};
 
 static MarsError marsPickQueueFamilyIndex(
-    uint32_t* queueFamilyIndex, 
-    uint32_t* queueCount, 
+    uint32_t& queueFamilyIndex, 
+    uint32_t& queueCount, 
     VkPhysicalDevice physicalDevice, 
     VkSurfaceKHR surface
 ) {
 	//Get queue family properties for the current physical device
 	uint32_t queueFamilyPropertyCount = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, nullptr);
-	VkQueueFamilyProperties2* queueFamilyProperties = SDL_calloc(queueFamilyPropertyCount, sizeof(VkQueueFamilyProperties2));
-	if(queueFamilyProperties == nullptr) {
-		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
-	}
-	vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties);
+    std::vector<VkQueueFamilyProperties2> queueFamilyProperties(queueFamilyPropertyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties.data());
 	//Check each queue family index for needed support
 	for(int i = 0; i < queueFamilyPropertyCount; i++) {
 		if(queueFamilyProperties[i].queueFamilyProperties.queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
 			VkBool32 surfaceSupport;
 			if(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &surfaceSupport) != VK_SUCCESS) {
-				SDL_free(queueFamilyProperties);
 				return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to get physical device surface support!");
 			}
 			if(surfaceSupport == VK_TRUE) {
 				//At this point, we have found our desired queue family index
-				*queueFamilyIndex = i;
-				*queueCount = queueFamilyProperties[i].queueFamilyProperties.queueCount;
-				SDL_free(queueFamilyProperties);
+				queueFamilyIndex = i;
+				queueCount = queueFamilyProperties[i].queueFamilyProperties.queueCount;
 				return MARS_SUCCESS;
 			}
 		}
 	}
-	SDL_free(queueFamilyProperties);
 	return marsMakeError(MARS_SEARCH_FAIL, "");
 }
 
 static MarsError marsChoosePresentMode(
-    VkPresentModeKHR* presentMode, 
+    VkPresentModeKHR& presentMode, 
     VkPhysicalDevice physicalDevice, 
     VkSurfaceKHR surface
 ) {
 	//Get present modes for the surface supported by the physical device
-	VkPresentModeKHR* presentModes = nullptr;
 	uint32_t presentModeCount = 0;
 	if(vkGetPhysicalDeviceSurfacePresentModesKHR(
 		physicalDevice, 
@@ -85,15 +78,12 @@ static MarsError marsChoosePresentMode(
 	) != VK_SUCCESS) {
 		return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!");
 	}
-	presentModes = SDL_malloc(sizeof(VkPresentModeKHR) * presentModeCount);
-	if(presentModes == nullptr) {
-		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
-	}
+    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
 	if(vkGetPhysicalDeviceSurfacePresentModesKHR(
 		physicalDevice, 
 		surface, 
 		&presentModeCount, 
-		presentModes
+		presentModes.data()
 	) != VK_SUCCESS) {
 		return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!");
 	}
@@ -101,25 +91,24 @@ static MarsError marsChoosePresentMode(
 	for(int i = 0; i < presentModeCount; i++) {
 		//This is our preferred presentation mode
 		if(presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
-			*presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+			presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
 			break;
 		}
 		//We are willing to use this present mode if we have to, but we'll continue the search
 		else if(presentModes[i] == VK_PRESENT_MODE_FIFO_KHR) {
-			*presentMode = VK_PRESENT_MODE_FIFO_KHR;
+			presentMode = VK_PRESENT_MODE_FIFO_KHR;
 		}
 	}
-	SDL_free(presentModes);
 	//If we got here but didn't write to surfaceInfo.presentMode, then the current device did not
 	// support any of the desired present modes
-	if((*presentMode) == 0) {
+	if(presentMode == 0) {
 		return marsMakeError(MARS_SEARCH_FAIL, "");
 	}
 	return MARS_SUCCESS;
 }
 
 static MarsError marsCheckDeviceSurfaceFormats(
-    VkSurfaceFormatKHR* surfaceFormat, 
+    VkSurfaceFormatKHR& surfaceFormat, 
     VkPhysicalDevice physicalDevice, 
     VkSurfaceKHR surface
 ) {
@@ -128,23 +117,17 @@ static MarsError marsCheckDeviceSurfaceFormats(
 	if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, nullptr) != VK_SUCCESS) {
 		return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!");
 	}
-	VkSurfaceFormatKHR* surfaceFormats = SDL_malloc(sizeof(VkSurfaceFormatKHR) * surfaceFormatCount);
-	if(surfaceFormats == nullptr) {
-		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
-	}
-	if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats) != VK_SUCCESS) {
-		SDL_free(surfaceFormats);
+    std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
+	if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()) != VK_SUCCESS) {
 		return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!");
 	}
 	for(int j = 0; j < surfaceFormatCount; j++) {
 		if(surfaceFormats[j].format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormats[j].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-			*surfaceFormat = surfaceFormats[j];
-			SDL_free(surfaceFormats);
+			surfaceFormat = surfaceFormats[j];
 			return MARS_SUCCESS;
 		}
 	}
-	*surfaceFormat = surfaceFormats[0];
-	SDL_free(surfaceFormats);
+	surfaceFormat = surfaceFormats[0];
 	return MARS_SUCCESS;
 }
 
@@ -154,60 +137,47 @@ static MarsError marsCheckDeviceExtensionSupport(VkPhysicalDevice physicalDevice
 	if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, nullptr) != VK_SUCCESS) {
 		return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!");
 	}
-	VkExtensionProperties* extensionProperties = SDL_malloc(sizeof(VkExtensionProperties) * deviceExtensionPropertyCount);
-	if(extensionProperties == nullptr) {
-	    return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
-	}
-	if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, extensionProperties) != VK_SUCCESS) {
-	    SDL_free(extensionProperties);
+    std::vector<VkExtensionProperties> extensionProperties(deviceExtensionPropertyCount);
+	if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, extensionProperties.data()) != VK_SUCCESS) {
 	    return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!");
 	}
 	//Construct linked list of extension names
-	MarsLinkedList deviceExtensions = {};
-	for(int j = 0; j < deviceExtensionNameCount; j++) {
-	   MARS_TRY(marsPush(&deviceExtensions, deviceExtensionNames[j])); 
+    std::set<std::string> physicalDeviceExtensions;
+	for(int i = 0; i < deviceExtensions.size(); i++) {
+        physicalDeviceExtensions.emplace(deviceExtensions[i]);
 	}
 	//Check if we have every needed extension
-	for(int j = 0; j < deviceExtensionPropertyCount; j++) {
-	    //Remove the current extension name from the list, if we have it
-	    marsRemove(&deviceExtensions, extensionProperties[j].extensionName);
-	    //Once we've "ticked off" each name from the list, we know the device supports all the needed
+	for(int i = 0; i < deviceExtensionPropertyCount; i++) {
+	    //Remove the current extension name from the set, if we have it
+        physicalDeviceExtensions.erase(extensionProperties[i].extensionName);
+	    //Once we've "ticked off" each name from the set, we know the device supports all the needed
 	    //	extensions
-	    if(deviceExtensions.head == nullptr) {
-			marsClear(&deviceExtensions);
-			SDL_free(extensionProperties);
-			return MARS_SUCCESS;
-	    }
+        if(physicalDeviceExtensions.empty()) {
+            return MARS_SUCCESS;
+        }
 	}
-	SDL_free(extensionProperties);
 	return marsMakeError(MARS_SEARCH_FAIL, "");
 }
 
 static MarsError marsCreateVkDeviceAndSwapchain(
-	VkDevice* device, 
-	VkPhysicalDevice* physicalDevice, 
-	VkSwapchainKHR* swapchain, 
+	VkDevice& device, 
+	VkPhysicalDevice& physicalDevice, 
+	VkSwapchainKHR& swapchain, 
 	VkInstance const instance, 
 	VkSurfaceKHR const surface
 ) {
     uint32_t queueFamilyIndex = 0;
     uint32_t queueCount = 0;
-    MarsSurfaceInfo surfaceInfo = {};
+    SurfaceInfo surfaceInfo = {};
     surfaceInfo.surface = surface;
-    float* queuePriorities = nullptr;
-	VkPhysicalDevice* physicalDevices = nullptr;
 
     //Get all the physical devices installed on the system
     uint32_t physicalDeviceCount = 0;
     if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
 		return marsMakeError(MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL, "Failed to enumerate physical devices!");
     }
-    physicalDevices = SDL_malloc(sizeof(VkPhysicalDevice) * physicalDeviceCount);
-    if(physicalDevices == nullptr) {
-		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
-    }
-    if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices) != VK_SUCCESS) {
-		SDL_free(physicalDevices);
+    std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
+    if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices.data()) != VK_SUCCESS) {
 		return marsMakeError(MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL, "Failed to enumerate physical devices!");
     }
 
@@ -219,7 +189,6 @@ static MarsError marsCreateVkDeviceAndSwapchain(
 			continue;
 		}
 		if(result.key != MARS_ALL_OKAY) {
-			SDL_free(physicalDevices);
 			return result;
 		}
 
@@ -229,37 +198,32 @@ static MarsError marsCreateVkDeviceAndSwapchain(
     	    surface, 
     	    &surfaceInfo.capabilities
     	) != VK_SUCCESS) {
-			SDL_free(physicalDevices);
     	    return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to get physical device surface capabilities!");
     	}
 
 		//Get a surface format to use
-		result = marsCheckDeviceSurfaceFormats(&surfaceInfo.format, physicalDevices[i], surface);
+		result = marsCheckDeviceSurfaceFormats(surfaceInfo.format, physicalDevices[i], surface);
 		if(result.key != MARS_ALL_OKAY) {
-			SDL_free(physicalDevices);
 			return result;
 		}
 		//Choose a present mode to use
-		result = marsChoosePresentMode(&surfaceInfo.presentMode, physicalDevices[i], surface);
+		result = marsChoosePresentMode(surfaceInfo.presentMode, physicalDevices[i], surface);
 		if(result.key == MARS_SEARCH_FAIL) {
 			continue;
 		}
 		else if(result.key != MARS_ALL_OKAY) {
-			SDL_free(physicalDevices);
 			return result;
 		}
 		//Pick the desired queue family index
-		result = marsPickQueueFamilyIndex(&queueFamilyIndex, &queueCount, physicalDevices[i], surface);
+		result = marsPickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i], surface);
 		//At this point if all has succeeded, we are ready to use the current physical device and
 		// create the logical device
 		if(result.key == MARS_ALL_OKAY) {
-			*physicalDevice = physicalDevices[i];
-			SDL_free(physicalDevices);
+			physicalDevice = physicalDevices[i];
 			goto Device_Creation;
 		}
 		//Otherwise, if something went wrong, return the error
 		else if(result.key != MARS_SEARCH_FAIL) {
-			SDL_free(physicalDevices);
 			return result;
 		}
     } 
@@ -267,10 +231,7 @@ static MarsError marsCreateVkDeviceAndSwapchain(
     return marsMakeError(MARS_FIND_SUITABLE_GPU_FAIL, "Failed to find a suitable GPU!");
 
 Device_Creation:
-    queuePriorities = SDL_calloc(queueCount, sizeof(float));
-    if(queuePriorities == nullptr) {
-		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
-    }
+    std::vector<float> queuePriorities(queueCount, 0.0f);
 
     VkDeviceQueueCreateInfo queueInfo = {
     	.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -278,7 +239,7 @@ Device_Creation:
     	.flags = 0,
     	.queueFamilyIndex = queueFamilyIndex,
     	.queueCount = queueCount,
-    	.pQueuePriorities = queuePriorities
+    	.pQueuePriorities = queuePriorities.data()
     };
 
     VkDeviceCreateInfo deviceInfo = {
@@ -287,15 +248,14 @@ Device_Creation:
     	.flags = 0,
     	.queueCreateInfoCount = 1,
     	.pQueueCreateInfos = &queueInfo,
-    	.enabledExtensionCount = deviceExtensionNameCount,
-    	.ppEnabledExtensionNames = deviceExtensionNames,
+    	.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
+    	.ppEnabledExtensionNames = deviceExtensions.data(),
     	.pEnabledFeatures = nullptr
     };
 
-    if(vkCreateDevice(*physicalDevice, &deviceInfo, nullptr, device) != VK_SUCCESS) {
+    if(vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &device) != VK_SUCCESS) {
 		return marsMakeError(MARS_DEVICE_CREATION_FAIL, "Failed to create VkDevice!");
     }
-    SDL_free(queuePriorities);
 
 	VkSwapchainCreateInfoKHR swapchainInfo = {
     	.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -318,13 +278,13 @@ Device_Creation:
 		.oldSwapchain = nullptr
     };
 
-    if(vkCreateSwapchainKHR(*device, &swapchainInfo, nullptr, swapchain) != VK_SUCCESS) {
+    if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
 		return marsMakeError(MARS_SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!");
     }
     return MARS_SUCCESS;
 }
 
-static MarsError marsCreateVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debugMessenger, VkInstance const instance) {
+static MarsError marsCreateVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT& debugMessenger, VkInstance const instance) {
     VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
     	.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
     	.pNext = nullptr,
@@ -343,7 +303,7 @@ static MarsError marsCreateVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debug
     if(createVkDebugUtilsMessengerEXT == nullptr) {
         return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkCreateDebugUtilsMessengerEXT!");
     }
-    if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, debugMessenger) != VK_SUCCESS) {
+    if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
         return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessengerEXT!");
     }
     destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
@@ -354,18 +314,18 @@ static MarsError marsCreateVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debug
     return MARS_SUCCESS;
 }
 
-static MarsError marsCreateVkInstance(VkInstance* instance, char const* appName) {
+static MarsError marsCreateVkInstance(VkInstance& instance, char const* appName) {
     uint32_t extCount = 0;
     char const * const * sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
-    char const** extNames = SDL_malloc(sizeof(char const*) * (extCount + 1));
-    if(extNames == nullptr) {
-		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
+    std::vector<char const*> extNames;
+    extNames.reserve(extCount);
+    extNames.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    for(int i = 0; i < extCount; i++) {
+        extNames.push_back(sdlExtNames[i]);
     }
-	extNames[0] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-	memcpy(&extNames[1], sdlExtNames, extCount++ * sizeof(char const*));
-	printf("Instance Extensions\n");
-	for(int i = 0; i < extCount; i++) {
-		printf("\t%s\n", extNames[i]);
+    std::cout << "Instance Extensions:\n";
+	for(char const* extName : extNames) {
+        std::cout << '\t' << extName << '\n';
 	}
 
     VkApplicationInfo appInfo = {
@@ -384,35 +344,32 @@ static MarsError marsCreateVkInstance(VkInstance* instance, char const* appName)
     	.pApplicationInfo = &appInfo,
     	.enabledLayerCount = 0,
     	.ppEnabledLayerNames = nullptr,
-    	.enabledExtensionCount = extCount,
-    	.ppEnabledExtensionNames = extNames
+    	.enabledExtensionCount = static_cast<uint32_t>(extNames.size()),
+    	.ppEnabledExtensionNames = extNames.data()
     };
 
-    if(vkCreateInstance(&instanceInfo, nullptr, instance) != VK_SUCCESS) {
-        SDL_free(extNames);
+    if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS) {
 		return marsMakeError(MARS_INSTANCE_CREATION_FAIL, "Failed to create VkInstance!");
 	}
-    SDL_free(extNames);
     return MARS_SUCCESS;
 }
 
-static MarsError marsInitRenderer(MarsRenderer* marsRenderer, char const* appName) {
-	marsRenderer->window = SDL_CreateWindow(appName, WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
-    if(marsRenderer->window == nullptr) {
+static MarsError marsInitRenderer(MarsRenderer& marsRenderer, char const* appName) {
+	marsRenderer.window = SDL_CreateWindow(appName, WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
+    if(marsRenderer.window == nullptr) {
 		return marsMakeError(MARS_WINDOW_CREATION_FAIL, SDL_GetError());
     }
-    MARS_TRY(marsCreateVkInstance(&marsRenderer->instance, appName));
-    MARS_TRY(marsCreateVkDebugUtilsMessenger(&marsRenderer->debugMessenger, marsRenderer->instance));
-    if(!SDL_Vulkan_CreateSurface(marsRenderer->window, marsRenderer->instance, nullptr, &marsRenderer->surface)) {
+    MARS_TRY(marsCreateVkInstance(marsRenderer.instance, appName));
+    MARS_TRY(marsCreateVkDebugUtilsMessenger(marsRenderer.debugMessenger, marsRenderer.instance));
+    if(!SDL_Vulkan_CreateSurface(marsRenderer.window, marsRenderer.instance, nullptr, &marsRenderer.surface)) {
 		return marsMakeError(MARS_SURFACE_CREATION_FAIL, SDL_GetError());
     }
     MARS_TRY(marsCreateVkDeviceAndSwapchain(
-		&marsRenderer->device, 
-		&marsRenderer->physicalDevice, 
-		&marsRenderer->swapchain, 
-		marsRenderer->instance, 
-		marsRenderer->surface
+		marsRenderer.device, 
+		marsRenderer.physicalDevice, 
+		marsRenderer.swapchain, 
+		marsRenderer.instance, 
+		marsRenderer.surface
     ));
-    
     return MARS_SUCCESS;
 }

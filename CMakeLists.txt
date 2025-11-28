@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 4.1.2)
 
 project(MarsEngine)
 
-set(CMAKE_C_STANDARD 23)
-set(CMAKE_C_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Ensure all build objects are placed in the same directory
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
@@ -14,7 +14,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 # Set up mars target library
 add_library(Mars)
-target_sources(Mars PRIVATE src/mars.c)
+target_sources(Mars PRIVATE src/mars.cpp)
 
 # Set up SDL3
 add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)
@@ -31,6 +31,6 @@ target_link_directories(Mars PUBLIC
 )
 
 # Test Application
-add_executable(marsTest app/main.c)
+add_executable(marsTest app/main.cpp)
 target_include_directories(marsTest PUBLIC include)
 target_link_libraries(marsTest PRIVATE Mars)
