@@ -16,15 +16,15 @@ typedef struct {
 } MarsLinkedList;
 
 static MarsError marsPush(MarsLinkedList* list, char const* name) {
-    if(!list || !name) return marsMakeError(MARS_MISC_ERROR, "Bad call to function: marsPush");
+    if(list == nullptr || name == nullptr) return marsMakeError(MARS_BAD_FUNCTION_CALL, "Bad call to function: marsPush");
     MarsNode* newNode = SDL_malloc(sizeof(MarsNode));
-    if(!newNode) {
+    if(newNode == nullptr) {
         return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
     }
     newNode->name = name;
     newNode->prev = list->tail;
     newNode->next = nullptr;
-    if(!list->head) {
+    if(list->head == nullptr) {
         list->head = newNode;
         list->tail = newNode;
     }
@@ -38,17 +38,17 @@ static void marsRemove(MarsLinkedList* list, char const* name) {
     if(!list || !name) return;
     //Find the desired node
     MarsNode* iterator = list->head;
-    while(iterator && strcmp(iterator->name, name)) {
+    while(iterator != nullptr && strcmp(iterator->name, name) != 0) {
         iterator = iterator->next;
     }
-    if(!iterator) return;
-    if(iterator->prev) {
+    if(iterator == nullptr) return;
+    if(iterator->prev != nullptr) {
         iterator->prev->next = iterator->next;
     }
     else {
         list->head = iterator->next;
     }
-    if(iterator->next) {
+    if(iterator->next != nullptr) {
         iterator->next->prev = iterator->prev;
     }
     else {
@@ -60,7 +60,7 @@ static void marsRemove(MarsLinkedList* list, char const* name) {
 static void marsClear(MarsLinkedList* list) {
     if(!list) return;
     MarsNode* iterator = list->head;
-    while(iterator) {
+    while(iterator != nullptr) {
         iterator = iterator->next;
         SDL_free(iterator->prev);
     }

@@ -44,7 +44,7 @@ static MarsError marsPickQueueFamilyIndex(
 	uint32_t queueFamilyPropertyCount = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, nullptr);
 	VkQueueFamilyProperties2* queueFamilyProperties = SDL_calloc(queueFamilyPropertyCount, sizeof(VkQueueFamilyProperties2));
-	if(!queueFamilyProperties) {
+	if(queueFamilyProperties == nullptr) {
 		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
 	}
 	vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties);
@@ -86,7 +86,7 @@ static MarsError marsChoosePresentMode(
 		return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!");
 	}
 	presentModes = SDL_malloc(sizeof(VkPresentModeKHR) * presentModeCount);
-	if(!presentModes) {
+	if(presentModes == nullptr) {
 		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
 	}
 	if(vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -112,7 +112,7 @@ static MarsError marsChoosePresentMode(
 	SDL_free(presentModes);
 	//If we got here but didn't write to surfaceInfo.presentMode, then the current device did not
 	// support any of the desired present modes
-	if(!(*presentMode)) {
+	if((*presentMode) == 0) {
 		return marsMakeError(MARS_SEARCH_FAIL, "");
 	}
 	return MARS_SUCCESS;
@@ -129,7 +129,7 @@ static MarsError marsCheckDeviceSurfaceFormats(
 		return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!");
 	}
 	VkSurfaceFormatKHR* surfaceFormats = SDL_malloc(sizeof(VkSurfaceFormatKHR) * surfaceFormatCount);
-	if(!surfaceFormats) {
+	if(surfaceFormats == nullptr) {
 		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
 	}
 	if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats) != VK_SUCCESS) {
@@ -155,7 +155,7 @@ static MarsError marsCheckDeviceExtensionSupport(VkPhysicalDevice physicalDevice
 		return marsMakeError(MARS_VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!");
 	}
 	VkExtensionProperties* extensionProperties = SDL_malloc(sizeof(VkExtensionProperties) * deviceExtensionPropertyCount);
-	if(!extensionProperties) {
+	if(extensionProperties == nullptr) {
 	    return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
 	}
 	if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, extensionProperties) != VK_SUCCESS) {
@@ -203,7 +203,7 @@ static MarsError marsCreateVkDeviceAndSwapchain(
 		return marsMakeError(MARS_ENUMERATE_PHYSICAL_DEVICES_FAIL, "Failed to enumerate physical devices!");
     }
     physicalDevices = SDL_malloc(sizeof(VkPhysicalDevice) * physicalDeviceCount);
-    if(!physicalDevices) {
+    if(physicalDevices == nullptr) {
 		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
     }
     if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices) != VK_SUCCESS) {
@@ -268,7 +268,7 @@ static MarsError marsCreateVkDeviceAndSwapchain(
 
 Device_Creation:
     queuePriorities = SDL_calloc(queueCount, sizeof(float));
-    if(!queuePriorities) {
+    if(queuePriorities == nullptr) {
 		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
     }
 
@@ -340,13 +340,17 @@ static MarsError marsCreateVkDebugUtilsMessenger(VkDebugUtilsMessengerEXT* debug
 		.pUserData = nullptr,
     };
     createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-    if(createVkDebugUtilsMessengerEXT != nullptr) {
-		if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, debugMessenger) != VK_SUCCESS) {
-			return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessenger!");
-		}
+    if(createVkDebugUtilsMessengerEXT == nullptr) {
+        return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkCreateDebugUtilsMessengerEXT!");
+    }
+    if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, debugMessenger) != VK_SUCCESS) {
+        return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessengerEXT!");
     }
     destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-	instance, "vkDestroyDebugUtilsMessengerEXT");
+        instance, "vkDestroyDebugUtilsMessengerEXT");
+    if(destroyVkDebugUtilsMessengerEXT == nullptr) {
+        return marsMakeError(MARS_DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkDestroyDebugUtilsMessengerEXT!");
+    }
     return MARS_SUCCESS;
 }
 
@@ -354,7 +358,7 @@ static MarsError marsCreateVkInstance(VkInstance* instance, char const* appName)
     uint32_t extCount = 0;
     char const * const * sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
     char const** extNames = SDL_malloc(sizeof(char const*) * (extCount + 1));
-    if(!extNames) {
+    if(extNames == nullptr) {
 		return marsMakeError(MARS_MEMORY_ALLOC_FAIL, "Failed to allocate host memory!");
     }
 	extNames[0] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
@@ -385,6 +389,7 @@ static MarsError marsCreateVkInstance(VkInstance* instance, char const* appName)
     };
 
     if(vkCreateInstance(&instanceInfo, nullptr, instance) != VK_SUCCESS) {
+        SDL_free(extNames);
 		return marsMakeError(MARS_INSTANCE_CREATION_FAIL, "Failed to create VkInstance!");
 	}
     SDL_free(extNames);
