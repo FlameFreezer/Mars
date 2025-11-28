@@ -52,6 +52,5 @@ typedef struct {
     MarsRenderer renderer;
 } MarsGame;
 
-
 MarsError marsInit(MarsGame* marsGame, char const* name); 
 void marsQuit(MarsGame* marsGame);
