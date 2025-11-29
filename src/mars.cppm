@@ -1,21 +1,21 @@
-#define MARS_H
+module;
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
 #include <string>
-#include <utility>
 
-#include "error.hpp"
+export module mars;
+export import :error;
 
 namespace mars {
     static int const MAX_CONCURRENT_FRAMES = 2;
 
-    Error<noreturn> init();
-    int quit() noexcept;
+    export Error<noreturn> init();
+    export int quit() noexcept;
 
-    class Renderer {
+    export class Renderer {
         public:
         Renderer() noexcept;
         virtual ~Renderer() noexcept;
@@ -30,7 +30,7 @@ namespace mars {
         VkSwapchainKHR swapchain;
     };
 
-    class Game {
+    export class Game {
         public:
         Game() = delete;
         Game(Error<noreturn>& result) noexcept;

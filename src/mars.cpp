@@ -1,8 +1,15 @@
-#ifndef MARS_H
-#include <mars.hpp>
-#endif
+module;
 
-#include "renderer/renderer.cpp"
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
+#include <vulkan/vulkan.h>
+
+#include <string>
+
+module mars;
+
+#define MARS_TRY(proc) procResult = proc;\
+if(!procResult.okay()) return procResult
 
 namespace mars {
     Error<noreturn> success()  {

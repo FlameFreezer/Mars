@@ -1,9 +1,15 @@
+module;
+
 #include <cstdint>
+#include <string>
+#include <utility>
+
+export module mars:error;
 
 namespace mars {
-    class noreturn {};
+    export class noreturn {};
 
-    enum class ErrorTag : uint32_t {
+    export enum class ErrorTag : uint32_t {
         ALL_OKAY = 0,
         MISC_ERROR,
         BAD_FUNCTION_CALL,
@@ -21,13 +27,14 @@ namespace mars {
         SWAPCHAIN_CREATION_FAIL,
     };
 
-    template <class T>
+    export template <class T>
     class [[nodiscard("Potentially unhandled error value")]] Error {
         public:
         Error() noexcept : tag(ErrorTag::ALL_OKAY), data() {}
         Error(const T& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(inData) {}
         Error(T&& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(std::move(inData)) {}
         Error(ErrorTag inTag, const std::string& inMessage) noexcept : tag(inTag), message(inMessage) {}
+        //Returns `true` if `this->tag` is of a value not indicating an error during execution.
         bool okay() const noexcept {
             return tag == ErrorTag::ALL_OKAY;
         }
@@ -78,11 +85,13 @@ namespace mars {
         ErrorTag getTag() const noexcept {
             return tag;
         }
+        //Accessor for `data`. Raises a compile error if `message` is the active union field.
         T getData() const noexcept {
             //No data to retrieve if there has been an error - message is the active union field
             if(!okay()) std::unreachable();
             return data;
         }
+        //Accessor for `message`. Raises a compile error if `data` is the active union field.
         const std::string& getMessage() const noexcept {
             //No message to retrieve if there is no error - data is the active union field
             if(okay()) std::unreachable();
@@ -99,10 +108,6 @@ namespace mars {
     template<>
     noreturn Error<noreturn>::getData() const noexcept = delete;
 
-    Error<noreturn> success();
-
-    //Make sure to declare an Error<T> named procResult inside your function before using this macro
-    #define MARS_TRY(proc) procResult = proc;\
-    if(!procResult.okay()) return procResult
-
+    //Returns an `Error<noreturn>` with `key == ALL_OKAY`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
+    export Error<noreturn> success();
 }

@@ -1,9 +1,6 @@
-#ifndef MARS_H
-#include "mars.hpp"
-#endif
+import mars;
 
 #include <iostream>
-#include <vector>
 
 #define MARS_REPORT(proc) procResult = proc;\
 if(!procResult.okay()) {\

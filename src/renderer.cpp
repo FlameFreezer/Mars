@@ -1,12 +1,19 @@
-#ifndef MARS_H
-#include <mars.hpp>
-#endif
+module;
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
+#include <vulkan/vulkan.h>
 
 #include <iostream>
 #include <array>
 #include <vector>
 #include <string>
 #include <set>
+
+module mars;
+
+#define MARS_TRY(proc) procResult = proc;\
+if(!procResult.okay()) return procResult
 
 static int const WIDTH = 800;
 static int const HEIGHT = 600;
