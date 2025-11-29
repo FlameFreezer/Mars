@@ -16,6 +16,7 @@ static std::array<char const*, 1> const deviceExtensions = {
 static std::array<char const*, 1> const validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
+
 #ifdef NDEBUG
 static bool const enableValidationLayers = false;
 #else
@@ -62,7 +63,7 @@ namespace mars {
             if(queueFamilyProperties[i].queueFamilyProperties.queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
                 VkBool32 surfaceSupport;
                 if(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &surfaceSupport) != VK_SUCCESS) {
-                    return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to get physical device surface support!"};
+                    return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface support!"};
                 }
                 if(surfaceSupport == VK_TRUE) {
                     //At this point, we have found our desired queue family index
@@ -72,7 +73,7 @@ namespace mars {
                 }
             }
         }
-        return {ErrorKey::SEARCH_FAIL, "Physical Device did not have queue family with needed properties!"};
+        return {ErrorTag::SEARCH_FAIL, "Physical Device did not have queue family with needed properties!"};
     }
 
     Error<VkPresentModeKHR> choosePresentMode(
@@ -88,7 +89,7 @@ namespace mars {
             &presentModeCount, 
             nullptr
         ) != VK_SUCCESS) {
-            return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!"};
+            return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!"};
         }
         std::vector<VkPresentModeKHR> presentModes(presentModeCount);
         if(vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -97,7 +98,7 @@ namespace mars {
             &presentModeCount, 
             presentModes.data()
         ) != VK_SUCCESS) {
-            return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!"};
+            return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!"};
         }
         //Select correct present mode
         for(int i = 0; i < presentModeCount; i++) {
@@ -113,7 +114,7 @@ namespace mars {
         //If we got here but didn't write to surfaceInfo.presentMode, then the current device did not
         // support any of the desired present modes
         if(presentMode == 0) {
-            return {ErrorKey::SEARCH_FAIL, "Physical device did not support needed present modes!"};
+            return {ErrorTag::SEARCH_FAIL, "Physical device did not support needed present modes!"};
         }
         return presentMode;
     }
@@ -125,11 +126,11 @@ namespace mars {
         //Get physical device's surface formats
         uint32_t surfaceFormatCount = 0;
         if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, nullptr) != VK_SUCCESS) {
-            return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!"};
+            return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!"};
         }
         std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
         if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()) != VK_SUCCESS) {
-            return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!"};
+            return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!"};
         }
         for(int j = 0; j < surfaceFormatCount; j++) {
             if(surfaceFormats[j].format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormats[j].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -143,11 +144,11 @@ namespace mars {
         //Check that the device supports the extensions needed by the application
         uint32_t deviceExtensionPropertyCount = 0;
         if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, nullptr) != VK_SUCCESS) {
-            return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!"};
+            return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!"};
         }
         std::vector<VkExtensionProperties> extensionProperties(deviceExtensionPropertyCount);
         if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, extensionProperties.data()) != VK_SUCCESS) {
-            return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!"};
+            return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!"};
         }
         //Construct linked list of extension names
         std::set<std::string> physicalDeviceExtensions;
@@ -164,7 +165,7 @@ namespace mars {
                 return success();
             }
         }
-        return {ErrorKey::SEARCH_FAIL, "Physical Device did not support needed extensions!"};
+        return {ErrorTag::SEARCH_FAIL, "Physical Device did not support needed extensions!"};
     }
 
     Error<noreturn> createVkDeviceAndSwapchain(
@@ -183,18 +184,18 @@ namespace mars {
         //Get all the physical devices installed on the system
         uint32_t physicalDeviceCount = 0;
         if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
-            return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to enumerate physical devices!"};
+            return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical devices!"};
         }
         std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
         if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices.data()) != VK_SUCCESS) {
-            return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to enumerate physical devices!"};
+            return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical devices!"};
         }
 
         //Iterate through each of these devices
         for(int i = 0; i < physicalDeviceCount; i++) {
             //Check device extension support for the current physical device
             procResult = checkDeviceExtensionSupport(physicalDevices[i]);
-            if(procResult.getKey() == ErrorKey::SEARCH_FAIL) {
+            if(procResult.getTag() == ErrorTag::SEARCH_FAIL) {
                 continue;
             }
             else if(!procResult.okay()) {
@@ -206,7 +207,7 @@ namespace mars {
                 surface, 
                 &surfaceInfo.capabilities
             ) != VK_SUCCESS) {
-                return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to get physical device surface capabilities!"};
+                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface capabilities!"};
             }
 
             //Get a surface format to use
@@ -215,18 +216,18 @@ namespace mars {
                 surfaceInfo.format = surfaceFormat.getData();
             }
             else {
-                return {surfaceFormat.getKey(), surfaceFormat.getMessage()};
+                return {surfaceFormat.getTag(), surfaceFormat.getMessage()};
             }
             //Choose a present mode to use
             Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevices[i], surface);
-            if(presentMode.getKey() == ErrorKey::SEARCH_FAIL) {
+            if(presentMode.getTag() == ErrorTag::SEARCH_FAIL) {
                 continue;
             }
             else if(presentMode.okay()) {
                 surfaceInfo.presentMode = presentMode.getData();
             }
             else {
-                return {presentMode.getKey(), presentMode.getMessage()};
+                return {presentMode.getTag(), presentMode.getMessage()};
             }
             //Pick the desired queue family index
             procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i], surface);
@@ -237,12 +238,12 @@ namespace mars {
                 goto Device_Creation;
             }
             //Otherwise, if something went wrong, return the error
-            else if(procResult.getKey() != ErrorKey::SEARCH_FAIL) {
+            else if(procResult.getTag() != ErrorTag::SEARCH_FAIL) {
                 return procResult;
             }
         } 
         //If we got here, none of the physical devices supported the features we needed
-        return {ErrorKey::FIND_SUITABLE_GPU_FAIL, "Failed to find a suitable GPU!"};
+        return {ErrorTag::FIND_SUITABLE_GPU_FAIL, "Failed to find a suitable GPU!"};
 
     Device_Creation:
         std::vector<float> queuePriorities(queueCount, 0.0f);
@@ -268,7 +269,7 @@ namespace mars {
         };
 
         if(vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &device) != VK_SUCCESS) {
-            return {ErrorKey::DEVICE_CREATION_FAIL, "Failed to create VkDevice!"};
+            return {ErrorTag::DEVICE_CREATION_FAIL, "Failed to create VkDevice!"};
         }
 
         VkSwapchainCreateInfoKHR swapchainInfo = {
@@ -293,7 +294,7 @@ namespace mars {
         };
 
         if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
-            return {ErrorKey::SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!"};
+            return {ErrorTag::SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!"};
         }
         return success();
     }
@@ -315,15 +316,15 @@ namespace mars {
         };
         createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
         if(createVkDebugUtilsMessengerEXT == nullptr) {
-            return {ErrorKey::DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
+            return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
         }
         if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-            return {ErrorKey::DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessengerEXT!"};
+            return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessengerEXT!"};
         }
         destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
             instance, "vkDestroyDebugUtilsMessengerEXT");
         if(destroyVkDebugUtilsMessengerEXT == nullptr) {
-            return {ErrorKey::DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
+            return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
         }
         return success();
     }
@@ -332,11 +333,11 @@ namespace mars {
         if(enableValidationLayers) {
             uint32_t layerPropertyCount = 0;
             if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
-                return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
+                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
             }
             std::vector<VkLayerProperties> layerProperties(layerPropertyCount);
             if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, layerProperties.data()) != VK_SUCCESS) {
-                return {ErrorKey::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
+                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
             }
             std::cout << "Available Layers:\n";
             for(char const* layer : validationLayers) {
@@ -346,7 +347,7 @@ namespace mars {
                         goto Next_Layer;
                     }
                 }
-                return {ErrorKey::INSTANCE_CREATION_FAIL, "Needed instance layers not found!"};
+                return {ErrorTag::INSTANCE_CREATION_FAIL, "Needed instance layers not found!"};
                 Next_Layer:
             }
         }
@@ -391,7 +392,7 @@ namespace mars {
         }
 
         if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS) {
-            return {ErrorKey::INSTANCE_CREATION_FAIL, "Failed to create VkInstance!"};
+            return {ErrorTag::INSTANCE_CREATION_FAIL, "Failed to create VkInstance!"};
     	}
         return success();
     }
@@ -404,10 +405,10 @@ namespace mars {
         }
         window = SDL_CreateWindow(name.c_str(), WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
         if(window == nullptr) {
-            return {ErrorKey::WINDOW_CREATION_FAIL, SDL_GetError()};
+            return {ErrorTag::WINDOW_CREATION_FAIL, SDL_GetError()};
         }
         if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
-            return {ErrorKey::SURFACE_CREATION_FAIL, SDL_GetError()};
+            return {ErrorTag::SURFACE_CREATION_FAIL, SDL_GetError()};
         }
         MARS_TRY(createVkDeviceAndSwapchain(
             device, 

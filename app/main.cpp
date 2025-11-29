@@ -3,6 +3,7 @@
 #endif
 
 #include <iostream>
+#include <vector>
 
 #define MARS_REPORT(proc) procResult = proc;\
 if(!procResult.okay()) {\
@@ -25,5 +26,4 @@ void mainLoop(mars::Error<mars::noreturn>& procResult) {
         std::cout << procResult.getMessage() << '\n';
         return;
     }
-
 }

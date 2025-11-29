@@ -11,7 +11,7 @@ namespace mars {
 
     Error<noreturn> init() {
         if(!SDL_Init(SDL_INIT_VIDEO)) {
-            return Error<noreturn>(ErrorKey::INIT_SDL_FAIL, SDL_GetError());
+            return {ErrorTag::INIT_SDL_FAIL, SDL_GetError()};
         }
         return success();
     }
