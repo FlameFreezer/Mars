@@ -30,6 +30,19 @@ namespace mars {
         Error<noreturn> procResult;
         Game g(procResult);
         if(!procResult.okay()) return procResult;
+        bool shouldKeepRunning = true;
+        while(shouldKeepRunning) {
+            SDL_Event e;
+            while(SDL_PollEvent(&e)) {
+                switch(e.type) {
+                case SDL_EVENT_QUIT:
+                    shouldKeepRunning = false;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
         return success();
     }
 

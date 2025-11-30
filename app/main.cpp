@@ -8,8 +8,6 @@ if(!procResult.okay()) {\
     return 1;\
 }
 
-void mainLoop(mars::Error<mars::noreturn>& procResult);
-
 int main(int argc, char** argv) {
     mars::Error<mars::noreturn> procResult;
     MARS_REPORT(mars::init());
