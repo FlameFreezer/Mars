@@ -34,10 +34,7 @@ namespace mars {
         Error(const T& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(inData) {}
         Error(T&& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(std::move(inData)) {}
         Error(ErrorTag inTag, const std::string& inMessage) noexcept : tag(inTag), message(inMessage) {}
-        //Returns `true` if `this->tag` is of a value not indicating an error during execution.
-        bool okay() const noexcept {
-            return tag == ErrorTag::ALL_OKAY;
-        }
+        Error(ErrorTag inTag, std::string&& inMessage) noexcept : tag(inTag), message(std::move(inMessage)) {}
         Error(const Error<T>& other) noexcept : tag(other.tag) {
             if(other.okay()) {
                 data = other.data;
@@ -55,32 +52,44 @@ namespace mars {
             }
         }
         Error<T>& operator=(const Error<T>& rhs) noexcept {
-            tag = rhs.tag;
-            if(rhs.okay()) {
-                data = rhs.data;
-            }
-            else {
-                message = rhs.message;
+            if(this != &rhs) {
+                //Call destructor on active data member, then write zeroes to whole object
+                //We have to do this to prevent any invalid pointers from being read once the 
+                // memory is reinterpreted
+                zeroMemory();
+                //Now we can safely assign data members
+                tag = rhs.tag;
+                if(rhs.okay()) {
+                    data = rhs.data;
+                }
+                else {
+                    message = rhs.message;
+                }
             }
             return *this;
         }
         Error<T>& operator=(Error<T>&& rhs) noexcept {
-            tag = rhs.tag;
-            if(rhs.okay()) {
-                data = std::move(rhs.data);
-            }
-            else {
-                message = std::move(rhs.message);
+            if(this != &rhs) {
+                //Call destructor on active data member, then write zeroes to whole object
+                //We have to do this to prevent any invalid pointers from being read once the 
+                // memory is reinterpreted
+                zeroMemory();
+                //Now we can safely assign data members
+                tag = rhs.tag;
+                if(rhs.okay()) {
+                    data = std::move(rhs.data);
+                }
+                else {
+                    message = std::move(rhs.message);
+                }
             }
             return *this;
         }
         ~Error() noexcept {
-            if(!okay()) {
-                message.~basic_string();
-            }
-            else {
-                data.~T();
-            }
+        }
+        //Returns `true` if `this->tag` is of a value not indicating an error during execution.
+        bool okay() const noexcept {
+            return tag == ErrorTag::ALL_OKAY;
         }
         ErrorTag getTag() const noexcept {
             return tag;
@@ -103,6 +112,20 @@ namespace mars {
             T data;
             std::string message;
         };
+        //Calls the destructor of the active data member, then writes zeroes to the entire space taken up by the object
+        void zeroMemory() {
+            if(okay()) {
+                data.~T();
+            }
+            else {
+                message.~basic_string();
+            }
+            //Once either destructor has been called, write the zeroes
+            size_t const size = sizeof(Error<T>);
+            //Passing the `this` pointer through another variable avoids a compiler warning
+            void* objectAddress = this;
+            memset(objectAddress, 0x00, size);
+        }
     };
 
     template<>

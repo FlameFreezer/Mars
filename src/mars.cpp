@@ -16,7 +16,7 @@ namespace mars {
         return Error<noreturn>();
     }
 
-    Error<noreturn> init() {
+    Error<noreturn> init() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO)) {
             return {ErrorTag::INIT_SDL_FAIL, SDL_GetError()};
         }
@@ -25,6 +25,12 @@ namespace mars {
     int quit() noexcept {
         SDL_Quit();
         return 0;
+    }
+    Error<noreturn> run() noexcept {
+        Error<noreturn> procResult;
+        Game g(procResult);
+        if(!procResult.okay()) return procResult;
+        return success();
     }
 
     Error<noreturn> Game::init(const std::string& appName) {

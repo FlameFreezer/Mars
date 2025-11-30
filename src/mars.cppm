@@ -12,8 +12,9 @@ export import :error;
 namespace mars {
     static int const MAX_CONCURRENT_FRAMES = 2;
 
-    export Error<noreturn> init();
+    export Error<noreturn> init() noexcept;
     export int quit() noexcept;
+    export Error<noreturn> run() noexcept;
 
     export class Renderer {
         public:
