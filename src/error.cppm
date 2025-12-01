@@ -78,10 +78,10 @@ namespace mars {
                 //Now we can safely assign data members
                 tag = rhs.tag;
                 if(rhs.okay()) {
-                    data = std::move(rhs.data);
+                    data = rhs.data;
                 }
                 else {
-                    message = std::move(rhs.message);
+                    message = rhs.message;
                 }
             }
             return *this;
@@ -125,7 +125,7 @@ namespace mars {
             size_t const size = sizeof(Error<T>);
             //Passing the `this` pointer through another variable avoids a compiler warning
             void* objectAddress = this;
-            memset(objectAddress, 0x00, size);
+	    std::memset(objectAddress, 0x00, size);
         }
     };
 
