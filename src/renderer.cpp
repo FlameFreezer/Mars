@@ -287,7 +287,7 @@ namespace mars {
             .minImageCount = surfaceInfo.capabilities.minImageCount + 1,
             .imageFormat = surfaceInfo.format.format,
             .imageColorSpace = surfaceInfo.format.colorSpace,
-            .imageExtent = surfaceInfo.capabilities.currentExtent,
+            .imageExtent = {.width = WIDTH, .height = HEIGHT,},
             .imageArrayLayers = 1,
             .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,

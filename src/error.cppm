@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <cstring>
 
 export module mars:error;
 
