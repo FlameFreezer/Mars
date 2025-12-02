@@ -123,9 +123,7 @@ namespace mars {
             }
             //Once either destructor has been called, write the zeroes
             size_t const size = sizeof(Error<T>);
-            //Passing the `this` pointer through another variable avoids a compiler warning
-            void* objectAddress = this;
-	    std::memset(objectAddress, 0x00, size);
+	    std::memset(static_cast<void*>(this), 0x00, size);
         }
     };
 
