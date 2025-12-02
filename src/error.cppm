@@ -26,6 +26,7 @@ namespace mars {
         FIND_SUITABLE_GPU_FAIL,
         DEVICE_CREATION_FAIL,
         SWAPCHAIN_CREATION_FAIL,
+	SDL_QUERY_FAIL,
     };
 
     export template <class T>

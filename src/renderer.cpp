@@ -9,6 +9,8 @@ module;
 #include <vector>
 #include <string>
 #include <set>
+#include <limits>
+#include <algorithm>
 
 module mars;
 
@@ -50,6 +52,53 @@ namespace mars {
     	VkSurfaceFormatKHR format;
         VkSurfaceKHR surface;
     };
+
+    Error<VkExtent2D> chooseImageExtent(VkSurfaceCapabilitiesKHR const& capabilities, SDL_Window* window) noexcept {
+	if(capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+	    return capabilities.currentExtent;
+	}
+	int width = 0, height = 0;
+	if(!SDL_GetWindowSize(window, &width, &height)) {
+	    return {ErrorTag::SDL_QUERY_FAIL, SDL_GetError()};
+	}
+	return VkExtent2D{
+	    .width = std::clamp<uint32_t>(width, 
+		capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+	    .height = std::clamp<uint32_t>(height, 
+		capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
+	};
+    }
+
+    Error<noreturn> createVkSwapchainKHR(VkSwapchainKHR& swapchain, VkDevice device, SurfaceInfo const& surfaceInfo, SDL_Window* window) noexcept {
+	Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceInfo.capabilities, window);
+	if(!imageExtent.okay()) return {imageExtent.getTag(), imageExtent.getMessage()};
+        VkSwapchainCreateInfoKHR swapchainInfo = {
+            .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+            .pNext = nullptr,
+            .flags = 0,
+            .surface = surfaceInfo.surface,
+            .minImageCount = surfaceInfo.capabilities.minImageCount + 1,
+            .imageFormat = surfaceInfo.format.format,
+            .imageColorSpace = surfaceInfo.format.colorSpace,
+            .imageExtent = imageExtent.getData(),
+            .imageArrayLayers = 1,
+            .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            .queueFamilyIndexCount = 1,
+            .pQueueFamilyIndices = nullptr,
+            .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+            .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+            .presentMode = surfaceInfo.presentMode,
+            .clipped = VK_FALSE,
+            .oldSwapchain = nullptr
+        };
+
+        if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
+            return {ErrorTag::SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!"};
+        }
+	return success();
+    }
+
 
     Error<noreturn> pickQueueFamilyIndex(
         uint32_t& queueFamilyIndex, 
@@ -175,17 +224,14 @@ namespace mars {
         return {ErrorTag::SEARCH_FAIL, "Physical Device did not support needed extensions!"};
     }
 
-    Error<noreturn> createVkDeviceAndSwapchain(
+    Error<noreturn> createVkDevice(
         VkDevice& device, 
         VkPhysicalDevice& physicalDevice, 
-        VkSwapchainKHR& swapchain, 
-        VkInstance instance, 
-        VkSurfaceKHR surface
+        SurfaceInfo& surfaceInfo, 
+        VkInstance instance 
     )  {
         uint32_t queueFamilyIndex = 0;
         uint32_t queueCount = 0;
-        SurfaceInfo surfaceInfo = {};
-        surfaceInfo.surface = surface;
         Error<noreturn> procResult;
 
         //Get all the physical devices installed on the system
@@ -211,14 +257,14 @@ namespace mars {
             //Get physical device's capabilities with the surface
             if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
                 physicalDevices[i], 
-                surface, 
+                surfaceInfo.surface, 
                 &surfaceInfo.capabilities
             ) != VK_SUCCESS) {
                 return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface capabilities!"};
             }
 
             //Get a surface format to use
-            Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevices[i], surface);
+            Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevices[i], surfaceInfo.surface);
             if(surfaceFormat.okay()) {
                 surfaceInfo.format = surfaceFormat.getData();
             }
@@ -226,7 +272,7 @@ namespace mars {
                 return {surfaceFormat.getTag(), surfaceFormat.getMessage()};
             }
             //Choose a present mode to use
-            Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevices[i], surface);
+            Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevices[i], surfaceInfo.surface);
             if(presentMode.getTag() == ErrorTag::SEARCH_FAIL) {
                 continue;
             }
@@ -237,7 +283,7 @@ namespace mars {
                 return {presentMode.getTag(), presentMode.getMessage()};
             }
             //Pick the desired queue family index
-            procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i], surface);
+            procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i], surfaceInfo.surface);
             //At this point if all has succeeded, we are ready to use the current physical device and
             // create the logical device
             if(procResult.okay()) {
@@ -279,30 +325,6 @@ namespace mars {
             return {ErrorTag::DEVICE_CREATION_FAIL, "Failed to create VkDevice!"};
         }
 
-        VkSwapchainCreateInfoKHR swapchainInfo = {
-            .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            .pNext = nullptr,
-            .flags = 0,
-            .surface = surfaceInfo.surface,
-            .minImageCount = surfaceInfo.capabilities.minImageCount + 1,
-            .imageFormat = surfaceInfo.format.format,
-            .imageColorSpace = surfaceInfo.format.colorSpace,
-            .imageExtent = {.width = WIDTH, .height = HEIGHT,},
-            .imageArrayLayers = 1,
-            .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-            .queueFamilyIndexCount = 1,
-            .pQueueFamilyIndices = nullptr,
-            .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-            .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            .presentMode = surfaceInfo.presentMode,
-            .clipped = VK_FALSE,
-            .oldSwapchain = nullptr
-        };
-
-        if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
-            return {ErrorTag::SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!"};
-        }
         return success();
     }
 
@@ -417,13 +439,20 @@ namespace mars {
         if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
             return {ErrorTag::SURFACE_CREATION_FAIL, SDL_GetError()};
         }
-        MARS_TRY(createVkDeviceAndSwapchain(
+	SurfaceInfo surfaceInfo{};
+	surfaceInfo.surface = surface;
+        MARS_TRY(createVkDevice(
             device, 
             physicalDevice, 
-            swapchain, 
-            instance, 
-            surface
+	    surfaceInfo,
+            instance 
         ));
+	MARS_TRY(createVkSwapchainKHR(
+	    swapchain,
+	    device,
+	    surfaceInfo,
+	    window
+	));
         return success();
     }
 
@@ -434,7 +463,8 @@ namespace mars {
         surface(nullptr), 
         device(nullptr), 
         physicalDevice(nullptr), 
-        swapchain(nullptr) 
+        swapchain(nullptr),
+	commandPool(nullptr)
     {}
 
     Renderer::~Renderer() noexcept {

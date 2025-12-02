@@ -5,12 +5,13 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <string>
+#include <array>
 
 export module mars;
 export import :error;
 
 namespace mars {
-    static int const MAX_CONCURRENT_FRAMES = 2;
+    int const MAX_CONCURRENT_FRAMES = 2;
 
     export Error<noreturn> init() noexcept;
     export int quit() noexcept;
@@ -29,6 +30,8 @@ namespace mars {
         VkDevice device;
         VkPhysicalDevice physicalDevice;
         VkSwapchainKHR swapchain;
+	std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> commandBuffers;
+	VkCommandPool commandPool;
     };
 
     export class Game {
