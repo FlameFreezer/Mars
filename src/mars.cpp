@@ -12,10 +12,6 @@ module mars;
 if(!procResult.okay()) return procResult
 
 namespace mars {
-    Error<noreturn> success()  {
-        return Error<noreturn>();
-    }
-
     Error<noreturn> init() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO)) {
             return {ErrorTag::INIT_SDL_FAIL, SDL_GetError()};

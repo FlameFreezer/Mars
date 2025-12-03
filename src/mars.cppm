@@ -5,33 +5,15 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <string>
-#include <array>
 
 export module mars;
-export import :error;
+export import error;
+import :renderer;
 
 namespace mars {
     export Error<noreturn> init() noexcept;
     export int quit() noexcept;
     export Error<noreturn> run() noexcept;
-
-    export class Renderer {
-        public:
-        Renderer() noexcept;
-        virtual ~Renderer() noexcept;
-        Error<noreturn> init(const std::string& name);
-	static int const MAX_CONCURRENT_FRAMES = 2;
-        private:
-        VkInstance instance;
-        SDL_Window* window;
-        VkDebugUtilsMessengerEXT debugMessenger;
-        VkSurfaceKHR surface;
-        VkDevice device;
-        VkPhysicalDevice physicalDevice;
-        VkSwapchainKHR swapchain;
-	std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> commandBuffers;
-	VkCommandPool commandPool;
-    };
 
     export class Game {
         public:

@@ -4,8 +4,9 @@ module;
 #include <string>
 #include <utility>
 #include <cstring>
+#include <print>
 
-export module mars:error;
+export module error;
 
 namespace mars {
     export class noreturn {};
@@ -110,6 +111,12 @@ namespace mars {
             if(okay()) std::unreachable();
             return message;
         }
+	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
+	bool report() const noexcept {
+	    if(okay()) return true;
+	    std::println("Error: {}", message);
+	    return false;
+	}
         private:
         ErrorTag tag;
         union {
@@ -134,5 +141,7 @@ namespace mars {
     noreturn Error<noreturn>::getData() const noexcept = delete;
 
     //Returns an `Error<noreturn>` with `key == ALL_OKAY`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
-    export Error<noreturn> success();
+    export Error<noreturn> success() {
+	return Error<noreturn>();
+    }
 }
