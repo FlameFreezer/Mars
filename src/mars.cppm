@@ -11,8 +11,6 @@ export module mars;
 export import :error;
 
 namespace mars {
-    int const MAX_CONCURRENT_FRAMES = 2;
-
     export Error<noreturn> init() noexcept;
     export int quit() noexcept;
     export Error<noreturn> run() noexcept;
@@ -22,6 +20,7 @@ namespace mars {
         Renderer() noexcept;
         virtual ~Renderer() noexcept;
         Error<noreturn> init(const std::string& name);
+	static int const MAX_CONCURRENT_FRAMES = 2;
         private:
         VkInstance instance;
         SDL_Window* window;

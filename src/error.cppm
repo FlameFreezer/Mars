@@ -27,6 +27,8 @@ namespace mars {
         DEVICE_CREATION_FAIL,
         SWAPCHAIN_CREATION_FAIL,
 	SDL_QUERY_FAIL,
+	COMMAND_POOL_CREATE_FAIL,
+	COMMAND_BUFFER_ALLOC_FAIL,
     };
 
     export template <class T>

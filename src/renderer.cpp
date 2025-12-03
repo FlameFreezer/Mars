@@ -46,6 +46,34 @@ static VkBool32 debugCallback(
 }
 
 namespace mars {
+
+    Error<noreturn> createCommandBuffers(
+	std::array<VkCommandBuffer, Renderer::MAX_CONCURRENT_FRAMES>& commandBuffers, 
+        VkCommandPool& commandPool, 
+        uint32_t queueFamilyIndex,
+	VkDevice device
+    ) noexcept {
+	VkCommandPoolCreateInfo poolInfo = {
+	    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+	    .pNext = nullptr,
+	    .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+	    .queueFamilyIndex = queueFamilyIndex
+	};
+	if(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+	    return {ErrorTag::COMMAND_POOL_CREATE_FAIL, "Failed to create VkCommandPool!"};
+	}
+	VkCommandBufferAllocateInfo allocInfo = {
+	    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+	    .pNext = nullptr,
+	    .commandPool = commandPool,
+	    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+	    .commandBufferCount = Renderer::MAX_CONCURRENT_FRAMES
+	};
+	if(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+	    return {ErrorTag::COMMAND_BUFFER_ALLOC_FAIL, "Failed to allocate command buffers!"};
+	}
+	return success();
+    }
     struct SurfaceInfo {
         VkSurfaceCapabilitiesKHR capabilities;
         VkPresentModeKHR presentMode;
@@ -228,9 +256,9 @@ namespace mars {
         VkDevice& device, 
         VkPhysicalDevice& physicalDevice, 
         SurfaceInfo& surfaceInfo, 
+	uint32_t& queueFamilyIndex,
         VkInstance instance 
     )  {
-        uint32_t queueFamilyIndex = 0;
         uint32_t queueCount = 0;
         Error<noreturn> procResult;
 
@@ -441,10 +469,12 @@ namespace mars {
         }
 	SurfaceInfo surfaceInfo{};
 	surfaceInfo.surface = surface;
+	uint32_t queueFamilyIndex;
         MARS_TRY(createVkDevice(
             device, 
             physicalDevice, 
 	    surfaceInfo,
+	    queueFamilyIndex,
             instance 
         ));
 	MARS_TRY(createVkSwapchainKHR(
@@ -452,6 +482,12 @@ namespace mars {
 	    device,
 	    surfaceInfo,
 	    window
+	));
+	MARS_TRY(createCommandBuffers(
+	    commandBuffers,
+	    commandPool,
+	    queueFamilyIndex,
+	    device
 	));
         return success();
     }
@@ -469,6 +505,8 @@ namespace mars {
 
     Renderer::~Renderer() noexcept {
         vkDestroySwapchainKHR(device, swapchain, nullptr);
+	vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
+	vkDestroyCommandPool(device, commandPool, nullptr);
         vkDestroyDevice(device, nullptr);
         SDL_Vulkan_DestroySurface(instance, surface, nullptr);
         SDL_DestroyWindow(window);
