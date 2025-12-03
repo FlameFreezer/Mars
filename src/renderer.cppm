@@ -40,7 +40,7 @@ namespace mars {
 
     VkBool32 debugCallback(
 	    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	    VkDebugUtilsMessageTypeFlagsEXT	messageTypes,
+	    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
 	    VkDebugUtilsMessengerCallbackDataEXT const*	pCallbackData,
 	    void* pUserData
     ) {
@@ -67,28 +67,6 @@ namespace mars {
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;	
 	public:
-	Renderer() noexcept : 
-	    instance(nullptr), 
-	    window(nullptr), 
-	    debugMessenger(nullptr), 
-	    surface(nullptr), 
-	    device(nullptr), 
-	    physicalDevice(nullptr), 
-	    swapchain(nullptr),
-	    commandPool(nullptr)
-	{}
-	virtual ~Renderer() noexcept {
-	    vkDestroySwapchainKHR(device, swapchain, nullptr);
-	    vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
-	    vkDestroyCommandPool(device, commandPool, nullptr);
-	    vkDestroyDevice(device, nullptr);
-	    SDL_Vulkan_DestroySurface(instance, surface, nullptr);
-	    SDL_DestroyWindow(window);
-	    if(enableValidationLayers) {
-		destroyVkDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-	    }
-	    vkDestroyInstance(instance, nullptr);
-	}
 	Error<noreturn> createCommandBuffers(uint32_t queueFamilyIndex) noexcept {
 	    VkCommandPoolCreateInfo poolInfo = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -156,6 +134,15 @@ namespace mars {
 	    if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
 		return {ErrorTag::SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!"};
 	    }
+	    uint32_t imageCount;
+	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
+		return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
+	    }
+	    swapchainImages.reserve(imageCount);
+	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
+		return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
+	    }
+	    
 	    return success();
 	}
 
@@ -492,6 +479,30 @@ namespace mars {
 	    MARS_TRY(createVkSwapchainKHR(surfaceInfo));
 	    MARS_TRY(createCommandBuffers(queueFamilyIndex));
 	    return success();
+	}
+
+	Renderer() noexcept : 
+	    instance(nullptr), 
+	    window(nullptr), 
+	    debugMessenger(nullptr), 
+	    surface(nullptr), 
+	    device(nullptr), 
+	    physicalDevice(nullptr), 
+	    swapchain(nullptr),
+	    commandPool(nullptr)
+	{}
+
+	virtual ~Renderer() noexcept {
+	    vkDestroySwapchainKHR(device, swapchain, nullptr);
+	    vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
+	    vkDestroyCommandPool(device, commandPool, nullptr);
+	    vkDestroyDevice(device, nullptr);
+	    SDL_Vulkan_DestroySurface(instance, surface, nullptr);
+	    SDL_DestroyWindow(window);
+	    if(enableValidationLayers) {
+		destroyVkDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+	    }
+	    vkDestroyInstance(instance, nullptr);
 	}
     };
 }

@@ -30,6 +30,7 @@ namespace mars {
 	SDL_QUERY_FAIL,
 	COMMAND_POOL_CREATE_FAIL,
 	COMMAND_BUFFER_ALLOC_FAIL,
+	SWAPCHAIN_IMAGE_ACQUISITION_FAIL,
     };
 
     export template <class T>
@@ -58,7 +59,7 @@ namespace mars {
         }
         Error<T>& operator=(const Error<T>& rhs) noexcept {
             if(this != &rhs) {
-                //Call destructor on active data member, then write zeroes to whole object
+                //Call destructor on active data member, then write zeroes to whole object.
                 //We have to do this to prevent any invalid pointers from being read once the 
                 // memory is reinterpreted
                 zeroMemory();
@@ -75,7 +76,7 @@ namespace mars {
         }
         Error<T>& operator=(Error<T>&& rhs) noexcept {
             if(this != &rhs) {
-                //Call destructor on active data member, then write zeroes to whole object
+                //Call destructor on active data member, then write zeroes to whole object.
                 //We have to do this to prevent any invalid pointers from being read once the 
                 // memory is reinterpreted
                 zeroMemory();
@@ -132,8 +133,7 @@ namespace mars {
                 message.~basic_string();
             }
             //Once either destructor has been called, write the zeroes
-            size_t const size = sizeof(Error<T>);
-	    std::memset(static_cast<void*>(this), 0x00, size);
+	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
         }
     };
 
