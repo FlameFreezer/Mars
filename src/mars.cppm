@@ -8,7 +8,7 @@ module;
 
 export module mars;
 export import error;
-import :renderer;
+export import :renderer;
 
 namespace mars {
     export Error<noreturn> init() noexcept;

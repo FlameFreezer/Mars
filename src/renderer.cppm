@@ -72,17 +72,17 @@ namespace mars {
 	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
 		return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
 	    }
-	    swapchainImages.reserve(imageCount);
+	    swapchainImages.resize(imageCount);
 	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
 		return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
 	    }
-	    swapchainImageViews.reserve(imageCount);
+	    swapchainImageViews.resize(imageCount);
 
 	    VkImageViewCreateInfo imageViewInfo = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.image = nullptr,
+		.image = nullptr, //This will be updated for each image in a loop later
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		.format = surfaceInfo.format.format,
 		.components = {
@@ -102,7 +102,7 @@ namespace mars {
 	    for(uint32_t i = 0; i < imageCount; i++) {
 		imageViewInfo.image = swapchainImages[i];
 		if(vkCreateImageView(device, &imageViewInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
-		    return {ErrorTag::IMAGE_VIEW_CREATE_FAIL, "Failed to create VkImageView!"};
+		    return {ErrorTag::IMAGE_VIEW_CREATE_FAIL, std::format("Failed to create swapchain image view {}!", i)};
 		}
 	    }
 
@@ -487,7 +487,7 @@ namespace mars {
 		instanceInfo.ppEnabledLayerNames = validationLayers.data();
 	    }
 
-	    if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS) {
+	    if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS or true) {
 		return {ErrorTag::INSTANCE_CREATION_FAIL, "Failed to create VkInstance!"};
 	    }
 	    return success();
@@ -510,6 +510,7 @@ namespace mars {
 	    uint32_t queueFamilyIndex;
 	    MARS_TRY(createVkDevice(surfaceInfo, queueFamilyIndex));
 	    MARS_TRY(createVkSwapchainKHR(surfaceInfo));
+	    MARS_TRY(getSwapchainImages(surfaceInfo));
 	    MARS_TRY(createCommandBuffers(queueFamilyIndex));
 	    return success();
 	}

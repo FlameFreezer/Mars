@@ -55,7 +55,7 @@ namespace mars {
                 data = std::move(other.data);
             }
             else {
-                message = std::move(other.message);
+                message = other.message;
             }
         }
         Error<T>& operator=(const Error<T>& rhs) noexcept {
