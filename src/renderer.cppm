@@ -67,6 +67,47 @@ namespace mars {
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;	
 	public:
+	Error<noreturn> getSwapchainImages(SurfaceInfo const& surfaceInfo) noexcept {
+	    uint32_t imageCount;
+	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
+		return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
+	    }
+	    swapchainImages.reserve(imageCount);
+	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
+		return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
+	    }
+	    swapchainImageViews.reserve(imageCount);
+
+	    VkImageViewCreateInfo imageViewInfo = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.image = nullptr,
+		.viewType = VK_IMAGE_VIEW_TYPE_2D,
+		.format = surfaceInfo.format.format,
+		.components = {
+		    VK_COMPONENT_SWIZZLE_IDENTITY, 
+		    VK_COMPONENT_SWIZZLE_IDENTITY, 
+		    VK_COMPONENT_SWIZZLE_IDENTITY, 
+		    VK_COMPONENT_SWIZZLE_IDENTITY
+		},
+		.subresourceRange = {
+		    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		    .baseMipLevel = 0,
+		    .levelCount = 1,
+		    .baseArrayLayer = 0,
+		    .layerCount = 1
+		}
+	    };
+	    for(uint32_t i = 0; i < imageCount; i++) {
+		imageViewInfo.image = swapchainImages[i];
+		if(vkCreateImageView(device, &imageViewInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
+		    return {ErrorTag::IMAGE_VIEW_CREATE_FAIL, "Failed to create VkImageView!"};
+		}
+	    }
+
+	    return success();
+	}
 	Error<noreturn> createCommandBuffers(uint32_t queueFamilyIndex) noexcept {
 	    VkCommandPoolCreateInfo poolInfo = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -134,15 +175,7 @@ namespace mars {
 	    if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
 		return {ErrorTag::SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!"};
 	    }
-	    uint32_t imageCount;
-	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
-		return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
-	    }
-	    swapchainImages.reserve(imageCount);
-	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
-		return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
-	    }
-	    
+	    	    
 	    return success();
 	}
 
@@ -494,6 +527,9 @@ namespace mars {
 
 	virtual ~Renderer() noexcept {
 	    vkDestroySwapchainKHR(device, swapchain, nullptr);
+	    for(VkImageView view : swapchainImageViews) {
+		vkDestroyImageView(device, view, nullptr);
+	    }
 	    vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
 	    vkDestroyCommandPool(device, commandPool, nullptr);
 	    vkDestroyDevice(device, nullptr);
