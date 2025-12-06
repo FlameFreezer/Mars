@@ -17,14 +17,15 @@ namespace mars {
 
     export class Game {
         public:
-        Game() = delete;
-        Game(Error<noreturn>& result) noexcept;
-        Game(Error<noreturn>& result, const std::string& name) noexcept;
+        Game() noexcept;
+        Game(const std::string& name) noexcept;
+	Error<noreturn> const& getProcResult() const noexcept;
         virtual ~Game() noexcept;
-        Error<noreturn> init(const std::string& appName);
+        void init(const std::string& appName);
         private:
         std::string windowName;
         std::string appName;
         Renderer renderer;
+	Error<noreturn> procResult;
     };
 };

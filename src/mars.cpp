@@ -8,9 +8,6 @@ module;
 
 module mars;
 
-#define MARS_TRY(proc) procResult = proc;\
-if(!procResult.okay()) return procResult
-
 namespace mars {
     Error<noreturn> init() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO)) {
@@ -23,9 +20,8 @@ namespace mars {
         return 0;
     }
     Error<noreturn> run() noexcept {
-        Error<noreturn> procResult;
-        Game g(procResult);
-        if(!procResult.okay()) return procResult;
+        Game g;
+        if(!g.getProcResult().okay()) return g.getProcResult();
         bool shouldKeepRunning = true;
         while(shouldKeepRunning) {
             SDL_Event e;
@@ -42,16 +38,19 @@ namespace mars {
         return success();
     }
 
-    Error<noreturn> Game::init(const std::string& appName) {
-        Error<noreturn> procResult;
-        MARS_TRY(renderer.init(appName));
-        return success();
+    void Game::init(const std::string& appName) {
+        procResult = renderer.init(appName);
+	if(!procResult.okay()) return;
     }
-    Game::Game(Error<noreturn>& result) noexcept : windowName("My Mars Game"), appName("My Mars Game") {
-        result = this->init(appName);
+    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game") {
+        this->init(appName);
     }
-    Game::Game(Error<noreturn>& result, const std::string& name) noexcept : windowName(name), appName(name) {
-        result = this->init(appName);
+    Game::Game(const std::string& name) noexcept : windowName(name), appName(name) {
+        this->init(appName);
     }
     Game::~Game() noexcept {}
+
+    Error<noreturn> const& Game::getProcResult() const noexcept {
+	return procResult;
+    }
 }

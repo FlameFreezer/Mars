@@ -42,7 +42,9 @@ namespace mars {
         Error(T&& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(std::move(inData)) {}
         Error(ErrorTag inTag, const std::string& inMessage) noexcept : tag(inTag), message(inMessage) {}
         Error(ErrorTag inTag, std::string&& inMessage) noexcept : tag(inTag), message(std::move(inMessage)) {}
-        Error(const Error<T>& other) noexcept : tag(other.tag) {
+        Error(const Error<T>& other) noexcept {
+	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
+	    tag = other.tag;
             if(other.okay()) {
                 data = other.data;
             }
@@ -50,7 +52,9 @@ namespace mars {
                 message = other.message;
             }
         }
-        Error(Error<T>&& other) noexcept : tag(other.tag) {
+        Error(Error<T>&& other) noexcept {
+	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
+	    tag = other.tag;
             if(other.okay()) {
                 data = std::move(other.data);
             }
@@ -63,7 +67,7 @@ namespace mars {
                 //Call destructor on active data member, then write zeroes to whole object.
                 //We have to do this to prevent any invalid pointers from being read once the 
                 // memory is reinterpreted
-                zeroMemory();
+                clear();
                 //Now we can safely assign data members
                 tag = rhs.tag;
                 if(rhs.okay()) {
@@ -80,7 +84,7 @@ namespace mars {
                 //Call destructor on active data member, then write zeroes to whole object.
                 //We have to do this to prevent any invalid pointers from being read once the 
                 // memory is reinterpreted
-                zeroMemory();
+                clear();
                 //Now we can safely assign data members
                 tag = rhs.tag;
                 if(rhs.okay()) {
@@ -93,6 +97,12 @@ namespace mars {
             return *this;
         }
         ~Error() noexcept {
+	    if(okay()) {
+		data.~T();
+	    }
+	    else {
+		message.~basic_string();
+	    }
         }
         //Returns `true` if `this->tag` is of a value not indicating an error during execution.
         bool okay() const noexcept {
@@ -126,7 +136,7 @@ namespace mars {
             std::string message;
         };
         //Calls the destructor of the active data member, then writes zeroes to the entire space taken up by the object
-        void zeroMemory() {
+        void clear() {
             if(okay()) {
                 data.~T();
             }

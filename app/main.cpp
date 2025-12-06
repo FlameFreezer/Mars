@@ -1,9 +1,7 @@
 import mars;
 
-#define MARS_REPORT(proc) if(!proc.report()) return 1
-
 int main(int argc, char** argv) {
-    MARS_REPORT(mars::init());
-    MARS_REPORT(mars::run());
+    if(!mars::init().report()) return 1;
+    if(!mars::run().report()) return 1;
     return mars::quit();
 }

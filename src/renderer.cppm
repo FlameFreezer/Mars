@@ -15,9 +15,6 @@ module;
 export module mars:renderer;
 import error;
 
-#define MARS_TRY(proc) procResult = proc;\
-if(!procResult.okay()) return procResult
-
 namespace mars {
     int const WIDTH = 800;
     int const HEIGHT = 600;
@@ -55,6 +52,7 @@ namespace mars {
 
     export class Renderer {
 	private:
+	Error<noreturn> procResult;
         VkInstance instance;
         SDL_Window* window;
         VkDebugUtilsMessengerEXT debugMessenger;
@@ -66,7 +64,6 @@ namespace mars {
 	VkCommandPool commandPool;
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;	
-	public:
 	Error<noreturn> getSwapchainImages(SurfaceInfo const& surfaceInfo) noexcept {
 	    uint32_t imageCount;
 	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
@@ -299,7 +296,6 @@ namespace mars {
 
 	Error<noreturn> createVkDevice(SurfaceInfo& surfaceInfo, uint32_t& queueFamilyIndex)  {
 	    uint32_t queueCount = 0;
-	    Error<noreturn> procResult;
 
 	    //Get all the physical devices installed on the system
 	    uint32_t physicalDeviceCount = 0;
@@ -487,17 +483,20 @@ namespace mars {
 		instanceInfo.ppEnabledLayerNames = validationLayers.data();
 	    }
 
-	    if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS or true) {
+	    if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS) {
 		return {ErrorTag::INSTANCE_CREATION_FAIL, "Failed to create VkInstance!"};
 	    }
 	    return success();
 	}
-
+	public:
 	Error<noreturn> init(const std::string& name)  {
-	    Error<noreturn> procResult;
-	    MARS_TRY(createVkInstance(name));
+	    procResult = createVkInstance(name);
+	    if(!procResult.okay()) {
+		return procResult;
+	    }
 	    if(enableValidationLayers) {
-		MARS_TRY(createVkDebugUtilsMessenger());
+		procResult = createVkDebugUtilsMessenger();
+		if(!procResult.okay()) return procResult;
 	    }
 	    window = SDL_CreateWindow(name.c_str(), WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
 	    if(window == nullptr) {
@@ -508,13 +507,20 @@ namespace mars {
 	    }
 	    SurfaceInfo surfaceInfo{};
 	    uint32_t queueFamilyIndex;
-	    MARS_TRY(createVkDevice(surfaceInfo, queueFamilyIndex));
-	    MARS_TRY(createVkSwapchainKHR(surfaceInfo));
-	    MARS_TRY(getSwapchainImages(surfaceInfo));
-	    MARS_TRY(createCommandBuffers(queueFamilyIndex));
+	    procResult = createVkDevice(surfaceInfo, queueFamilyIndex);
+	    if(!procResult.okay()) return procResult;
+
+	    procResult = createVkSwapchainKHR(surfaceInfo);
+	    if(!procResult.okay()) return procResult;
+
+	    procResult = getSwapchainImages(surfaceInfo);
+	    if(!procResult.okay()) return procResult;
+
+	    procResult = createCommandBuffers(queueFamilyIndex);
+	    if(!procResult.okay()) return procResult;
+
 	    return success();
 	}
-
 	Renderer() noexcept : 
 	    instance(nullptr), 
 	    window(nullptr), 
@@ -525,8 +531,8 @@ namespace mars {
 	    swapchain(nullptr),
 	    commandPool(nullptr)
 	{}
-
 	virtual ~Renderer() noexcept {
+	    if(!procResult.okay()) return;
 	    vkDestroySwapchainKHR(device, swapchain, nullptr);
 	    for(VkImageView view : swapchainImageViews) {
 		vkDestroyImageView(device, view, nullptr);
@@ -540,6 +546,9 @@ namespace mars {
 		destroyVkDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 	    }
 	    vkDestroyInstance(instance, nullptr);
+	}
+	Error<noreturn> const& getProcResult() const noexcept {
+	    return procResult;
 	}
     };
 }
