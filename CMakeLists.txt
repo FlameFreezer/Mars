@@ -26,10 +26,15 @@ target_sources(Mars PUBLIC
 # Set up SDL3
 add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)
 
+# Set up GLM
+add_subdirectory(libraries/GLM EXCLUDE_FROM_ALL)
+
 # Link libraries to mars
-target_link_libraries(Mars PRIVATE SDL3::SDL3 vulkan)
+target_link_libraries(Mars PRIVATE SDL3::SDL3 vulkan glm::glm)
+
 target_include_directories(Mars PUBLIC 
     "${CMAKE_SOURCE_DIR}/libraries/SDL/include" 
+    "${CMAKE_SOURCE_DIR}/libraries/GLM"
     "$ENV{VULKAN_SDK}/include" 
 )
 target_link_directories(Mars INTERFACE

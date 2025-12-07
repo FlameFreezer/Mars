@@ -3,6 +3,8 @@ module;
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
+#include <glm/vec3.hpp>
+#include <glm/vec2.hpp>
 
 #include <print>
 #include <array>
@@ -44,11 +46,45 @@ namespace mars {
 	std::println("Validation Layer: {}", pCallbackData->pMessage);
 	return VK_FALSE;
     }
+
     struct SurfaceInfo {
         VkSurfaceCapabilitiesKHR capabilities;
         VkPresentModeKHR presentMode;
     	VkSurfaceFormatKHR format;
     };
+
+    struct Vertex {
+	glm::vec3 pos;
+	glm::vec3 color;
+	glm::vec2 texCoord;
+
+	static VkVertexInputBindingDescription getInputBindingDescription() noexcept {
+	    return { 0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
+	}
+
+	static std::array<VkVertexInputAttributeDescription, 3> getInputAttributeDescriptions() noexcept {
+	    std::array<VkVertexInputAttributeDescription, 3> descs;
+	    descs[0] = {
+		.location = 0,
+		.binding = 0,
+		.format = VK_FORMAT_R32G32B32_SFLOAT,
+		.offset = offsetof(Vertex, pos)
+	    };
+	    descs[1] = {
+		.location = 1,
+		.binding = 0,
+		.format = VK_FORMAT_R32G32B32_SFLOAT,
+		.offset = offsetof(Vertex, color)
+	    };
+	    descs[2] = {
+		.location = 2,
+		.binding = 0,
+		.format = VK_FORMAT_R32G32_SFLOAT,
+		.offset = offsetof(Vertex, texCoord)
+	    };
+	    return descs;
+	}
+    };	
 
     export class Renderer {
 	private:
@@ -64,6 +100,64 @@ namespace mars {
 	VkCommandPool commandPool;
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;	
+	VkPipeline graphicsPipeline;
+
+	Error<noreturn> createGraphicsPipeline() noexcept {
+	    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos;
+	    shaderStageInfos[0] = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.module = nullptr,
+		.pName = "vertMain",
+		.pSpecializationInfo = nullptr
+	    };
+	    shaderStageInfos[1] = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = nullptr,
+		.pName = "fragMain",
+		.pSpecializationInfo = nullptr
+	    };
+
+	    VkVertexInputBindingDescription const desc = Vertex::getInputBindingDescription();
+	    auto const attributeDescs = Vertex::getInputAttributeDescriptions();
+	    VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.vertexBindingDescriptionCount = 1,
+		.pVertexBindingDescriptions = &desc,
+		.vertexAttributeDescriptionCount = attributeDescs.max_size(),
+		.pVertexAttributeDescriptions = attributeDescs.data()
+	    };
+
+	    VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		.primitiveRestartEnable = VK_FALSE
+	    };
+	    
+	    VkGraphicsPipelineCreateInfo pipelineInfo = {
+		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.stageCount = shaderStageInfos.max_size(),
+		.pStages = shaderStageInfos.data(),
+		.pVertexInputState = &vertexInputStateInfo,
+		.pInputAssemblyState = &inputAssemblyInfo,
+		.pTessellationState = nullptr,
+	    };
+	    if(vkCreateGraphicsPipelines(device, nullptr, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+		return {ErrorTag::GRAPHICS_PIPELINE_CREATION_FAIL, "Failed to create graphics pipeline!"};
+	    }
+	    return success();
+	}
 	Error<noreturn> getSwapchainImages(SurfaceInfo const& surfaceInfo) noexcept {
 	    uint32_t imageCount;
 	    if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
@@ -491,13 +585,13 @@ namespace mars {
 	public:
 	Error<noreturn> init(const std::string& name)  {
 	    procResult = createVkInstance(name);
-	    if(!procResult.okay()) {
-		return procResult;
-	    }
+	    if(!procResult.okay()) return procResult;
+
 	    if(enableValidationLayers) {
 		procResult = createVkDebugUtilsMessenger();
 		if(!procResult.okay()) return procResult;
 	    }
+
 	    window = SDL_CreateWindow(name.c_str(), WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
 	    if(window == nullptr) {
 		return {ErrorTag::WINDOW_CREATION_FAIL, SDL_GetError()};
@@ -505,6 +599,7 @@ namespace mars {
 	    if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
 		return {ErrorTag::SURFACE_CREATION_FAIL, SDL_GetError()};
 	    }
+
 	    SurfaceInfo surfaceInfo{};
 	    uint32_t queueFamilyIndex;
 	    procResult = createVkDevice(surfaceInfo, queueFamilyIndex);
@@ -519,6 +614,9 @@ namespace mars {
 	    procResult = createCommandBuffers(queueFamilyIndex);
 	    if(!procResult.okay()) return procResult;
 
+	    procResult = createGraphicsPipeline();
+	    if(!procResult.okay()) return procResult;
+
 	    return success();
 	}
 	Renderer() noexcept : 
@@ -529,7 +627,8 @@ namespace mars {
 	    device(nullptr), 
 	    physicalDevice(nullptr), 
 	    swapchain(nullptr),
-	    commandPool(nullptr)
+	    commandPool(nullptr),
+	    graphicsPipeline(nullptr)
 	{}
 	virtual ~Renderer() noexcept {
 	    if(!procResult.okay()) return;
@@ -539,6 +638,7 @@ namespace mars {
 	    }
 	    vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
 	    vkDestroyCommandPool(device, commandPool, nullptr);
+	    vkDestroyPipeline(device, graphicsPipeline, nullptr);
 	    vkDestroyDevice(device, nullptr);
 	    SDL_Vulkan_DestroySurface(instance, surface, nullptr);
 	    SDL_DestroyWindow(window);

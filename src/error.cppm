@@ -5,6 +5,7 @@ module;
 #include <utility>
 #include <cstring>
 #include <print>
+#include <iostream>
 
 export module error;
 
@@ -32,17 +33,36 @@ namespace mars {
 	COMMAND_BUFFER_ALLOC_FAIL,
 	SWAPCHAIN_IMAGE_ACQUISITION_FAIL,
 	IMAGE_VIEW_CREATE_FAIL,
+	GRAPHICS_PIPELINE_CREATION_FAIL,
     };
 
     export template <class T>
     class [[nodiscard("Potentially unhandled error value")]] Error {
+        private:
+        union {
+            T data;
+            std::string message;
+        };
+        ErrorTag tag;
+        //Calls the destructor of the active data member, then writes zeroes to the entire space taken up by the object
+        void clear() {
+            if(okay()) {
+                data.~T();
+            }
+            else {
+                message.~basic_string();
+            }
+            //Once either destructor has been called, write the zeroes
+	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
+        }
         public:
         Error() noexcept : tag(ErrorTag::ALL_OKAY), data() {}
-        Error(const T& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(inData) {}
+        Error(T const& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(inData) {}
         Error(T&& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(std::move(inData)) {}
-        Error(ErrorTag inTag, const std::string& inMessage) noexcept : tag(inTag), message(inMessage) {}
+        Error(ErrorTag inTag, std::string const& inMessage) noexcept : tag(inTag), message(inMessage) {}
         Error(ErrorTag inTag, std::string&& inMessage) noexcept : tag(inTag), message(std::move(inMessage)) {}
-        Error(const Error<T>& other) noexcept {
+        Error(Error<T> const& other) noexcept {
+	    //Zero memory, so that any pointers stored within data members are null before any attempted initialization
 	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
 	    tag = other.tag;
             if(other.okay()) {
@@ -53,13 +73,14 @@ namespace mars {
             }
         }
         Error(Error<T>&& other) noexcept {
+	    //Zero memory, so that any pointers stored within data members are null before any attempted initialization
 	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
 	    tag = other.tag;
             if(other.okay()) {
                 data = std::move(other.data);
             }
             else {
-                message = other.message;
+                message = std::move(other.message);
             }
         }
         Error<T>& operator=(const Error<T>& rhs) noexcept {
@@ -112,13 +133,13 @@ namespace mars {
             return tag;
         }
         //Accessor for `data`. Raises a compile error if `message` is the active union field.
-        T getData() const noexcept {
+        T const& getData() const noexcept {
             //No data to retrieve if there has been an error - message is the active union field
             if(!okay()) std::unreachable();
             return data;
         }
         //Accessor for `message`. Raises a compile error if `data` is the active union field.
-        const std::string& getMessage() const noexcept {
+        std::string const& getMessage() const noexcept {
             //No message to retrieve if there is no error - data is the active union field
             if(okay()) std::unreachable();
             return message;
@@ -129,27 +150,16 @@ namespace mars {
 	    std::println("Error: {}", message);
 	    return false;
 	}
-        private:
-        ErrorTag tag;
-        union {
-            T data;
-            std::string message;
-        };
-        //Calls the destructor of the active data member, then writes zeroes to the entire space taken up by the object
-        void clear() {
-            if(okay()) {
-                data.~T();
-            }
-            else {
-                message.~basic_string();
-            }
-            //Once either destructor has been called, write the zeroes
-	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-        }
+	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
+	bool report(std::ostream & ostrm) const noexcept {
+	    if(okay()) return true;
+	    std::println(ostrm, "Error: {}", message);
+	    return false;
+	}
     };
 
     template<>
-    noreturn Error<noreturn>::getData() const noexcept = delete;
+    noreturn const& Error<noreturn>::getData() const noexcept = delete;
 
     //Returns an `Error<noreturn>` with `key == ALL_OKAY`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
     export Error<noreturn> success() {
