@@ -263,19 +263,14 @@ namespace mars {
 		.pDynamicStates = dynamicStates.data()
 	    };
 		
-	    VkPushConstantRange pushConstantRange = {
-		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-		.offset = 0,
-		.size = 0
-	    };
 	    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
 		.setLayoutCount = 0,
 		.pSetLayouts = nullptr,
-		.pushConstantRangeCount = 1,
-		.pPushConstantRanges = &pushConstantRange
+		.pushConstantRangeCount = 0,
+		.pPushConstantRanges = nullptr
 	    };
 	    
 	    VkGraphicsPipelineCreateInfo pipelineInfo = {
@@ -433,10 +428,14 @@ namespace mars {
 	    //Get queue family properties for the current physical device
 	    uint32_t queueFamilyPropertyCount = 0;
 	    vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, nullptr);
-	    std::vector<VkQueueFamilyProperties2> queueFamilyProperties(queueFamilyPropertyCount);
-	    for(VkQueueFamilyProperties2& prop : queueFamilyProperties) {
-		prop.sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
-	    }
+	    std::vector<VkQueueFamilyProperties2> queueFamilyProperties(
+		queueFamilyPropertyCount, 
+		VkQueueFamilyProperties2{
+		    .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2, 
+		    .pNext = nullptr, 
+		    .queueFamilyProperties = {}
+		}
+	    );
 	    vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties.data());
 	    //Check each queue family index for needed support
 	    for(int i = 0; i < queueFamilyPropertyCount; i++) {
