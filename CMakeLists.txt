@@ -14,8 +14,28 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
+# Shader Code Compilation
+set(MARS_SHADER_PATH "${CMAKE_SOURCE_DIR}/shaders")
+add_custom_command(OUTPUT slang.spv
+    COMMAND slangc "${MARS_SHADER_PATH}/shader.slang" 
+	-target spirv 
+	-profile spirv_1_4 
+	-emit-spirv-directly 
+	-fvk-use-entrypoint-name 
+	-entry vertMain 
+	-entry fragMain 
+	-o slang.spv
+    DEPENDS "${MARS_SHADER_PATH}/shader.slang"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    COMMENT "Compiling shaders..."
+    CODEGEN
+    VERBATIM
+)
+add_custom_target(shaders DEPENDS slang.spv)
+
 # Set up mars target library
 add_library(Mars)
+add_dependencies(Mars shaders)
 target_sources(Mars PUBLIC 
     FILE_SET mars_module 
     TYPE CXX_MODULES 

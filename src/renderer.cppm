@@ -13,6 +13,7 @@ module;
 #include <set>
 #include <limits>
 #include <algorithm>
+#include <fstream>
 
 export module mars:renderer;
 import error;
@@ -21,8 +22,9 @@ namespace mars {
     int const WIDTH = 800;
     int const HEIGHT = 600;
     uint32_t const MAX_CONCURRENT_FRAMES = 2;
-    std::array<char const*, 1> const deviceExtensions = {
-	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    std::array<char const*, 2> const deviceExtensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+	VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME
     };
     std::array<char const*, 1> const validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
@@ -64,18 +66,21 @@ namespace mars {
 
 	static std::array<VkVertexInputAttributeDescription, 3> getInputAttributeDescriptions() noexcept {
 	    std::array<VkVertexInputAttributeDescription, 3> descs;
+	    // POS
 	    descs[0] = {
 		.location = 0,
 		.binding = 0,
 		.format = VK_FORMAT_R32G32B32_SFLOAT,
 		.offset = offsetof(Vertex, pos)
 	    };
+	    // COLOR
 	    descs[1] = {
 		.location = 1,
 		.binding = 0,
 		.format = VK_FORMAT_R32G32B32_SFLOAT,
 		.offset = offsetof(Vertex, color)
 	    };
+	    // TEXCOORD
 	    descs[2] = {
 		.location = 2,
 		.binding = 0,
@@ -102,23 +107,50 @@ namespace mars {
 	std::vector<VkImageView> swapchainImageViews;	
 	VkPipeline graphicsPipeline;
 
+	Error<VkShaderModule> createShaderModule() noexcept {
+	    std::ifstream shaderCode("slang.spv", std::ios::binary | std::ios::ate);
+	    if(!shaderCode.is_open()) {
+		return {ErrorTag::FILE_OPEN_ERROR, "Failed to find shader code!"};
+	    }
+	    VkShaderModuleCreateInfo shaderModuleInfo{};
+	    shaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	    shaderModuleInfo.pNext = nullptr;
+	    shaderModuleInfo.flags = 0;
+	    shaderModuleInfo.codeSize = shaderCode.tellg();
+
+	    std::vector<char> code(shaderModuleInfo.codeSize);
+	    shaderCode.seekg(0);
+	    shaderCode.read(code.data(), shaderModuleInfo.codeSize);
+	    shaderCode.close();
+	    shaderModuleInfo.pCode = reinterpret_cast<uint32_t*>(code.data());
+
+	    VkShaderModule result;
+	    if(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &result) != VK_SUCCESS) {
+		return {ErrorTag::SHADER_MODULE_CREATE_FAIL, "Failed to create shader module!"};
+	    }
+	    return result;
+	}
+
 	Error<noreturn> createGraphicsPipeline() noexcept {
 	    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos;
+	    Error<VkShaderModule> shaderModule = createShaderModule();
+	    if(!shaderModule.okay()) return {shaderModule.getTag(), shaderModule.getMessage()};
+
 	    shaderStageInfos[0] = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.pNext = nullptr,
+		.pNext = nullptr, 
 		.flags = 0,
 		.stage = VK_SHADER_STAGE_VERTEX_BIT,
-		.module = nullptr,
+		.module = shaderModule.getData(),
 		.pName = "vertMain",
 		.pSpecializationInfo = nullptr
 	    };
 	    shaderStageInfos[1] = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.pNext = nullptr,
+		.pNext = nullptr, 
 		.flags = 0,
 		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.module = nullptr,
+		.module = shaderModule.getData(),
 		.pName = "fragMain",
 		.pSpecializationInfo = nullptr
 	    };
@@ -142,20 +174,142 @@ namespace mars {
 		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 		.primitiveRestartEnable = VK_FALSE
 	    };
+
+	    VkPipelineRasterizationStateCreateInfo rasterizationStateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.cullMode = VK_CULL_MODE_BACK_BIT,
+		.frontFace = VK_FRONT_FACE_CLOCKWISE,
+		.depthBiasEnable = VK_FALSE,
+		.depthBiasConstantFactor = 0.0f,
+		.depthBiasClamp = 0.0f,
+		.depthBiasSlopeFactor = 0.0f,
+		.lineWidth = 1.0f
+	    };
+
+	    VkPipelineMultisampleStateCreateInfo multisampleStateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+		.sampleShadingEnable = VK_FALSE,
+		.minSampleShading = 0.0f,
+		.pSampleMask = nullptr,
+		.alphaToCoverageEnable = VK_FALSE,
+		.alphaToOneEnable = VK_FALSE
+	    };
+
+	    VkPipelineDepthStencilStateCreateInfo depthStencilStateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.depthTestEnable = VK_FALSE,
+		.depthWriteEnable = VK_FALSE,
+		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+		.depthBoundsTestEnable = VK_FALSE,
+		.stencilTestEnable = VK_FALSE,
+		.front = {},
+		.back = {},
+		.minDepthBounds = 0.0f,
+		.maxDepthBounds = 1.0f
+	    };
+
+	    VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {
+		.blendEnable = VK_FALSE,
+		.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
+		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+	    };
+
+	    VkPipelineColorBlendStateCreateInfo colorBlendStateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.logicOpEnable = VK_FALSE,
+		.logicOp = VK_LOGIC_OP_NO_OP,
+		.attachmentCount = 1,
+		.pAttachments = &colorBlendAttachmentState,
+		.blendConstants = {1.0f, 1.0f, 1.0f, 1.0f}
+	    };
+
+	    std::array<VkFormat, 1> colorAttachmentFormats = {VK_FORMAT_B8G8R8A8_SRGB};
+
+	    VkPipelineRenderingCreateInfo pipelineRenderingInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+		.pNext = nullptr,
+		.viewMask = 0,
+		.colorAttachmentCount = colorAttachmentFormats.max_size(),
+		.pColorAttachmentFormats = colorAttachmentFormats.data(),
+		.depthAttachmentFormat = VK_FORMAT_UNDEFINED,
+		.stencilAttachmentFormat = VK_FORMAT_UNDEFINED
+	    };
+
+	    std::array<VkDynamicState, 2> dynamicStates = {
+		VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT, VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT, 
+	    };
+	    VkPipelineDynamicStateCreateInfo dynamicStateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.dynamicStateCount = dynamicStates.max_size(),
+		.pDynamicStates = dynamicStates.data()
+	    };
+		
+	    VkPushConstantRange pushConstantRange = {
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.offset = 0,
+		.size = 0
+	    };
+	    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.setLayoutCount = 0,
+		.pSetLayouts = nullptr,
+		.pushConstantRangeCount = 1,
+		.pPushConstantRanges = &pushConstantRange
+	    };
 	    
 	    VkGraphicsPipelineCreateInfo pipelineInfo = {
 		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.pNext = nullptr,
+		.pNext = &pipelineRenderingInfo,
 		.flags = 0,
 		.stageCount = shaderStageInfos.max_size(),
 		.pStages = shaderStageInfos.data(),
 		.pVertexInputState = &vertexInputStateInfo,
 		.pInputAssemblyState = &inputAssemblyInfo,
 		.pTessellationState = nullptr,
+		.pViewportState = nullptr, //dynamic
+		.pRasterizationState = &rasterizationStateInfo,
+		.pMultisampleState = &multisampleStateInfo,
+		.pDepthStencilState = &depthStencilStateInfo,
+		.pColorBlendState = &colorBlendStateInfo,
+		.pDynamicState = &dynamicStateInfo,
+		.layout = nullptr,
+		.renderPass = nullptr,
+		.subpass = 0,
+		.basePipelineHandle = nullptr,
+		.basePipelineIndex = 0
 	    };
+
+	    if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineInfo.layout) != VK_SUCCESS) {
+		return {ErrorTag::GRAPHICS_PIPELINE_CREATION_FAIL, "Failed to create graphics pipeline layout!"};
+	    }
+
 	    if(vkCreateGraphicsPipelines(device, nullptr, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
 		return {ErrorTag::GRAPHICS_PIPELINE_CREATION_FAIL, "Failed to create graphics pipeline!"};
 	    }
+
+	    vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
+	    vkDestroyShaderModule(device, shaderModule.getData(), nullptr);
 	    return success();
 	}
 	Error<noreturn> getSwapchainImages(SurfaceInfo const& surfaceInfo) noexcept {
@@ -467,9 +621,15 @@ namespace mars {
 		.pQueuePriorities = queuePriorities.data()
 	    };
 
+	    VkPhysicalDeviceVulkan13Features vulkan13Features{};
+	    vulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+	    vulkan13Features.synchronization2 = VK_TRUE;
+	    vulkan13Features.dynamicRendering = VK_TRUE;
+	    vulkan13Features.maintenance4 = VK_TRUE;
+
 	    VkDeviceCreateInfo deviceInfo = {
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.pNext = nullptr,
+		.pNext = &vulkan13Features,
 		.flags = 0,
 		.queueCreateInfoCount = 1,
 		.pQueueCreateInfos = &queueInfo,
