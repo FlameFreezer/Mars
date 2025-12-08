@@ -36,6 +36,7 @@ namespace mars {
 	GRAPHICS_PIPELINE_CREATION_FAIL,
 	FILE_OPEN_ERROR,
 	SHADER_MODULE_CREATE_FAIL,
+	BUFFER_CREATION_FAIL,
     };
 
     export template <class T>

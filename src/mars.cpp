@@ -15,9 +15,8 @@ namespace mars {
         }
         return success();
     }
-    int quit() noexcept {
+    void quit() noexcept {
         SDL_Quit();
-        return 0;
     }
     Error<noreturn> run() noexcept {
         Game g;

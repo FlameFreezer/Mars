@@ -91,6 +91,66 @@ namespace mars {
 	}
     };	
 
+    std::array<Vertex, 3> vertices = {
+	Vertex{glm::vec3(-0.5f, -0.5f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+	Vertex{glm::vec3(0.0f, 0.5f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+	Vertex{glm::vec3(0.5f, -0.5f, 1.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)}
+    };
+
+    struct GPUBuffer {
+	VkBuffer handle;
+	VkDeviceMemory memory;
+
+	GPUBuffer() noexcept : handle(nullptr), memory(nullptr) {}
+	GPUBuffer(Error<noreturn>& procResult, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, uint32_t memoryType) noexcept {
+	    VkBufferCreateInfo bufferInfo = {
+		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.size = size,
+		.usage = usage,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.queueFamilyIndexCount = 0,
+		.pQueueFamilyIndices = nullptr
+	    };
+	    if(vkCreateBuffer(device, &bufferInfo, nullptr, &handle) != VK_SUCCESS) {
+		procResult = {ErrorTag::BUFFER_CREATION_FAIL, "Failed to create VkBuffer!"};
+		return;
+	    }
+	    VkMemoryAllocateInfo allocInfo = {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.pNext = nullptr,
+		.allocationSize = size,
+		.memoryTypeIndex = memoryType
+	    };
+	    if(vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+		procResult = {ErrorTag::MEMORY_ALLOC_FAIL, "Failed to allocate device memory!"};
+		return;
+	    }
+	    if(vkBindBufferMemory(device, handle, memory, 0) != VK_SUCCESS) {
+		procResult = {ErrorTag::BUFFER_CREATION_FAIL, "Failed to bind buffer memory!"};
+		return;
+	    }
+	    procResult = success();
+	}
+
+	GPUBuffer& operator=(GPUBuffer&& other) {
+	    if(this != &other) {
+		handle = other.handle;
+		memory = other.memory;
+
+		other.handle = nullptr;
+		other.memory = nullptr;
+	    }
+	    return *this;
+	}
+
+	void destroy(VkDevice device) noexcept {
+	    vkDestroyBuffer(device, handle, nullptr);
+	    vkFreeMemory(device, memory, nullptr);
+	}
+    };
+
     export class Renderer {
 	private:
 	Error<noreturn> procResult;
@@ -106,6 +166,19 @@ namespace mars {
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;	
 	VkPipeline graphicsPipeline;
+	GPUBuffer vertexBuffer;
+
+	Error<noreturn> createVertexBuffer() noexcept {
+	    vertexBuffer = GPUBuffer(
+		procResult, 
+		device, 
+		vertices.max_size() * sizeof(Vertex), 
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+	    );
+	    if(!procResult.okay()) return procResult;
+	    return success();
+	}
 
 	Error<VkShaderModule> createShaderModule() noexcept {
 	    std::ifstream shaderCode("slang.spv", std::ios::binary | std::ios::ate);
@@ -742,7 +815,7 @@ namespace mars {
 	    return success();
 	}
 	public:
-	Error<noreturn> init(const std::string& name)  {
+	Error<noreturn> init(std::string const& name)  {
 	    procResult = createVkInstance(name);
 	    if(!procResult.okay()) return procResult;
 
@@ -776,6 +849,9 @@ namespace mars {
 	    procResult = createGraphicsPipeline();
 	    if(!procResult.okay()) return procResult;
 
+	    procResult = createVertexBuffer();
+	    if(!procResult.okay()) return procResult;
+
 	    return success();
 	}
 	Renderer() noexcept : 
@@ -795,6 +871,7 @@ namespace mars {
 	    for(VkImageView view : swapchainImageViews) {
 		vkDestroyImageView(device, view, nullptr);
 	    }
+	    vertexBuffer.destroy(device);
 	    vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
 	    vkDestroyCommandPool(device, commandPool, nullptr);
 	    vkDestroyPipeline(device, graphicsPipeline, nullptr);
