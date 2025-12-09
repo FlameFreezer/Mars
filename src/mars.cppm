@@ -13,7 +13,6 @@ export import :renderer;
 namespace mars {
     export Error<noreturn> init() noexcept;
     export void quit() noexcept;
-    export Error<noreturn> run() noexcept;
 
     export class Game {
         public:

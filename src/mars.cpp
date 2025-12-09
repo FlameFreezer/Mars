@@ -18,24 +18,6 @@ namespace mars {
     void quit() noexcept {
         SDL_Quit();
     }
-    Error<noreturn> run() noexcept {
-        Game g;
-        if(!g.getProcResult().okay()) return g.getProcResult();
-        bool shouldKeepRunning = true;
-        while(shouldKeepRunning) {
-            SDL_Event e;
-            while(SDL_PollEvent(&e)) {
-                switch(e.type) {
-                case SDL_EVENT_QUIT:
-                    shouldKeepRunning = false;
-                    break;
-                default:
-                    break;
-                }
-            }
-        }
-        return success();
-    }
 
     void Game::init(const std::string& appName) {
         procResult = renderer.init(appName);

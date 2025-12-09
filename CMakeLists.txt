@@ -63,8 +63,11 @@ target_link_directories(Mars INTERFACE
 
 # Test Application
 add_executable(marsTest app/main.cpp)
-target_link_libraries(marsTest PRIVATE Mars)
+target_link_libraries(marsTest PRIVATE Mars SDL3::SDL3 glm::glm)
+target_include_directories(marsTest PUBLIC
+    "${CMAKE_SOURCE_DIR}/libraries/SDL/include"
+    "${CMAKE_SOURCE_DIR}/libraries/GLM"
+)
 
 target_compile_options(Mars PUBLIC -g)
-#target_compile_options(SDL3::SDL3 PUBLIC -g)
 target_compile_options(marsTest PUBLIC -g)
