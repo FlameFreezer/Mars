@@ -4,38 +4,43 @@ cmake_minimum_required(VERSION 4.1.2)
 project(MarsEngine)
 
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
-#set(CMAKE_COMPILE_WARNING_AS_ERROR True)
-#set(CMAKE_LINK_WARNING_AS_ERROR True)
+#set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Ensure all build objects are placed in the same directory
-#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
-#set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 
-# Shader Code Compilation
+# Add libraries to build
+add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)
+add_subdirectory(libraries/GLM EXCLUDE_FROM_ALL)
+
+# Shader Compilation
 set(MARS_SHADER_PATH "${CMAKE_SOURCE_DIR}/shaders")
 add_custom_command(OUTPUT slang.spv
     COMMAND slangc "${MARS_SHADER_PATH}/shader.slang" 
-	-target spirv 
-	-profile spirv_1_4 
-	-emit-spirv-directly 
-	-fvk-use-entrypoint-name 
-	-entry vertMain 
-	-entry fragMain 
-	-o slang.spv
+        -target spirv 
+        -profile spirv_1_4 
+        -emit-spirv-directly 
+        -fvk-use-entrypoint-name 
+        -entry vertMain 
+        -entry fragMain 
+        -o slang.spv
     DEPENDS "${MARS_SHADER_PATH}/shader.slang"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
     COMMENT "Compiling shaders..."
     CODEGEN
     VERBATIM
 )
-add_custom_target(shaders DEPENDS slang.spv)
+add_custom_target(marsShaders DEPENDS slang.spv)
+
+# Set compiler flags for Mars library (these cause issues when building SDL3 
+#   so I have to set them after it it built)
+set(CMAKE_COMPILE_WARNING_AS_ERROR True)
+set(CMAKE_LINK_WARNING_AS_ERROR True)
 
 # Set up mars target library
 add_library(Mars)
-add_dependencies(Mars shaders)
+add_dependencies(Mars marsShaders)
 target_sources(Mars PUBLIC 
     FILE_SET mars_module 
     TYPE CXX_MODULES 
@@ -43,15 +48,8 @@ target_sources(Mars PUBLIC
     PRIVATE src/mars.cpp
 )
 
-# Set up SDL3
-add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)
-
-# Set up GLM
-add_subdirectory(libraries/GLM EXCLUDE_FROM_ALL)
-
 # Link libraries to mars
 target_link_libraries(Mars PRIVATE SDL3::SDL3 vulkan glm::glm)
-
 target_include_directories(Mars PUBLIC 
     "${CMAKE_SOURCE_DIR}/libraries/SDL/include" 
     "${CMAKE_SOURCE_DIR}/libraries/GLM"
@@ -69,5 +67,9 @@ target_include_directories(marsTest PUBLIC
     "${CMAKE_SOURCE_DIR}/libraries/GLM"
 )
 
-target_compile_options(Mars PUBLIC -g)
-target_compile_options(marsTest PUBLIC -g)
+# Build for Debug Symbols
+if(CMAKE_BUILD_TYPE STREQUAL "Build")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|IntelLLVM")
+        add_compile_options(-g)
+    endif()
+endif()

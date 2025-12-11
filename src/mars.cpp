@@ -21,7 +21,7 @@ namespace mars {
 
     void Game::init(const std::string& appName) {
         procResult = renderer.init(appName);
-	if(!procResult.okay()) return;
+        if(!procResult.okay()) return;
     }
     Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game") {
         this->init(appName);
@@ -32,6 +32,6 @@ namespace mars {
     Game::~Game() noexcept {}
 
     Error<noreturn> const& Game::getProcResult() const noexcept {
-	return procResult;
+        return procResult;
     }
 }

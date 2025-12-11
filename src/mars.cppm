@@ -18,13 +18,13 @@ namespace mars {
         public:
         Game() noexcept;
         Game(const std::string& name) noexcept;
-	Error<noreturn> const& getProcResult() const noexcept;
+        Error<noreturn> const& getProcResult() const noexcept;
         virtual ~Game() noexcept;
         void init(const std::string& appName);
         private:
         std::string windowName;
         std::string appName;
         Renderer renderer;
-	Error<noreturn> procResult;
+        Error<noreturn> procResult;
     };
 };

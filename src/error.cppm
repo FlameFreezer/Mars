@@ -18,6 +18,7 @@ namespace mars {
         BAD_FUNCTION_CALL,
         SEARCH_FAIL,
         MEMORY_ALLOC_FAIL,
+        RENDERER_INIT_FAIL,
         VULKAN_QUERY_ERROR,
         VULKAN_VALIDATION_LAYER,
         INIT_SDL_FAIL,
@@ -28,15 +29,15 @@ namespace mars {
         FIND_SUITABLE_GPU_FAIL,
         DEVICE_CREATION_FAIL,
         SWAPCHAIN_CREATION_FAIL,
-	SDL_QUERY_FAIL,
-	COMMAND_POOL_CREATE_FAIL,
-	COMMAND_BUFFER_ALLOC_FAIL,
-	SWAPCHAIN_IMAGE_ACQUISITION_FAIL,
-	IMAGE_VIEW_CREATE_FAIL,
-	GRAPHICS_PIPELINE_CREATION_FAIL,
-	FILE_OPEN_ERROR,
-	SHADER_MODULE_CREATE_FAIL,
-	BUFFER_CREATION_FAIL,
+        SDL_QUERY_FAIL,
+        COMMAND_POOL_CREATE_FAIL,
+        COMMAND_BUFFER_ALLOC_FAIL,
+        SWAPCHAIN_IMAGE_ACQUISITION_FAIL,
+        IMAGE_VIEW_CREATE_FAIL,
+        GRAPHICS_PIPELINE_CREATION_FAIL,
+        FILE_OPEN_ERROR,
+        SHADER_MODULE_CREATE_FAIL,
+        BUFFER_CREATION_FAIL,
     };
 
     export template <class T>
@@ -56,7 +57,7 @@ namespace mars {
                 message.~basic_string();
             }
             //Once either destructor has been called, write the zeroes
-	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
+            std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
         }
         public:
         Error() noexcept : tag(ErrorTag::ALL_OKAY), data() {}
@@ -65,9 +66,9 @@ namespace mars {
         Error(ErrorTag inTag, std::string const& inMessage) noexcept : tag(inTag), message(inMessage) {}
         Error(ErrorTag inTag, std::string&& inMessage) noexcept : tag(inTag), message(std::move(inMessage)) {}
         Error(Error<T> const& other) noexcept {
-	    //Zero memory, so that any pointers stored within data members are null before any attempted initialization
-	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-	    tag = other.tag;
+            //Zero memory, so that any pointers stored within data members are null before any attempted initialization
+            std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
+            tag = other.tag;
             if(other.okay()) {
                 data = other.data;
             }
@@ -76,9 +77,9 @@ namespace mars {
             }
         }
         Error(Error<T>&& other) noexcept {
-	    //Zero memory, so that any pointers stored within data members are null before any attempted initialization
-	    std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-	    tag = other.tag;
+            //Zero memory, so that any pointers stored within data members are null before any attempted initialization
+            std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
+            tag = other.tag;
             if(other.okay()) {
                 data = std::move(other.data);
             }
@@ -121,12 +122,12 @@ namespace mars {
             return *this;
         }
         ~Error() noexcept {
-	    if(okay()) {
-		data.~T();
-	    }
-	    else {
-		message.~basic_string();
-	    }
+            if(okay()) {
+                data.~T();
+            }
+            else {
+                message.~basic_string();
+            }
         }
         //Returns `true` if `this->tag` is of a value not indicating an error during execution.
         bool okay() const noexcept {
@@ -147,18 +148,18 @@ namespace mars {
             if(okay()) std::unreachable();
             return message;
         }
-	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
-	bool report() const noexcept {
-	    if(okay()) return true;
-	    std::println("Error: {}", message);
-	    return false;
-	}
-	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
-	bool report(std::ostream & ostrm) const noexcept {
-	    if(okay()) return true;
-	    std::println(ostrm, "Error: {}", message);
-	    return false;
-	}
+    	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
+    	bool report() const noexcept {
+    	    if(okay()) return true;
+    	    std::println("Error: {}", message);
+    	    return false;
+    	}
+    	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
+    	bool report(std::ostream & ostrm) const noexcept {
+    	    if(okay()) return true;
+    	    std::println(ostrm, "Error: {}", message);
+    	    return false;
+    	}
     };
 
     template<>

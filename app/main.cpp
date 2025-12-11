@@ -7,16 +7,16 @@ bool run() noexcept {
     if(!g.getProcResult().report()) return false;
     bool shouldKeepRunning = true;
     while(shouldKeepRunning) {
-	SDL_Event e;
-	while(SDL_PollEvent(&e) and shouldKeepRunning) {
-	    switch(e.type) {
-	    case SDL_EVENT_QUIT:
-		shouldKeepRunning = false;
-		break;
-	    default:
-		break;
-	    }
-	}
+    	SDL_Event e;
+    	while(SDL_PollEvent(&e) and shouldKeepRunning) {
+    	    switch(e.type) {
+    	    case SDL_EVENT_QUIT:
+                shouldKeepRunning = false;
+                break;
+            default:
+                break;
+    	    }
+    	}
     }
     return true;
 }
