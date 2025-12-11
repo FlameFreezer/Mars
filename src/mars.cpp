@@ -8,6 +8,10 @@ module;
 
 module mars;
 
+#define TRY(proc)\
+procResult = proc;\
+if(!procResult.okay()) return procResult
+
 namespace mars {
     Error<noreturn> init() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO)) {

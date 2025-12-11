@@ -18,6 +18,16 @@ module;
 export module mars:renderer;
 import error;
 
+#define TRY(proc) \
+procResult = proc;\
+if(!procResult.okay()) return procResult
+
+#define INIT_TRY(proc)\
+procResult = proc;\
+if(!procResult.okay()) {\
+    initFail = true;\
+    return procResult;}
+
 namespace mars {
     constexpr int WIDTH = 800;
     constexpr int HEIGHT = 600;
@@ -35,6 +45,8 @@ namespace mars {
     #else
     constexpr bool enableValidationLayers = true;
     #endif
+
+    bool initFail = false;
 
     PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = nullptr;
     PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = nullptr;
@@ -819,41 +831,27 @@ namespace mars {
         }
         public:
         Error<noreturn> init(std::string const& name)  {
-            procResult = createVkInstance(name);
-            if(!procResult.okay()) return procResult;
-
+            INIT_TRY(createVkInstance(name));
             if(enableValidationLayers) {
-                procResult = createVkDebugUtilsMessenger();
-                if(!procResult.okay()) return procResult;
+                INIT_TRY(createVkDebugUtilsMessenger());
             }
-
             window = SDL_CreateWindow(name.c_str(), WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
             if(window == nullptr) {
+                initFail = true;
                 return {ErrorTag::WINDOW_CREATION_FAIL, SDL_GetError()};
             }
             if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
+                initFail = true;
                 return {ErrorTag::SURFACE_CREATION_FAIL, SDL_GetError()};
             }
-
             SurfaceInfo surfaceInfo{};
             uint32_t queueFamilyIndex;
-            procResult = createVkDevice(surfaceInfo, queueFamilyIndex);
-            if(!procResult.okay()) return procResult;
-
-            procResult = createVkSwapchainKHR(surfaceInfo);
-            if(!procResult.okay()) return procResult;
-
-            procResult = getSwapchainImages(surfaceInfo);
-            if(!procResult.okay()) return procResult;
-
-            procResult = createCommandBuffers(queueFamilyIndex);
-            if(!procResult.okay()) return procResult;
-
-            procResult = createGraphicsPipeline();
-            if(!procResult.okay()) return procResult;
-
-            procResult = createVertexBuffer();
-            if(!procResult.okay()) return procResult;
+            INIT_TRY(createVkDevice(surfaceInfo, queueFamilyIndex));
+            INIT_TRY(createVkSwapchainKHR(surfaceInfo));
+            INIT_TRY(getSwapchainImages(surfaceInfo));
+            INIT_TRY(createCommandBuffers(queueFamilyIndex));
+            INIT_TRY(createGraphicsPipeline());
+            INIT_TRY(createVertexBuffer());
 
             return success();
         }
@@ -871,7 +869,7 @@ namespace mars {
         virtual ~Renderer() noexcept {
             //If something went wrong during initialization, we can't destory vulkan objects, so 
             // we'll quickly end program execution
-            if(procResult.getTag() == ErrorTag::RENDERER_INIT_FAIL) return;
+            if(initFail) return;
             vkDestroySwapchainKHR(device, swapchain, nullptr);
             for(VkImageView view : swapchainImageViews) {
                 vkDestroyImageView(device, view, nullptr);

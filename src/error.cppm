@@ -87,23 +87,6 @@ namespace mars {
                 message = std::move(other.message);
             }
         }
-        Error<T>& operator=(const Error<T>& rhs) noexcept {
-            if(this != &rhs) {
-                //Call destructor on active data member, then write zeroes to whole object.
-                //We have to do this to prevent any invalid pointers from being read once the 
-                // memory is reinterpreted
-                clear();
-                //Now we can safely assign data members
-                tag = rhs.tag;
-                if(rhs.okay()) {
-                    data = rhs.data;
-                }
-                else {
-                    message = rhs.message;
-                }
-            }
-            return *this;
-        }
         Error<T>& operator=(Error<T>&& rhs) noexcept {
             if(this != &rhs) {
                 //Call destructor on active data member, then write zeroes to whole object.
@@ -113,10 +96,10 @@ namespace mars {
                 //Now we can safely assign data members
                 tag = rhs.tag;
                 if(rhs.okay()) {
-                    data = rhs.data;
+                    data = std::move(rhs.data);
                 }
                 else {
-                    message = rhs.message;
+                    message = std::move(rhs.message);
                 }
             }
             return *this;
@@ -167,6 +150,6 @@ namespace mars {
 
     //Returns an `Error<noreturn>` with `key == ALL_OKAY`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
     export Error<noreturn> success() {
-	return Error<noreturn>();
+        return Error<noreturn>();
     }
 }
