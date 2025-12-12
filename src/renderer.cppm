@@ -14,6 +14,7 @@ module;
 #include <limits>
 #include <algorithm>
 #include <fstream>
+#include <cstring>
 
 export module mars:renderer;
 import error;
