@@ -104,6 +104,13 @@ namespace mars {
             }
             return *this;
         }
+        template<class U>
+        Error<U> move() const noexcept {
+            //It doesn't make sense to attempt to move a T into a U, so we only operate if message 
+            // is the active union member
+            if(okay()) std::unreachable();
+            return {tag, std::move(message)};
+        }
         ~Error() noexcept {
             if(okay()) {
                 data.~T();

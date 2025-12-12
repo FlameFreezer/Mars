@@ -50,8 +50,8 @@ namespace mars {
     constexpr bool enableValidationLayers = true;
     #endif
 
-    PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = nullptr;
-    PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = nullptr;
+    PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = nullptr;
+    PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = nullptr;
 
     bool initFail = false;
 
@@ -479,9 +479,9 @@ namespace mars {
         }
 
         Error<noreturn> createVkSwapchainKHR(SurfaceInfo const& surfaceInfo) noexcept {
-            Error<VkExtent2D> const imageExtent = chooseImageExtent(surfaceInfo.capabilities);
+            Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceInfo.capabilities);
             if(!imageExtent.okay()){
-                return {imageExtent.getTag(), imageExtent.getMessage()};
+                return imageExtent.move<noreturn>();
             }
             VkSwapchainCreateInfoKHR const swapchainInfo = {
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -633,7 +633,7 @@ namespace mars {
             return {ErrorTag::SEARCH_FAIL, "Physical Device did not support needed extensions!"};
         }
 
-        Error<noreturn> createVkDevice(SurfaceInfo& surfaceInfo, uint32_t& queueFamilyIndex)  {
+        Error<noreturn> createVkDevice(SurfaceInfo& surfaceInfo, uint32_t& queueFamilyIndex) noexcept {
             uint32_t queueCount = 0;
 
             //Get all the physical devices installed on the system
@@ -650,12 +650,8 @@ namespace mars {
             for(int i = 0; i < physicalDeviceCount; i++) {
                 //Check device extension support for the current physical device
                 procResult = checkDeviceExtensionSupport(physicalDevices[i]);
-                if(procResult.getTag() == ErrorTag::SEARCH_FAIL) {
-                    continue;
-                }
-                else if(!procResult.okay()) {
-                    return procResult;
-                }
+                if(procResult.getTag() == ErrorTag::SEARCH_FAIL) continue;
+                else if(!procResult.okay()) return procResult;
                 //Get physical device's capabilities with the surface
                 if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
                     physicalDevices[i], 
@@ -666,36 +662,30 @@ namespace mars {
                 }
 
                 //Get a surface format to use
-                Error<VkSurfaceFormatKHR> const surfaceFormat = checkDeviceSurfaceFormats(physicalDevices[i]);
+                Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevices[i]);
                 if(surfaceFormat.okay()) {
                     surfaceInfo.format = surfaceFormat.getData();
                 }
                 else {
-                    return {surfaceFormat.getTag(), surfaceFormat.getMessage()};
+                    return surfaceFormat.move<noreturn>();
                 }
                 //Choose a present mode to use
-                Error<VkPresentModeKHR> const presentMode = choosePresentMode(physicalDevices[i]);
-                if(presentMode.getTag() == ErrorTag::SEARCH_FAIL) {
-                    continue;
-                }
+                Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevices[i]);
+                if(presentMode.getTag() == ErrorTag::SEARCH_FAIL) continue;
                 else if(presentMode.okay()) {
                     surfaceInfo.presentMode = presentMode.getData();
                 }
                 else {
-                    return {presentMode.getTag(), presentMode.getMessage()};
+                    return presentMode.move<noreturn>();
                 }
                 //Pick the desired queue family index
                 procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i]);
+                if(procResult.getTag() == ErrorTag::SEARCH_FAIL) continue;
+                else if(!procResult.okay()) return procResult;
                 //At this point if all has succeeded, we are ready to use the current physical device and
                 // create the logical device
-                if(procResult.okay()) {
-                    physicalDevice = physicalDevices[i];
-                    goto Device_Creation;
-                }
-                //Otherwise, if something went wrong, return the error
-                else if(procResult.getTag() != ErrorTag::SEARCH_FAIL) {
-                    return procResult;
-                }
+                physicalDevice = physicalDevices[i];
+                goto Device_Creation;
             } 
             //If we got here, none of the physical devices supported the features we needed
             return {ErrorTag::FIND_SUITABLE_GPU_FAIL, "Failed to find a suitable GPU!"};
@@ -742,7 +732,7 @@ namespace mars {
             return success();
         }
 
-        Error<noreturn> createVkDebugUtilsMessenger() {
+        Error<noreturn> createVkDebugUtilsMessenger() noexcept {
             VkDebugUtilsMessengerCreateInfoEXT const debugMessengerInfo = {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
                 .pNext = nullptr,
@@ -757,23 +747,23 @@ namespace mars {
                 .pfnUserCallback = debugCallback,
                 .pUserData = nullptr,
             };
-            createVkDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-            if(createVkDebugUtilsMessengerEXT == nullptr) {
+            vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+            if(vkCreateDebugUtilsMessengerEXT == nullptr) {
                 return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
             }
-            if(createVkDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+            if(vkCreateDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
                 return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessengerEXT!"};
             }
-            destroyVkDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
                 instance, "vkDestroyDebugUtilsMessengerEXT"
             );
-            if(destroyVkDebugUtilsMessengerEXT == nullptr) {
+            if(vkDestroyDebugUtilsMessengerEXT == nullptr) {
                 return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
             }
             return success();
         }
 
-        Error<noreturn> createVkInstance(const std::string& appName)  {
+        Error<noreturn> createVkInstance(const std::string& appName) noexcept {
             if constexpr(enableValidationLayers) {
                 uint32_t layerPropertyCount = 0;
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
@@ -841,7 +831,7 @@ namespace mars {
             return success();
         }
         public:
-        Error<noreturn> init(std::string const& name)  {
+        Error<noreturn> init(std::string const& name) noexcept {
             INIT_TRY(createVkInstance(name));
             if constexpr(enableValidationLayers) {
                 INIT_TRY(createVkDebugUtilsMessenger());
@@ -893,7 +883,7 @@ namespace mars {
             SDL_Vulkan_DestroySurface(instance, surface, nullptr);
             SDL_DestroyWindow(window);
             if constexpr(enableValidationLayers) {
-                destroyVkDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+                vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
             }
             vkDestroyInstance(instance, nullptr);
         }
