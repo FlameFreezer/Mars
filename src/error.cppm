@@ -145,6 +145,8 @@ namespace mars {
     	}
     };
 
+    export using ErrorNoreturn = Error<noreturn>;
+
     template<>
     noreturn const& Error<noreturn>::getData() const noexcept = delete;
 

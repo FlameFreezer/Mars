@@ -27,7 +27,7 @@ add_custom_command(OUTPUT slang.spv
         -o slang.spv
     DEPENDS "${MARS_SHADER_PATH}/shader.slang"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
-    COMMENT "Compiling shaders..."
+    COMMENT "Compiling shaders"
     CODEGEN
     VERBATIM
 )
@@ -68,7 +68,7 @@ target_include_directories(marsTest PUBLIC
 )
 
 # Build for Debug Symbols
-if(CMAKE_BUILD_TYPE STREQUAL "Build")
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|IntelLLVM")
         add_compile_options(-g)
     endif()

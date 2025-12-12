@@ -18,20 +18,23 @@ module;
 export module mars:renderer;
 import error;
 
-#define TRY(proc) \
-procResult = proc;\
-if(!procResult.okay()) return procResult
+#define TRY(proc) do {\
+    procResult = proc;\
+    if(!procResult.okay()) return procResult;\
+} while(0)
 
-#define INIT_TRY(proc)\
-procResult = proc;\
-if(!procResult.okay()) {\
-    initFail = true;\
-    return procResult;}
+#define INIT_TRY(proc) do {\
+    procResult = proc;\
+    if(!procResult.okay()) {\
+        initFail = true;\
+        return procResult;\
+    } \
+} while(0)
 
 namespace mars {
-    constexpr int WIDTH = 800;
-    constexpr int HEIGHT = 600;
-    constexpr uint32_t MAX_CONCURRENT_FRAMES = 2;
+    constexpr int width = 800;
+    constexpr int height = 600;
+    constexpr uint32_t maxConcurrentFrames = 2;
     constexpr std::array<char const*, 2> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME
@@ -46,10 +49,10 @@ namespace mars {
     constexpr bool enableValidationLayers = true;
     #endif
 
-    bool initFail = false;
-
     PFN_vkCreateDebugUtilsMessengerEXT createVkDebugUtilsMessengerEXT = nullptr;
     PFN_vkDestroyDebugUtilsMessengerEXT destroyVkDebugUtilsMessengerEXT = nullptr;
+
+    bool initFail = false;
 
     VkBool32 debugCallback(
 	    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -72,11 +75,11 @@ namespace mars {
         glm::vec3 color;
         glm::vec2 texCoord;
 
-        static VkVertexInputBindingDescription getInputBindingDescription() noexcept {
+        static constexpr VkVertexInputBindingDescription getInputBindingDescription() noexcept {
             return { 0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
         }
 
-        static std::array<VkVertexInputAttributeDescription, 3> getInputAttributeDescriptions() noexcept {
+        static constexpr std::array<VkVertexInputAttributeDescription, 3> getInputAttributeDescriptions() noexcept {
             std::array<VkVertexInputAttributeDescription, 3> descs;
             // POS
             descs[0] = {
@@ -126,7 +129,7 @@ namespace mars {
                 .pQueueFamilyIndices = nullptr
             };
             if(vkCreateBuffer(device, &bufferInfo, nullptr, &handle) != VK_SUCCESS) {
-                procResult = {ErrorTag::BUFFER_CREATION_FAIL, "Failed to create VkBuffer!"};
+                procResult = {ErrorTag::BUFFER_CREATION_FAIL, "Failed to create VkBuffer while initializing GPUBuffer"};
                 return;
             }
             VkMemoryAllocateInfo allocInfo = {
@@ -136,11 +139,11 @@ namespace mars {
         		.memoryTypeIndex = memoryType
             };
             if(vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-                procResult = {ErrorTag::MEMORY_ALLOC_FAIL, "Failed to allocate device memory!"};
+                procResult = {ErrorTag::MEMORY_ALLOC_FAIL, "Failed to allocate device memory while initializing GPUBuffer"};
                 return;
             }
             if(vkBindBufferMemory(device, handle, memory, 0) != VK_SUCCESS) {
-                procResult = {ErrorTag::BUFFER_CREATION_FAIL, "Failed to bind buffer memory!"};
+                procResult = {ErrorTag::BUFFER_CREATION_FAIL, "Failed to bind buffer memory while initializing GPUBuffer!"};
                 return;
             }
             procResult = success();
@@ -163,7 +166,12 @@ namespace mars {
     };
 
     export class Renderer {
-	private:
+    private:
+    	std::vector<VkImage> swapchainImages;
+    	std::vector<VkImageView> swapchainImageViews;	
+        std::vector<VkQueue> queues;
+    	std::array<VkCommandBuffer, maxConcurrentFrames> commandBuffers;
+    	GPUBuffer vertexBuffer;
         Error<noreturn> procResult;
         VkInstance instance;
         SDL_Window* window;
@@ -172,12 +180,8 @@ namespace mars {
         VkDevice device;
         VkPhysicalDevice physicalDevice;
         VkSwapchainKHR swapchain;
-    	std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES> commandBuffers;
     	VkCommandPool commandPool;
-    	std::vector<VkImage> swapchainImages;
-    	std::vector<VkImageView> swapchainImageViews;	
     	VkPipeline graphicsPipeline;
-    	GPUBuffer vertexBuffer;
 
         Error<noreturn> createVertexBuffer() noexcept {
             vertexBuffer = GPUBuffer(
@@ -449,7 +453,7 @@ namespace mars {
                 .pNext = nullptr,
                 .commandPool = commandPool,
                 .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-                .commandBufferCount = MAX_CONCURRENT_FRAMES
+                .commandBufferCount = maxConcurrentFrames
             };
             if(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
                 return {ErrorTag::COMMAND_BUFFER_ALLOC_FAIL, "Failed to allocate command buffers!"};
@@ -728,6 +732,12 @@ namespace mars {
                 return {ErrorTag::DEVICE_CREATION_FAIL, "Failed to create VkDevice!"};
             }
 
+            //Acquire handles to all the GPU queues we just created
+            queues.resize(queueCount, nullptr);
+            for(uint32_t i = 0; i < queueCount; i++) {
+                vkGetDeviceQueue(device, queueFamilyIndex, i, &queues.at(i));
+            }
+
             return success();
         }
 
@@ -763,7 +773,7 @@ namespace mars {
         }
 
         Error<noreturn> createVkInstance(const std::string& appName)  {
-            if(enableValidationLayers) {
+            if constexpr(enableValidationLayers) {
                 uint32_t layerPropertyCount = 0;
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
                     return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
@@ -793,7 +803,7 @@ namespace mars {
                 extNames.push_back(sdlExtNames[i]);
             }
 
-            if(enableValidationLayers) {
+            if constexpr(enableValidationLayers) {
                 std::println("Enabled Instance Extensions:");
                 for(char const* extName : extNames) {
                     std::println("\t{}", extName);
@@ -819,7 +829,7 @@ namespace mars {
                 .enabledExtensionCount = static_cast<uint32_t>(extNames.size()),
                 .ppEnabledExtensionNames = extNames.data()
             };
-            if(enableValidationLayers) {
+            if constexpr(enableValidationLayers) {
                 instanceInfo.enabledLayerCount = validationLayers.size();
                 instanceInfo.ppEnabledLayerNames = validationLayers.data();
             }
@@ -832,10 +842,10 @@ namespace mars {
         public:
         Error<noreturn> init(std::string const& name)  {
             INIT_TRY(createVkInstance(name));
-            if(enableValidationLayers) {
+            if constexpr(enableValidationLayers) {
                 INIT_TRY(createVkDebugUtilsMessenger());
             }
-            window = SDL_CreateWindow(name.c_str(), WIDTH, HEIGHT, SDL_WINDOW_VULKAN);
+            window = SDL_CreateWindow(name.c_str(), width, height, SDL_WINDOW_VULKAN);
             if(window == nullptr) {
                 initFail = true;
                 return {ErrorTag::WINDOW_CREATION_FAIL, SDL_GetError()};
@@ -881,7 +891,7 @@ namespace mars {
             vkDestroyDevice(device, nullptr);
             SDL_Vulkan_DestroySurface(instance, surface, nullptr);
             SDL_DestroyWindow(window);
-            if(enableValidationLayers) {
+            if constexpr(enableValidationLayers) {
                 destroyVkDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
             }
             vkDestroyInstance(instance, nullptr);
