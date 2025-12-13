@@ -2,7 +2,9 @@ import mars;
 
 #include <SDL3/SDL.h>
 
-mars::ErrorNoreturn run() noexcept {
+using ErrorNoreturn = mars::Error<mars::noreturn>;
+
+ErrorNoreturn run() noexcept {
     mars::Game g;
     if(!g.getProcResult().report()) return g.getProcResult();
     bool shouldKeepRunning = true;

@@ -38,6 +38,8 @@ namespace mars {
         FILE_OPEN_ERROR,
         SHADER_MODULE_CREATE_FAIL,
         BUFFER_CREATION_FAIL,
+        MEMORY_MAP_FAIL,
+        MEMORY_TYPE_UNAVAILABLE,
     };
 
     export template <class T>
@@ -62,7 +64,6 @@ namespace mars {
             else {
                 message.~basic_string();
             }
-            //Once either destructor has been called, wipe the union
             reset();
         }
         public:
@@ -117,9 +118,6 @@ namespace mars {
         // Error union that is `okay` raises a compile error.
         template<class U>
         Error<U> moveError() noexcept {
-            //It doesn't make sense to attempt to move a T into a U, so we only operate if message 
-            // is the active union member
-            if(okay()) std::unreachable();
             Error<U> result(tag, std::move(message));
             reset();
             return result;
@@ -139,23 +137,15 @@ namespace mars {
         ErrorTag getTag() const noexcept {
             return tag;
         }
-        //Accessor for `data`. Raises a compile error if `message` is the active union field.
         T const& getData() const noexcept {
-            //No data to retrieve if there has been an error - message is the active union field
-            if(!okay()) std::unreachable();
             return data;
         }
-        //Creates an rvalue reference to `data`. Raises a compile error if `message` is the active 
-        // union field. `data` is considered invalid after calling this, though it is still 
-        // considered the active union field.
+        //Creates an rvalue reference to `data`. `data` is invalid after calling this, 
+        // though it is still considered the active union field.
         T&& moveData() noexcept {
-            if(!okay()) std::unreachable();
             return std::move(data);
         }
-        //Accessor for `message`. Raises a compile error if `data` is the active union field.
         std::string const& getMessage() const noexcept {
-            //No message to retrieve if there is no error - data is the active union field
-            if(okay()) std::unreachable();
             return message;
         }
     	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
@@ -165,7 +155,7 @@ namespace mars {
     	    return false;
     	}
     	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
-    	bool report(std::ostream & ostrm) const noexcept {
+    	bool report(std::ostream& ostrm) const noexcept {
     	    if(okay()) return true;
     	    std::println(ostrm, "Error: {}", message);
     	    return false;
@@ -179,6 +169,4 @@ namespace mars {
     export Error<noreturn> success() {
         return Error<noreturn>();
     }
-
-    export using ErrorNoreturn = Error<noreturn>;
 }

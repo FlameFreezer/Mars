@@ -117,13 +117,29 @@ namespace mars {
 
         GPUBuffer() noexcept : handle(nullptr), memory(nullptr)  {}
         GPUBuffer(GPUBuffer const& other) noexcept : handle(other.handle), memory(other.memory) {}
+        GPUBuffer(GPUBuffer&& other) noexcept : handle(other.handle), memory(other.memory) {
+            other.handle = nullptr;
+            other.memory = nullptr;
+        }
         void destroy(VkDevice device) {
             vkDestroyBuffer(device, handle, nullptr);
             vkFreeMemory(device, memory, nullptr);
         }
-        static Error<GPUBuffer> make(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, std::uint32_t memoryType) noexcept {
+        static Error<std::uint32_t> findPhysicalDeviceMemoryTypeIndex(VkPhysicalDevice physicalDevice, std::uint32_t availableTypes, VkMemoryPropertyFlags memProperties) noexcept {
+            VkPhysicalDeviceMemoryProperties2 deviceMemProperties{};
+            deviceMemProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
+            vkGetPhysicalDeviceMemoryProperties2(physicalDevice, &deviceMemProperties);
+            for(std::uint32_t i = 0; i < deviceMemProperties.memoryProperties.memoryTypeCount; i++) {
+                std::uint32_t currentTypeBit = 1U << i;
+                if(availableTypes & currentTypeBit and deviceMemProperties.memoryProperties.memoryTypes[i].propertyFlags & memProperties) {
+                    return i;
+                }
+            }
+            return {ErrorTag::MEMORY_TYPE_UNAVAILABLE, "Physical Device does not support needed memory type"};
+        }
+        static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
             GPUBuffer buffer;
-            VkBufferCreateInfo bufferInfo = {
+            VkBufferCreateInfo const bufferInfo = {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
@@ -136,16 +152,21 @@ namespace mars {
             if(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer.handle) != VK_SUCCESS) {
                 return {ErrorTag::BUFFER_CREATION_FAIL, "Failed to create VkBuffer while initializing GPUBuffer"};
             }
-            VkMemoryAllocateInfo allocInfo = {
+            VkMemoryRequirements memRequirements{};
+            vkGetBufferMemoryRequirements(device, buffer.handle, &memRequirements);
+            Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
+            if(!memType.okay()) return memType.moveError<GPUBuffer>();
+
+            VkMemoryAllocateInfo const allocInfo = {
         		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         		.pNext = nullptr,
-        		.allocationSize = size,
-        		.memoryTypeIndex = memoryType
+        		.allocationSize = memRequirements.size,
+        		.memoryTypeIndex = memType.getData()
             };
             if(vkAllocateMemory(device, &allocInfo, nullptr, &buffer.memory) != VK_SUCCESS) {
                 return {ErrorTag::MEMORY_ALLOC_FAIL, "Failed to allocate device memory while initializing GPUBuffer"};
             }
-            if(vkBindBufferMemory(device, buffer.handle, buffer.memory, 0) != VK_SUCCESS) {
+            if(vkBindBufferMemory(device, buffer.handle, buffer.memory, memRequirements.alignment) != VK_SUCCESS) {
                 return {ErrorTag::BUFFER_CREATION_FAIL, "Failed to bind buffer memory while initializing GPUBuffer!"};
             }
             return buffer;
@@ -189,12 +210,30 @@ namespace mars {
         Error<noreturn> createVertexBuffer() noexcept {
             Error<GPUBuffer> buff = GPUBuffer::make(
                 device, 
+                physicalDevice,
                 vertices.max_size() * sizeof(Vertex),
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
             );
             if(!buff.okay()) return buff.moveError<noreturn>();
             vertexBuffer = buff.moveData();
+
+            Error<GPUBuffer> transf = GPUBuffer::make(
+                device,
+                physicalDevice,
+                vertices.max_size() * sizeof(Vertex),
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            );
+            if(!transf.okay()) return transf.moveError<noreturn>();
+            GPUBuffer transferBuffer(transf.moveData());
+
+            void* memory = nullptr;
+            if(vkMapMemory(device, transferBuffer.memory, 0, vertices.max_size() * sizeof(Vertex), 0, &memory) != VK_SUCCESS) {
+                return {ErrorTag::MEMORY_MAP_FAIL, "Failed to map memory while creating transfer buffer"};
+            }
+            std::memcpy(memory, static_cast<void const*>(vertices.data()), vertices.max_size() * sizeof(Vertex));
+            vkUnmapMemory(device, transferBuffer.memory);
             return success();
         }
 
