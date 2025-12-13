@@ -11,20 +11,20 @@ export import error;
 export import :renderer;
 
 namespace mars {
-    export Error<noreturn> init() noexcept;
+    export ErrorNoreturn init() noexcept;
     export void quit() noexcept;
 
     export class Game {
         public:
         Game() noexcept;
         Game(const std::string& name) noexcept;
-        Error<noreturn> const& getProcResult() const noexcept;
+        ErrorNoreturn const& getProcResult() const noexcept;
         virtual ~Game() noexcept;
         void init(const std::string& appName);
         private:
         std::string windowName;
         std::string appName;
         Renderer renderer;
-        Error<noreturn> procResult;
+        ErrorNoreturn procResult;
     };
 };

@@ -48,7 +48,13 @@ namespace mars {
             std::string message;
         };
         ErrorTag tag;
-        //Calls the destructor of the active data member, then writes zeroes to the entire space taken up by the object
+        //Writes zeroes to the entire memory space taken up by the Error union, then sets the tag to 
+        // `ALL_OKAY`. Does NOT call destructors to the member `data` or `memory`.
+        void reset() {
+            std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
+            tag = ErrorTag::ALL_OKAY;
+        }
+        //Calls the destructor of the active data member, then resets the union.
         void clear() {
             if(okay()) {
                 data.~T();
@@ -56,8 +62,8 @@ namespace mars {
             else {
                 message.~basic_string();
             }
-            //Once either destructor has been called, write the zeroes
-            std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
+            //Once either destructor has been called, wipe the union
+            reset();
         }
         public:
         Error() noexcept : tag(ErrorTag::ALL_OKAY), data() {}
@@ -86,6 +92,7 @@ namespace mars {
             else {
                 message = std::move(other.message);
             }
+            other.reset();
         }
         Error<T>& operator=(Error<T>&& rhs) noexcept {
             if(this != &rhs) {
@@ -101,15 +108,21 @@ namespace mars {
                 else {
                     message = std::move(rhs.message);
                 }
+                rhs.reset();
             }
             return *this;
         }
+        //Creates an Error union of the templated type, moving the tag and message from the calling 
+        // Error union to it. The callng Error union is left `okay`, with data set to zeroes. Calling this function on an 
+        // Error union that is `okay` raises a compile error.
         template<class U>
-        Error<U> move() const noexcept {
+        Error<U> moveError() noexcept {
             //It doesn't make sense to attempt to move a T into a U, so we only operate if message 
             // is the active union member
             if(okay()) std::unreachable();
-            return {tag, std::move(message)};
+            Error<U> result(tag, std::move(message));
+            reset();
+            return result;
         }
         ~Error() noexcept {
             if(okay()) {
@@ -131,6 +144,13 @@ namespace mars {
             //No data to retrieve if there has been an error - message is the active union field
             if(!okay()) std::unreachable();
             return data;
+        }
+        //Creates an rvalue reference to `data`. Raises a compile error if `message` is the active 
+        // union field. `data` is considered invalid after calling this, though it is still 
+        // considered the active union field.
+        T&& moveData() noexcept {
+            if(!okay()) std::unreachable();
+            return std::move(data);
         }
         //Accessor for `message`. Raises a compile error if `data` is the active union field.
         std::string const& getMessage() const noexcept {
