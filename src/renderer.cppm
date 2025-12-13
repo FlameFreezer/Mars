@@ -15,27 +15,17 @@ module;
 #include <algorithm>
 #include <fstream>
 #include <cstring>
+#include <cstdint>
+
+#include "mars_macros.h"
 
 export module mars:renderer;
 import error;
 
-#define TRY(proc) do {\
-    procResult = proc;\
-    if(!procResult.okay()) return procResult;\
-} while(0)
-
-#define INIT_TRY(proc) do {\
-    procResult = proc;\
-    if(!procResult.okay()) {\
-        initFail = true;\
-        return procResult;\
-    } \
-} while(0)
-
 namespace mars {
     constexpr int width = 800;
     constexpr int height = 600;
-    constexpr uint32_t maxConcurrentFrames = 2;
+    constexpr std::uint32_t maxConcurrentFrames = 2;
     constexpr std::array<char const*, 2> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME
@@ -118,7 +108,7 @@ namespace mars {
         VkDeviceMemory memory;
 
         GPUBuffer() noexcept : handle(nullptr), memory(nullptr) {}
-        GPUBuffer(Error<noreturn>& procResult, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, uint32_t memoryType) noexcept {
+        GPUBuffer(Error<noreturn>& procResult, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, std::uint32_t memoryType) noexcept {
             VkBufferCreateInfo bufferInfo = {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                 .pNext = nullptr,
@@ -205,7 +195,7 @@ namespace mars {
                 .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,                                                     
-                .codeSize = static_cast<uint32_t>(shaderCode.tellg()),                                  
+                .codeSize = static_cast<std::uint32_t>(shaderCode.tellg()),                                  
                 .pCode = nullptr
             };
 
@@ -213,7 +203,7 @@ namespace mars {
             shaderCode.seekg(0);
             shaderCode.read(code.data(), shaderModuleInfo.codeSize);
             shaderCode.close();
-            shaderModuleInfo.pCode = reinterpret_cast<uint32_t*>(code.data());
+            shaderModuleInfo.pCode = reinterpret_cast<std::uint32_t*>(code.data());
 
             VkShaderModule result;
             if(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &result) != VK_SUCCESS) {
@@ -400,7 +390,7 @@ namespace mars {
             return success();
         }
         Error<noreturn> getSwapchainImages(SurfaceInfo const& surfaceInfo) noexcept {
-            uint32_t imageCount;
+            std::uint32_t imageCount;
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
             }
@@ -431,7 +421,7 @@ namespace mars {
                     .layerCount = 1
                 }
             };
-            for(uint32_t i = 0; i < imageCount; i++) {
+            for(std::uint32_t i = 0; i < imageCount; i++) {
                 imageViewInfo.image = swapchainImages[i];
                 if(vkCreateImageView(device, &imageViewInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
                     return {ErrorTag::IMAGE_VIEW_CREATE_FAIL, std::format("Failed to create swapchain image view {}!", i)};
@@ -439,7 +429,7 @@ namespace mars {
             }
             return success();
         }
-        Error<noreturn> createCommandBuffers(uint32_t queueFamilyIndex) noexcept {
+        Error<noreturn> createCommandBuffers(std::uint32_t queueFamilyIndex) noexcept {
             VkCommandPoolCreateInfo const poolInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                 .pNext = nullptr,
@@ -462,7 +452,7 @@ namespace mars {
             return success();
         }
         Error<VkExtent2D> chooseImageExtent(VkSurfaceCapabilitiesKHR const& capabilities) noexcept {
-            if(capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+            if(capabilities.currentExtent.width != std::numeric_limits<std::uint32_t>::max()) {
                 return capabilities.currentExtent;
             }
             int width = 0; 
@@ -471,9 +461,9 @@ namespace mars {
                 return {ErrorTag::SDL_QUERY_FAIL, SDL_GetError()};
             }
             return VkExtent2D{
-                .width = std::clamp<uint32_t>(width, 
+                .width = std::clamp<std::uint32_t>(width, 
                     capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
-                .height = std::clamp<uint32_t>(height, 
+                .height = std::clamp<std::uint32_t>(height, 
                     capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
             };
         }
@@ -513,12 +503,12 @@ namespace mars {
 
 
         Error<noreturn> pickQueueFamilyIndex(
-            uint32_t& queueFamilyIndex, 
-            uint32_t& queueCount, 
+            std::uint32_t& queueFamilyIndex, 
+            std::uint32_t& queueCount, 
             VkPhysicalDevice physicalDevice 
         )  {
             //Get queue family properties for the current physical device
-            uint32_t queueFamilyPropertyCount = 0;
+            std::uint32_t queueFamilyPropertyCount = 0;
             vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, nullptr);
             std::vector<VkQueueFamilyProperties2> queueFamilyProperties(
                 queueFamilyPropertyCount, 
@@ -550,7 +540,7 @@ namespace mars {
         Error<VkPresentModeKHR> choosePresentMode(VkPhysicalDevice physicalDevice) {
             VkPresentModeKHR presentMode{};
             //Get present modes for the surface supported by the physical device
-            uint32_t presentModeCount = 0;
+            std::uint32_t presentModeCount = 0;
             if(vkGetPhysicalDeviceSurfacePresentModesKHR(
                 physicalDevice, 
                 surface, 
@@ -589,7 +579,7 @@ namespace mars {
 
         Error<VkSurfaceFormatKHR> checkDeviceSurfaceFormats(VkPhysicalDevice physicalDevice) {
             //Get physical device's surface formats
-            uint32_t surfaceFormatCount = 0;
+            std::uint32_t surfaceFormatCount = 0;
             if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!"};
             }
@@ -607,7 +597,7 @@ namespace mars {
 
         Error<noreturn> checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice)  {
             //Check that the device supports the extensions needed by the application
-            uint32_t deviceExtensionPropertyCount = 0;
+            std::uint32_t deviceExtensionPropertyCount = 0;
             if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!"};
             }
@@ -633,11 +623,11 @@ namespace mars {
             return {ErrorTag::SEARCH_FAIL, "Physical Device did not support needed extensions!"};
         }
 
-        Error<noreturn> createVkDevice(SurfaceInfo& surfaceInfo, uint32_t& queueFamilyIndex) noexcept {
-            uint32_t queueCount = 0;
+        Error<noreturn> createVkDevice(SurfaceInfo& surfaceInfo, std::uint32_t& queueFamilyIndex) noexcept {
+            std::uint32_t queueCount = 0;
 
             //Get all the physical devices installed on the system
-            uint32_t physicalDeviceCount = 0;
+            std::uint32_t physicalDeviceCount = 0;
             if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical devices!"};
             }
@@ -714,7 +704,7 @@ namespace mars {
                 .flags = 0,
                 .queueCreateInfoCount = 1,
                 .pQueueCreateInfos = &queueInfo,
-                .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
+                .enabledExtensionCount = static_cast<std::uint32_t>(deviceExtensions.size()),
                 .ppEnabledExtensionNames = deviceExtensions.data(),
                 .pEnabledFeatures = nullptr
             };
@@ -725,7 +715,7 @@ namespace mars {
 
             //Acquire handles to all the GPU queues we just created
             queues.resize(queueCount, nullptr);
-            for(uint32_t i = 0; i < queueCount; i++) {
+            for(std::uint32_t i = 0; i < queueCount; i++) {
                 vkGetDeviceQueue(device, queueFamilyIndex, i, &queues.at(i));
             }
 
@@ -765,7 +755,7 @@ namespace mars {
 
         Error<noreturn> createVkInstance(const std::string& appName) noexcept {
             if constexpr(enableValidationLayers) {
-                uint32_t layerPropertyCount = 0;
+                std::uint32_t layerPropertyCount = 0;
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
                     return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
                 }
@@ -785,7 +775,7 @@ namespace mars {
                     Next_Layer:
                 }
             }
-            uint32_t extCount = 0;
+            std::uint32_t extCount = 0;
             char const*const* sdlExtNames = SDL_Vulkan_GetInstanceExtensions(&extCount);
             std::vector<char const*> extNames;
             extNames.reserve(extCount);
@@ -817,7 +807,7 @@ namespace mars {
                 .pApplicationInfo = &appInfo,
                 .enabledLayerCount = 0,
                 .ppEnabledLayerNames = nullptr,
-                .enabledExtensionCount = static_cast<uint32_t>(extNames.size()),
+                .enabledExtensionCount = static_cast<std::uint32_t>(extNames.size()),
                 .ppEnabledExtensionNames = extNames.data()
             };
             if constexpr(enableValidationLayers) {
@@ -846,7 +836,7 @@ namespace mars {
                 return {ErrorTag::SURFACE_CREATION_FAIL, SDL_GetError()};
             }
             SurfaceInfo surfaceInfo{};
-            uint32_t queueFamilyIndex;
+            std::uint32_t queueFamilyIndex;
             INIT_TRY(createVkDevice(surfaceInfo, queueFamilyIndex));
             INIT_TRY(createVkSwapchainKHR(surfaceInfo));
             INIT_TRY(getSwapchainImages(surfaceInfo));
