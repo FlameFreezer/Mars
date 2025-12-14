@@ -1,20 +1,26 @@
 module;
 
-#include <memory>
+#include <cstddef>
 
 export module array;
 
 namespace mars {
+    //Essentially implements the "fat pointer" from zig
     export template <class T>
     class Array {
-        private:
-        std::unique_ptr<T[]> mPtr;
+        protected:
+        T* mPtr;
         std::size_t mSize;
+        Array(T* inPtr, std::size_t inSize) noexcept : mPtr(inPtr), mSize(inSize) {}
         public:
-        Array() noexcept : mSize(0) {}
-        Array(std::size_t inSize) noexcept : mPtr(std::make_unique<T[]>(inSize)), mSize(inSize) {}
-        Array(std::size_t inSize, T initial) noexcept : mPtr(std::make_unique<T[]>(inSize)), mSize(inSize) {
+        Array() noexcept : mPtr(nullptr), mSize(0) {}
+        Array(std::size_t inSize) noexcept : mPtr(new T[inSize]), mSize(inSize) {}
+        Array(std::size_t inSize, T initial) noexcept : mPtr(new T[inSize]), mSize(inSize) {
             for(std::size_t i = 0; i < mSize; i++) mPtr[i] = initial;
+        }
+        virtual ~Array() noexcept {
+            delete[] mPtr;
+            mSize = 0;
         }
         std::size_t size() const noexcept {
             return mSize;
@@ -24,14 +30,24 @@ namespace mars {
         }
         Array<T>& operator=(Array<T>&& rhs) noexcept {
             if(this != &rhs) {
-                mPtr = std::move(rhs.mPtr);
+                mPtr = rhs.mPtr;
                 mSize = rhs.mSize;
+                rhs.mPtr = 0;
                 rhs.mSize = 0;
             }
             return *this;
         }
+        Array<T>& operator=(Array<T> const& rhs) noexcept {
+            if(this != &rhs) {
+                delete[] mPtr;
+                mPtr = new T[rhs.mSize];
+                for(std::size_t i = 0; i < rhs.mSize; i++) mPtr[i] = rhs.mPtr[i];
+                mSize = rhs.mSize;
+            }
+            return *this;
+        }
         T* data() const noexcept {
-            return mPtr.get();
+            return mPtr;
         }
 
         class Iterator {
@@ -67,6 +83,60 @@ namespace mars {
         }
         Iterator end() const noexcept {
             return Iterator(*this, mSize);
+        }
+    };
+
+    export template <class T>
+    class Slice : public Array<T> {
+        public:
+        Slice() noexcept {}
+        Slice(Array<T> const& array) noexcept : Array<T>(array.data(), array.size()) {}
+        Slice(Array<T> const& array, std::size_t start) noexcept : Array<T>(array.data() + start, array.size() - start) {
+            if(start >= array.size()) {
+                this->mSize = 0;
+                this->mPtr = nullptr;
+            }
+        }
+        Slice(Array<T> const& array, std::size_t start, std::size_t count) noexcept : Array<T>(array.data() + start, count) {
+            if(start + count >= array.size() or start >= array.size()) {
+                this->mSize = 0;
+                this->mPtr = nullptr;
+            }
+        }
+        Slice(Array<T>&& array) noexcept = delete;
+        Slice(Slice<T> const& other) noexcept : Array<T>(other.mPtr, other.mSize) {}
+        Slice(Slice<T>&& other) noexcept : Array<T>(other.mPtr, other.mSize) {
+            other.mPtr = nullptr;
+            other.mSize = 0;
+        }
+        virtual ~Slice() noexcept override {
+            this->mPtr = nullptr;
+        }
+        //Override behavior of copy assignment operator so that slices do not construct new arrays
+        Slice<T>& operator=(Array<T> const& rhs) noexcept {
+            if(this != &rhs) {
+                this->mPtr = rhs.data();
+                this->mSize = rhs.size();
+            }
+            return *this;
+        }
+        //A slice can never be assigned to a temporary array
+        Slice<T>& operator=(Array<T>&& rhs) = delete;
+        Slice<T>& operator=(Slice<T> const& rhs) noexcept {
+            if(this != &rhs) {
+                this->mPtr = rhs.mPtr;
+                this->mSize = rhs.mSize;
+            }
+            return *this;
+        }
+        Slice<T>& operator=(Slice<T>&& rhs) noexcept {
+            if(this != &rhs) {
+                this->mPtr = rhs.mPtr;
+                this->mSize = rhs.mSize;
+                rhs.mPtr = nullptr;
+                rhs.mSize = 0;
+            }
+            return *this;
         }
     };
 }
