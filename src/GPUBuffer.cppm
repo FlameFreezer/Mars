@@ -1,14 +1,14 @@
-#ifndef MARS_GPUBUFFER_HPP
-#define MARS_GPUBUFFER_HPP 1
+module;
 
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
 
+export module gpubuffer;
 import error;
 
 namespace mars {
-    struct GPUBuffer {
+    export struct GPUBuffer {
         VkBuffer handle;
         VkDeviceMemory memory;
 
@@ -80,4 +80,3 @@ namespace mars {
         GPUBuffer& operator=(GPUBuffer const& rhs) = delete;
     };
 }
-#endif

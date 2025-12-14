@@ -7,21 +7,42 @@ module;
 #include <string>
 
 export module mars;
-export import error;
 export import :renderer;
+export import error;
+export import array;
 
 namespace mars {
-    export Error<noreturn> init() noexcept;
-    export void quit() noexcept;
+    export Error<noreturn> init() noexcept {
+        if(!SDL_Init(SDL_INIT_VIDEO)) {
+            return {ErrorTag::INIT_SDL_FAIL, SDL_GetError()};
+        }
+        return success();
+    }
+    export void quit() noexcept {
+        SDL_Quit();
+    }
 
     export class Game {
         public:
-        Game() noexcept;
-        Game(const std::string& name) noexcept;
-        Error<noreturn> const& getProcResult() const noexcept;
-        virtual ~Game() noexcept;
-        void init(const std::string& appName);
-        Error<noreturn> draw() noexcept;
+        Game() noexcept : windowName("My Mars Game"), appName("My Mars Game") {
+            this->init(appName);
+        }
+        Game(const std::string& name) noexcept : windowName(name), appName(name) {
+            this->init(appName);
+        }
+        virtual ~Game() noexcept {
+
+        }
+        Error<noreturn> const& getProcResult() const noexcept {
+            return procResult;
+        }
+        void init(const std::string& appName){
+            procResult = renderer.init(appName);
+            if(!procResult.okay()) return;
+        }
+        Error<noreturn> draw() noexcept {
+            return success();
+        }
         private:
         std::string windowName;
         std::string appName;

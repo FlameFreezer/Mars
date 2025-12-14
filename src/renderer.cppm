@@ -16,12 +16,11 @@ module;
 #include <fstream>
 #include <cstring>
 #include <cstdint>
-#include <memory>
-
-#include "GPUBuffer.hpp"
 
 export module mars:renderer;
+import gpubuffer;
 import error;
+import array;
 
 #define INIT_TRY(proc) do {\
     procResult = proc;\
@@ -114,12 +113,12 @@ namespace mars {
 
     export class Renderer {
     private:
-    	std::vector<VkImage> swapchainImages;
-    	std::vector<VkImageView> swapchainImageViews;	
-        std::vector<VkQueue> queues;
+    	Array<VkImage> swapchainImages;
+    	Array<VkImageView> swapchainImageViews;	
+        Array<VkQueue> queues;
     	std::array<VkCommandBuffer, maxConcurrentFrames + 1> commandBuffers;
         std::array<VkFence, maxConcurrentFrames> fences;
-        std::unique_ptr<VkSemaphore[]> semaphores;
+        Array<VkSemaphore> semaphores;
     	GPUBuffer vertexBuffer;
         Error<noreturn> procResult;
         VkInstance instance;
@@ -132,6 +131,11 @@ namespace mars {
     	VkCommandPool commandPool;
     	VkPipeline graphicsPipeline;
         std::uint32_t currentFrame;
+
+        Error<noreturn> createSyncObjects() noexcept {
+            semaphores = Array<VkSemaphore>(swapchainImages.size() + maxConcurrentFrames);
+            return success();
+        }
 
         Error<noreturn> createVertexBuffer() noexcept {
             VkCommandBufferBeginInfo const beginInfo = {
@@ -194,10 +198,10 @@ namespace mars {
                 .signalSemaphoreInfoCount = 0,
                 .pSignalSemaphoreInfos = nullptr
             };
-            if(vkQueueSubmit2(queues.front(), 1, &submitInfo, nullptr) != VK_SUCCESS) {
+            if(vkQueueSubmit2(queues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::QUEUE_SUBMIT_FAIL, "Failed to submit to transfer queue while creating vertex buffer"};
             }
-            vkQueueWaitIdle(queues.front());
+            vkQueueWaitIdle(queues[0]);
             vkResetCommandBuffer(commandBuffers.front(), 0);
             transferBuffer.destroy(device);
             return success();
@@ -413,11 +417,11 @@ namespace mars {
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
             }
-            swapchainImages.resize(imageCount);
+            swapchainImages = Array<VkImage>(imageCount, nullptr);
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
                 return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
             }
-            swapchainImageViews.resize(imageCount);
+            swapchainImageViews = Array<VkImageView>(imageCount, nullptr);
 
             VkImageViewCreateInfo imageViewInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -733,9 +737,9 @@ namespace mars {
             }
 
             //Acquire handles to all the GPU queues we just created
-            queues.resize(queueCount, nullptr);
+            queues = Array<VkQueue>(queueCount);
             for(std::uint32_t i = 0; i < queueCount; i++) {
-                vkGetDeviceQueue(device, queueFamilyIndex, i, &queues.at(i));
+                vkGetDeviceQueue(device, queueFamilyIndex, i, &queues[i]);
             }
 
             return success();
@@ -862,6 +866,7 @@ namespace mars {
             INIT_TRY(createCommandBuffers(queueFamilyIndex));
             INIT_TRY(createGraphicsPipeline());
             INIT_TRY(createVertexBuffer());
+            INIT_TRY(createSyncObjects());
 
             return success();
         }
