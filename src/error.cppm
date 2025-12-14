@@ -40,6 +40,9 @@ namespace mars {
         BUFFER_CREATION_FAIL,
         MEMORY_MAP_FAIL,
         MEMORY_TYPE_UNAVAILABLE,
+        COMMAND_BUFFER_BEGIN_FAIL,
+        COMMAND_BUFFER_END_FAIL,
+        QUEUE_SUBMIT_FAIL,
     };
 
     export template <class T>

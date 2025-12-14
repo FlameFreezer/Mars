@@ -38,4 +38,8 @@ namespace mars {
     Error<noreturn> const& Game::getProcResult() const noexcept {
         return procResult;
     }
+
+    Error<noreturn> Game::draw() noexcept {
+        return success();
+    }
 }

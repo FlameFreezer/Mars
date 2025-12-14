@@ -16,8 +16,9 @@ module;
 #include <fstream>
 #include <cstring>
 #include <cstdint>
+#include <memory>
 
-#include "mars_macros.h"
+#include "GPUBuffer.hpp"
 
 export module mars:renderer;
 import error;
@@ -111,90 +112,14 @@ namespace mars {
         Vertex{glm::vec3(0.5f, -0.5f, 1.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)}
     };
 
-    struct GPUBuffer {
-        VkBuffer handle;
-        VkDeviceMemory memory;
-
-        GPUBuffer() noexcept : handle(nullptr), memory(nullptr)  {}
-        GPUBuffer(GPUBuffer const& other) noexcept : handle(other.handle), memory(other.memory) {}
-        GPUBuffer(GPUBuffer&& other) noexcept : handle(other.handle), memory(other.memory) {
-            other.handle = nullptr;
-            other.memory = nullptr;
-        }
-        void destroy(VkDevice device) {
-            vkDestroyBuffer(device, handle, nullptr);
-            vkFreeMemory(device, memory, nullptr);
-        }
-        static Error<std::uint32_t> findPhysicalDeviceMemoryTypeIndex(VkPhysicalDevice physicalDevice, std::uint32_t availableTypes, VkMemoryPropertyFlags memProperties) noexcept {
-            VkPhysicalDeviceMemoryProperties2 deviceMemProperties{};
-            deviceMemProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
-            vkGetPhysicalDeviceMemoryProperties2(physicalDevice, &deviceMemProperties);
-            for(std::uint32_t i = 0; i < deviceMemProperties.memoryProperties.memoryTypeCount; i++) {
-                std::uint32_t currentTypeBit = 1U << i;
-                if(availableTypes & currentTypeBit and deviceMemProperties.memoryProperties.memoryTypes[i].propertyFlags & memProperties) {
-                    return i;
-                }
-            }
-            return {ErrorTag::MEMORY_TYPE_UNAVAILABLE, "Physical Device does not support needed memory type"};
-        }
-        static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
-            GPUBuffer buffer;
-            VkBufferCreateInfo const bufferInfo = {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .size = size,
-                .usage = usage,
-                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = 0,
-                .pQueueFamilyIndices = nullptr
-            };
-            if(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer.handle) != VK_SUCCESS) {
-                return {ErrorTag::BUFFER_CREATION_FAIL, "Failed to create VkBuffer while initializing GPUBuffer"};
-            }
-            VkMemoryRequirements memRequirements{};
-            vkGetBufferMemoryRequirements(device, buffer.handle, &memRequirements);
-            Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
-            if(!memType.okay()) return memType.moveError<GPUBuffer>();
-
-            VkMemoryAllocateInfo const allocInfo = {
-        		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        		.pNext = nullptr,
-        		.allocationSize = memRequirements.size,
-        		.memoryTypeIndex = memType.getData()
-            };
-            if(vkAllocateMemory(device, &allocInfo, nullptr, &buffer.memory) != VK_SUCCESS) {
-                return {ErrorTag::MEMORY_ALLOC_FAIL, "Failed to allocate device memory while initializing GPUBuffer"};
-            }
-            if(vkBindBufferMemory(device, buffer.handle, buffer.memory, memRequirements.alignment) != VK_SUCCESS) {
-                return {ErrorTag::BUFFER_CREATION_FAIL, "Failed to bind buffer memory while initializing GPUBuffer!"};
-            }
-            return buffer;
-        }
-        GPUBuffer& operator=(GPUBuffer const& other) {
-            if(this != &other) {
-                handle = other.handle;
-                memory = other.memory;
-            }
-            return *this;
-        }
-        GPUBuffer& operator=(GPUBuffer&& other) {
-            if(this != &other) {
-                handle = other.handle;
-                memory = other.memory;
-                other.handle = nullptr;
-                other.memory = nullptr;
-            }
-            return *this;
-        }
-    };
-
     export class Renderer {
     private:
     	std::vector<VkImage> swapchainImages;
     	std::vector<VkImageView> swapchainImageViews;	
         std::vector<VkQueue> queues;
-    	std::array<VkCommandBuffer, maxConcurrentFrames> commandBuffers;
+    	std::array<VkCommandBuffer, maxConcurrentFrames + 1> commandBuffers;
+        std::array<VkFence, maxConcurrentFrames> fences;
+        std::unique_ptr<VkSemaphore[]> semaphores;
     	GPUBuffer vertexBuffer;
         Error<noreturn> procResult;
         VkInstance instance;
@@ -206,8 +131,18 @@ namespace mars {
         VkSwapchainKHR swapchain;
     	VkCommandPool commandPool;
     	VkPipeline graphicsPipeline;
+        std::uint32_t currentFrame;
 
         Error<noreturn> createVertexBuffer() noexcept {
+            VkCommandBufferBeginInfo const beginInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .pNext = nullptr,
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                .pInheritanceInfo = nullptr
+            };
+            if(vkBeginCommandBuffer(commandBuffers.front(), &beginInfo) != VK_SUCCESS) {
+                return {ErrorTag::COMMAND_BUFFER_BEGIN_FAIL, "Failed to begin transfer command buffer!"};
+            }
             Error<GPUBuffer> buff = GPUBuffer::make(
                 device, 
                 physicalDevice,
@@ -234,28 +169,61 @@ namespace mars {
             }
             std::memcpy(memory, static_cast<void const*>(vertices.data()), vertices.max_size() * sizeof(Vertex));
             vkUnmapMemory(device, transferBuffer.memory);
+
+            VkBufferCopy const region = {
+                .srcOffset = 0, .dstOffset = 0, .size = vertices.max_size() * sizeof(Vertex)
+            };
+            vkCmdCopyBuffer(commandBuffers.front(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
+            if(vkEndCommandBuffer(commandBuffers.front()) != VK_SUCCESS) {
+                return {ErrorTag::COMMAND_BUFFER_END_FAIL, "Failed to end transfer command buffer"};
+            }
+            VkCommandBufferSubmitInfo const commandBufferInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .pNext = nullptr,
+                .commandBuffer = commandBuffers.front(),
+                .deviceMask = 0
+            };
+            VkSubmitInfo2 const submitInfo = {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .pNext = nullptr,
+                .flags = 0,
+                .waitSemaphoreInfoCount = 0,
+                .pWaitSemaphoreInfos = nullptr,
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &commandBufferInfo,
+                .signalSemaphoreInfoCount = 0,
+                .pSignalSemaphoreInfos = nullptr
+            };
+            if(vkQueueSubmit2(queues.front(), 1, &submitInfo, nullptr) != VK_SUCCESS) {
+                return {ErrorTag::QUEUE_SUBMIT_FAIL, "Failed to submit to transfer queue while creating vertex buffer"};
+            }
+            vkQueueWaitIdle(queues.front());
+            vkResetCommandBuffer(commandBuffers.front(), 0);
+            transferBuffer.destroy(device);
             return success();
         }
 
         Error<VkShaderModule> createShaderModule() noexcept {
-            std::ifstream shaderCode("slang.spv", std::ios::binary | std::ios::ate);
-            if(!shaderCode.is_open()) {
+            std::ifstream shaderFile("slang.spv", std::ios::binary);
+            if(!shaderFile.is_open()) {
                 return {ErrorTag::FILE_OPEN_ERROR, "Failed to find shader code!"};
             }
-            VkShaderModuleCreateInfo shaderModuleInfo = {
+            std::vector<char> code;
+            while(true) {
+                char buff;
+                buff = shaderFile.get();
+                if(shaderFile.eof()) break;
+                code.push_back(buff);
+            }
+            shaderFile.close();
+
+            VkShaderModuleCreateInfo const shaderModuleInfo = {
                 .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,                                                     
-                .codeSize = static_cast<std::uint32_t>(shaderCode.tellg()),                                  
-                .pCode = nullptr
+                .codeSize = code.size(),                                  
+                .pCode = reinterpret_cast<std::uint32_t*>(code.data())
             };
-
-            std::vector<char> code(shaderModuleInfo.codeSize);
-            shaderCode.seekg(0);
-            shaderCode.read(code.data(), shaderModuleInfo.codeSize);
-            shaderCode.close();
-            shaderModuleInfo.pCode = reinterpret_cast<std::uint32_t*>(code.data());
-
             VkShaderModule result;
             if(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &result) != VK_SUCCESS) {
                 return {ErrorTag::SHADER_MODULE_CREATE_FAIL, "Failed to create shader module!"};
@@ -495,7 +463,7 @@ namespace mars {
                 .pNext = nullptr,
                 .commandPool = commandPool,
                 .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-                .commandBufferCount = maxConcurrentFrames
+                .commandBufferCount = static_cast<std::uint32_t>(commandBuffers.max_size())
             };
             if(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
                 return {ErrorTag::COMMAND_BUFFER_ALLOC_FAIL, "Failed to allocate command buffers!"};
@@ -849,7 +817,7 @@ namespace mars {
                 .applicationVersion = 1,
                 .pEngineName = nullptr,
                 .engineVersion = 0,
-                .apiVersion = VK_MAKE_API_VERSION(1, 4, 313, 0)
+                .apiVersion = VK_MAKE_API_VERSION(1, 4, 335, 0)
             };
             VkInstanceCreateInfo instanceInfo = {
                 .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -906,12 +874,14 @@ namespace mars {
             physicalDevice(nullptr), 
             swapchain(nullptr),
             commandPool(nullptr),
-            graphicsPipeline(nullptr)
+            graphicsPipeline(nullptr),
+            currentFrame(0)
         {}
         virtual ~Renderer() noexcept {
             //If something went wrong during initialization, we can't destory vulkan objects, so 
             // we'll quickly end program execution
             if(initFail) return;
+            vkDeviceWaitIdle(device);
             vkDestroySwapchainKHR(device, swapchain, nullptr);
             for(VkImageView view : swapchainImageViews) {
                 vkDestroyImageView(device, view, nullptr);

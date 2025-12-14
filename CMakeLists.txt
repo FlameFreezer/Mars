@@ -49,7 +49,18 @@ target_sources(Mars PUBLIC
 )
 
 # Link libraries to mars
-target_link_libraries(Mars PRIVATE SDL3::SDL3 vulkan glm::glm)
+target_link_libraries(Mars PRIVATE SDL3::SDL3 glm::glm)
+
+if(WIN32)
+    target_link_libraries(Mars PRIVATE vulkan-1)
+else()
+    target_link_libraries(Mars PRIVATE vulkan)
+endif()
+
+if(NOT DEFINED ENV{VULKAN_SDK})
+    message(FATAL_ERROR "Environment variable "VULKAN_SDK" not defined! Set this to the path to the Vulkan SDK installed on your system.")
+endif()
+
 target_include_directories(Mars PUBLIC 
     "${CMAKE_SOURCE_DIR}/libraries/SDL/include" 
     "${CMAKE_SOURCE_DIR}/libraries/GLM"

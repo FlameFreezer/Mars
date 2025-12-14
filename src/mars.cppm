@@ -21,6 +21,7 @@ namespace mars {
         Error<noreturn> const& getProcResult() const noexcept;
         virtual ~Game() noexcept;
         void init(const std::string& appName);
+        Error<noreturn> draw() noexcept;
         private:
         std::string windowName;
         std::string appName;

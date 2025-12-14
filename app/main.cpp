@@ -6,7 +6,7 @@ using ErrorNoreturn = mars::Error<mars::noreturn>;
 
 ErrorNoreturn run() noexcept {
     mars::Game g;
-    if(!g.getProcResult().report()) return g.getProcResult();
+    if(!g.getProcResult().okay()) return g.getProcResult();
     bool shouldKeepRunning = true;
     while(shouldKeepRunning) {
     	SDL_Event e;
