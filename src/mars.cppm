@@ -40,8 +40,8 @@ namespace mars {
             procResult = renderer.init(appName);
             if(!procResult.okay()) return;
         }
-        Error<noreturn> draw() noexcept {
-            return success();
+        void draw() noexcept {
+
         }
         private:
         std::string windowName;

@@ -43,6 +43,8 @@ namespace mars {
         COMMAND_BUFFER_BEGIN_FAIL,
         COMMAND_BUFFER_END_FAIL,
         QUEUE_SUBMIT_FAIL,
+        SEMAPHORE_CREATION_FAIL,
+        FENCE_CREATION_FAIL,
     };
 
     export template <class T>

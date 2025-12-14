@@ -14,7 +14,7 @@ namespace mars {
         Array() noexcept : mSize(0) {}
         Array(std::size_t inSize) noexcept : mPtr(std::make_unique<T[]>(inSize)), mSize(inSize) {}
         Array(std::size_t inSize, T initial) noexcept : mPtr(std::make_unique<T[]>(inSize)), mSize(inSize) {
-            for(int i = 0; i < mSize; i++) mPtr[i] = initial;
+            for(std::size_t i = 0; i < mSize; i++) mPtr[i] = initial;
         }
         std::size_t size() const noexcept {
             return mSize;

@@ -19,6 +19,8 @@ ErrorNoreturn run() noexcept {
                 break;
     	    }
     	}
+        g.draw();
+        if(!g.getProcResult().okay()) return g.getProcResult();
     }
     return mars::success();
 }

@@ -119,8 +119,8 @@ namespace mars {
     	std::array<VkCommandBuffer, maxConcurrentFrames + 1> commandBuffers;
         std::array<VkFence, maxConcurrentFrames> fences;
         Array<VkSemaphore> semaphores;
-    	GPUBuffer vertexBuffer;
         Error<noreturn> procResult;
+    	GPUBuffer vertexBuffer;
         VkInstance instance;
         SDL_Window* window;
         VkDebugUtilsMessengerEXT debugMessenger;
@@ -134,6 +134,26 @@ namespace mars {
 
         Error<noreturn> createSyncObjects() noexcept {
             semaphores = Array<VkSemaphore>(swapchainImages.size() + maxConcurrentFrames);
+            VkSemaphoreCreateInfo const semaphoreInfo = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0
+            };
+            for(VkSemaphore& semaphore : semaphores) {
+                if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS) {
+                    return {ErrorTag::SEMAPHORE_CREATION_FAIL, "Failed to create semaphores"};
+                }
+            }
+            VkFenceCreateInfo const fenceInfo = {
+                .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = VK_FENCE_CREATE_SIGNALED_BIT
+            };
+            for(VkFence& fence : fences) {
+                if(vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS) {
+                    return {ErrorTag::FENCE_CREATION_FAIL, "Failed to create fences!"};
+                }
+            }
             return success();
         }
 
@@ -157,15 +177,15 @@ namespace mars {
             if(!buff.okay()) return buff.moveError<noreturn>();
             vertexBuffer = buff.moveData();
 
-            Error<GPUBuffer> transf = GPUBuffer::make(
+            buff = GPUBuffer::make(
                 device,
                 physicalDevice,
                 vertices.max_size() * sizeof(Vertex),
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             );
-            if(!transf.okay()) return transf.moveError<noreturn>();
-            GPUBuffer transferBuffer(transf.moveData());
+            if(!buff.okay()) return buff.moveError<noreturn>();
+            GPUBuffer transferBuffer(buff.moveData());
 
             void* memory = nullptr;
             if(vkMapMemory(device, transferBuffer.memory, 0, vertices.max_size() * sizeof(Vertex), 0, &memory) != VK_SUCCESS) {
@@ -890,6 +910,12 @@ namespace mars {
             vkDestroySwapchainKHR(device, swapchain, nullptr);
             for(VkImageView view : swapchainImageViews) {
                 vkDestroyImageView(device, view, nullptr);
+            }
+            for(VkSemaphore semaphore : semaphores) {
+                vkDestroySemaphore(device, semaphore, nullptr);
+            }
+            for(VkFence fence : fences) {
+                vkDestroyFence(device, fence, nullptr);
             }
             vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
             vkDestroyCommandPool(device, commandPool, nullptr);

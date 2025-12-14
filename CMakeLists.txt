@@ -44,6 +44,7 @@ add_dependencies(Mars marsShaders)
 target_sources(Mars PUBLIC 
     FILE_SET mars_module 
     TYPE CXX_MODULES 
+    BASE_DIRS src
     FILES src/mars.cppm src/error.cppm src/renderer.cppm src/GPUBuffer.cppm src/Array.cppm
 )
 
