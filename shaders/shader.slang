@@ -5,7 +5,7 @@ struct VertexIn {
 };
 
 struct VertexOut {
-    float4 position : SV_POSITION;
+    float4 position : SV_Position;
     float3 color;
     float2 texCoord;
 };
@@ -20,6 +20,6 @@ func vertMain(VertexIn input) -> VertexOut {
 }
 
 [shader("fragment")]
-func fragMain(VertexOut input) -> float4 {
+func fragMain(VertexOut input)-> float4 {
     return float4(input.color, 1.0);
 }

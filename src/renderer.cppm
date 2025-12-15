@@ -131,6 +131,7 @@ namespace mars {
         VkDevice device;
         VkPhysicalDevice physicalDevice;
         VkSwapchainKHR swapchain;
+        VkExtent2D swapchainImageExtent;
     	VkCommandPool commandPool;
     	VkPipeline graphicsPipeline;
         std::uint32_t currentFrame;
@@ -232,17 +233,14 @@ namespace mars {
         }
 
         Error<VkShaderModule> createShaderModule() noexcept {
-            std::ifstream shaderFile("slang.spv", std::ios::binary);
+            std::ifstream shaderFile("slang.spv", std::ios::binary | std::ios::ate);
             if(!shaderFile.is_open()) {
                 return {ErrorTag::FILE_OPEN_ERROR, "Failed to find shader code!"};
             }
             std::vector<char> code;
-            while(true) {
-                char buff;
-                buff = shaderFile.get();
-                if(shaderFile.eof()) break;
-                code.push_back(buff);
-            }
+            code.resize(shaderFile.tellg());
+            shaderFile.seekg(0);
+            shaderFile.read(code.data(), code.size());
             shaderFile.close();
 
             VkShaderModuleCreateInfo const shaderModuleInfo = {
@@ -417,7 +415,7 @@ namespace mars {
                 .pDepthStencilState = &depthStencilStateInfo,
                 .pColorBlendState = &colorBlendStateInfo,
                 .pDynamicState = &dynamicStateInfo,
-                .layout = nullptr,
+                .layout = nullptr, //initialized by next function call
                 .renderPass = nullptr,
                 .subpass = 0,
                 .basePipelineHandle = nullptr,
@@ -520,6 +518,7 @@ namespace mars {
             if(!imageExtent.okay()){
                 return imageExtent.moveError<noreturn>();
             }
+            swapchainImageExtent = imageExtent.getData();
             VkSwapchainCreateInfoKHR const swapchainInfo = {
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
                 .pNext = nullptr,
@@ -528,7 +527,7 @@ namespace mars {
                 .minImageCount = surfaceInfo.capabilities.minImageCount + 1,
                 .imageFormat = surfaceInfo.format.format,
                 .imageColorSpace = surfaceInfo.format.colorSpace,
-                .imageExtent = imageExtent.getData(),
+                .imageExtent = swapchainImageExtent,
                 .imageArrayLayers = 1,
                 .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                 .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -634,9 +633,9 @@ namespace mars {
             if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()) != VK_SUCCESS) {
                 return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!"};
             }
-            for(int j = 0; j < surfaceFormatCount; j++) {
-                if(surfaceFormats[j].format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormats[j].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-                    return surfaceFormats[j];
+            for(int i = 0; i < surfaceFormatCount; i++) {
+                if(surfaceFormats[i].format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                    return surfaceFormats[i];
                 }
             }
             return surfaceFormats[0];
@@ -952,7 +951,7 @@ namespace mars {
                 swapchain, 
                 std::numeric_limits<std::uint64_t>::max(), 
                 imageAcquiredSemaphores[currentFrame], 
-                fences[currentFrame], 
+                nullptr, 
                 &imageViewIndex
             );
             if(res != VK_SUCCESS and res != VK_SUBOPTIMAL_KHR) {
@@ -972,8 +971,8 @@ namespace mars {
                 return {ErrorTag::COMMAND_BUFFER_BEGIN_FAIL, std::format("Failed to begin command buffer {}", currentFrame)};
             }
 
-
-            VkImageMemoryBarrier2 imageMemoryBarrier = {
+            //Transition image layout for color writing
+            VkImageMemoryBarrier2 const colorWriteBarrier = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
                 .pNext = nullptr,
                 .srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -988,13 +987,13 @@ namespace mars {
                 .subresourceRange = VkImageSubresourceRange{
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel = 0,
-                    .levelCount = 0,
+                    .levelCount = 1,
                     .baseArrayLayer = 0,
-                    .layerCount = 0
+                    .layerCount = 1
                 }
             };
 
-            VkDependencyInfo colorWriteDependency = {
+            VkDependencyInfo const colorWriteDependency = {
                 .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
                 .pNext = nullptr,
                 .dependencyFlags = 0,
@@ -1003,12 +1002,157 @@ namespace mars {
                 .bufferMemoryBarrierCount = 0,
                 .pBufferMemoryBarriers = 0,
                 .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &imageMemoryBarrier
+                .pImageMemoryBarriers = &colorWriteBarrier
             };
 
             vkCmdPipelineBarrier2(commandBuffers[currentFrame], &colorWriteDependency);
 
-            return {ErrorTag::MISC_ERROR, "Early Exit!"};
+            VkRenderingAttachmentInfo colorAttachment = {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                .pNext = nullptr,
+                .imageView = swapchainImageViews[imageViewIndex],
+                .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .resolveMode = VK_RESOLVE_MODE_NONE,
+                .resolveImageView = nullptr,
+                .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .clearValue = {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}},
+            };
+            VkRenderingInfo renderingInfo = {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .renderArea = VkRect2D {
+                    .offset = VkOffset2D{0, 0},
+                    .extent = swapchainImageExtent
+                },
+                .layerCount = 1,
+                .viewMask = 0,
+                .colorAttachmentCount = 1,
+                .pColorAttachments = &colorAttachment,
+                .pDepthAttachment = nullptr,
+                .pStencilAttachment = nullptr
+            };
+            vkCmdBeginRendering(commandBuffers[currentFrame], &renderingInfo);
+            vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+            VkViewport const viewport = {
+                .x = 0.0f, .y = 0.0f, 
+                .width = static_cast<float>(swapchainImageExtent.width), 
+                .height = static_cast<float>(swapchainImageExtent.height), 
+                .minDepth = 0.0f, .maxDepth = 1.0f
+            };
+            vkCmdSetViewportWithCount(commandBuffers[currentFrame], 1, &viewport);
+            VkRect2D const scissor = {
+                .offset = {0, 0},
+                .extent = swapchainImageExtent 
+            };
+            vkCmdSetScissorWithCount(commandBuffers[currentFrame], 1, &scissor);
+
+            VkDeviceSize offset = 0ULL;
+            vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, &vertexBuffer.handle, &offset);
+
+            vkCmdDraw(commandBuffers[currentFrame], vertices.max_size(), 0, 0, 0);
+
+            vkCmdEndRendering(commandBuffers[currentFrame]);
+
+            //Transition image layout for presentation
+            VkImageMemoryBarrier2 const presentSrcBarrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                .dstAccessMask = VK_ACCESS_2_NONE,
+                .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .srcQueueFamilyIndex = 0,
+                .dstQueueFamilyIndex = 0,
+                .image = swapchainImages[imageViewIndex],
+                .subresourceRange = VkImageSubresourceRange{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+
+            VkDependencyInfo const presentDependency = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = 0,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &presentSrcBarrier
+            };
+            vkCmdPipelineBarrier2(commandBuffers[currentFrame], &presentDependency);
+
+            if(vkEndCommandBuffer(commandBuffers[currentFrame]) != VK_SUCCESS) {
+                return {ErrorTag::COMMAND_BUFFER_END_FAIL, std::format("Failed to end command buffer {}", currentFrame)};
+            }
+
+            VkSemaphoreSubmitInfo const imageAcquisition = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .semaphore = imageAcquiredSemaphores[currentFrame],
+                .value = 0,
+                .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .deviceIndex = 0
+            };
+
+            VkCommandBufferSubmitInfo const commandBufferInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .pNext = nullptr,
+                .commandBuffer = commandBuffers[currentFrame],
+                .deviceMask = 0
+            };
+
+            VkSemaphoreSubmitInfo const presentationReady = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .semaphore = presentReadySemaphores[imageViewIndex],
+                .value = 0,
+                .stageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .deviceIndex = 0
+            };
+
+            VkSubmitInfo2 const submitInfo = {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .pNext = nullptr,
+                .flags = 0,
+                .waitSemaphoreInfoCount = 1,
+                .pWaitSemaphoreInfos = &imageAcquisition,
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &commandBufferInfo,
+                .signalSemaphoreInfoCount = 1,
+                .pSignalSemaphoreInfos = &presentationReady
+            };
+
+            if(vkQueueSubmit2(queues[1], 1, &submitInfo, fences[currentFrame]) != VK_SUCCESS) {
+                return {ErrorTag::QUEUE_SUBMIT_FAIL, "Failed to submit draw commands to queue"};
+            }
+
+            VkPresentInfoKHR const presentInfo = {
+                .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = &presentReadySemaphores[imageViewIndex],
+                .swapchainCount = 1,
+                .pSwapchains = &swapchain,
+                .pImageIndices = &imageViewIndex,
+                .pResults = nullptr
+            };
+            if(vkQueuePresentKHR(queues[1], &presentInfo) != VK_SUCCESS) {
+                return {ErrorTag::QUEUE_SUBMIT_FAIL, "Failed to present graphics queue"};
+            }
+
+            currentFrame = (currentFrame + 1) % maxConcurrentFrames;
+
             return success();
         }
     };
