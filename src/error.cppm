@@ -15,6 +15,7 @@ namespace mars {
     export enum class ErrorTag : uint32_t {
         ALL_OKAY = 0,
         MISC_ERROR,
+        ARRAY_OUT_OF_BOUNDS,
         BAD_FUNCTION_CALL,
         SEARCH_FAIL,
         MEMORY_ALLOC_FAIL,
@@ -45,6 +46,10 @@ namespace mars {
         QUEUE_SUBMIT_FAIL,
         SEMAPHORE_CREATION_FAIL,
         FENCE_CREATION_FAIL,
+        WAIT_ERROR,
+        FENCE_RESET_FAIL,
+        ACQUIRE_SWAPCHAIN_IMAGE_FAIL,
+        COMMAND_BUFFER_RESET_FAIL,
     };
 
     export template <class T>

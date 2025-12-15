@@ -3,12 +3,8 @@
 
 import mars;
 
-namespace mars::internal {
-    static Error<noreturn> procResult;
-}
-
 #define TRY(proc) do {\
-    mars::internal::procResult = proc;\
-    if(!mars::internal::procResult.okay()) return mars::internal::procResult;\
+    mars::Error<mars::noreturn> procResult = proc;\
+    if(!procResult.okay()) return procResult;\
 } while(false)
 #endif

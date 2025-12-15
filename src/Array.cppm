@@ -111,6 +111,7 @@ namespace mars {
         }
         virtual ~Slice() noexcept override {
             this->mPtr = nullptr;
+            this->mSize = 0;
         }
         //Override behavior of copy assignment operator so that slices do not construct new arrays
         Slice<T>& operator=(Array<T> const& rhs) noexcept {

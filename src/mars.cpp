@@ -30,6 +30,7 @@ namespace mars {
         return success();
     }
     Error<noreturn> Game::draw() noexcept {
+        TRY(renderer.drawFrame());
         return success();
     }
 }

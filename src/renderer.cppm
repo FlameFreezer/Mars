@@ -16,6 +16,7 @@ module;
 #include <fstream>
 #include <cstring>
 #include <cstdint>
+#include <limits>
 
 export module mars:renderer;
 import gpubuffer;
@@ -133,6 +134,7 @@ namespace mars {
     	VkCommandPool commandPool;
     	VkPipeline graphicsPipeline;
         std::uint32_t currentFrame;
+
 
         Error<noreturn> createSyncObjects() noexcept {
             semaphores = Array<VkSemaphore>(swapchainImages.size() + maxConcurrentFrames);
@@ -930,6 +932,84 @@ namespace mars {
                 vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
             }
             vkDestroyInstance(instance, nullptr);
+        }
+
+        Error<noreturn> drawFrame() noexcept {
+            if(vkWaitForFences(device, 1, &fences[currentFrame], VK_TRUE, std::numeric_limits<std::uint64_t>::max()) != VK_SUCCESS) {
+                return {ErrorTag::WAIT_ERROR, std::format("Something went from while waiitng on fence {}", currentFrame)};
+            }
+            if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
+                return {ErrorTag::FENCE_RESET_FAIL, std::format("Failed to reset fence {}", currentFrame)};
+            }
+            //These semaphores indicate that we have successfully acquired an image on this frame
+            Slice<VkSemaphore> imageAcquiredSemaphores(semaphores, 0, maxConcurrentFrames);
+            //These semaphores indicate that the image acquired is ready to present
+            Slice<VkSemaphore> presentReadySemaphores(semaphores, maxConcurrentFrames);
+
+            std::uint32_t imageViewIndex;
+            VkResult res = vkAcquireNextImageKHR(
+                device, 
+                swapchain, 
+                std::numeric_limits<std::uint64_t>::max(), 
+                imageAcquiredSemaphores[currentFrame], 
+                fences[currentFrame], 
+                &imageViewIndex
+            );
+            if(res != VK_SUCCESS and res != VK_SUBOPTIMAL_KHR) {
+                return {ErrorTag::ACQUIRE_SWAPCHAIN_IMAGE_FAIL, "Failed to acquire next swapchain image index"};
+            }
+
+            if(vkResetCommandBuffer(commandBuffers[currentFrame], 0) != VK_SUCCESS) {
+                return {ErrorTag::COMMAND_BUFFER_RESET_FAIL, "Failed to reset command buffer"};
+            }
+            VkCommandBufferBeginInfo beginInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .pNext = nullptr,
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                .pInheritanceInfo = nullptr
+            };
+            if(vkBeginCommandBuffer(commandBuffers[currentFrame], &beginInfo) != VK_SUCCESS) {
+                return {ErrorTag::COMMAND_BUFFER_BEGIN_FAIL, std::format("Failed to begin command buffer {}", currentFrame)};
+            }
+
+
+            VkImageMemoryBarrier2 imageMemoryBarrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .srcQueueFamilyIndex = 0,
+                .dstQueueFamilyIndex = 0,
+                .image = swapchainImages[imageViewIndex],
+                .subresourceRange = VkImageSubresourceRange{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 0
+                }
+            };
+
+            VkDependencyInfo colorWriteDependency = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = 0,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &imageMemoryBarrier
+            };
+
+            vkCmdPipelineBarrier2(commandBuffers[currentFrame], &colorWriteDependency);
+
+            return {ErrorTag::MISC_ERROR, "Early Exit!"};
+            return success();
         }
     };
 }
