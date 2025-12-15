@@ -23,14 +23,17 @@ import error;
 import array;
 
 #define INIT_TRY(proc) do {\
-    procResult = proc;\
-    if(!procResult.okay()) {\
+    internal::procResult = proc;\
+    if(!internal::procResult.okay()) {\
         initFail = true;\
-        return procResult;\
+        return internal::procResult;\
     } \
 } while(false)
 
 namespace mars {
+    namespace internal {
+        Error<noreturn> procResult;
+    }
     constexpr int width = 800;
     constexpr int height = 600;
     constexpr std::uint32_t maxConcurrentFrames = 2;
@@ -119,7 +122,6 @@ namespace mars {
     	std::array<VkCommandBuffer, maxConcurrentFrames + 1> commandBuffers;
         std::array<VkFence, maxConcurrentFrames> fences;
         Array<VkSemaphore> semaphores;
-        Error<noreturn> procResult;
     	GPUBuffer vertexBuffer;
         VkInstance instance;
         SDL_Window* window;
@@ -682,9 +684,9 @@ namespace mars {
             //Iterate through each of these devices
             for(int i = 0; i < physicalDeviceCount; i++) {
                 //Check device extension support for the current physical device
-                procResult = checkDeviceExtensionSupport(physicalDevices[i]);
-                if(procResult.getTag() == ErrorTag::SEARCH_FAIL) continue;
-                else if(!procResult.okay()) return procResult;
+                internal::procResult = checkDeviceExtensionSupport(physicalDevices[i]);
+                if(internal::procResult.getTag() == ErrorTag::SEARCH_FAIL) continue;
+                else if(!internal::procResult.okay()) return internal::procResult;
                 //Get physical device's capabilities with the surface
                 if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
                     physicalDevices[i], 
@@ -712,9 +714,9 @@ namespace mars {
                     return presentMode.moveError<noreturn>();
                 }
                 //Pick the desired queue family index
-                procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i]);
-                if(procResult.getTag() == ErrorTag::SEARCH_FAIL) continue;
-                else if(!procResult.okay()) return procResult;
+                internal::procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i]);
+                if(internal::procResult.getTag() == ErrorTag::SEARCH_FAIL) continue;
+                else if(!internal::procResult.okay()) return internal::procResult;
                 //At this point if all has succeeded, we are ready to use the current physical device and
                 // create the logical device
                 physicalDevice = physicalDevices[i];
@@ -928,9 +930,6 @@ namespace mars {
                 vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
             }
             vkDestroyInstance(instance, nullptr);
-        }
-        Error<noreturn> const& getProcResult() const noexcept {
-            return procResult;
         }
     };
 }

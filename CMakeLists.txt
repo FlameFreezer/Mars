@@ -46,6 +46,7 @@ target_sources(Mars PUBLIC
     TYPE CXX_MODULES 
     BASE_DIRS src
     FILES src/mars.cppm src/error.cppm src/renderer.cppm src/GPUBuffer.cppm src/Array.cppm
+    PRIVATE src/mars.cpp
 )
 
 # Link libraries to mars
@@ -76,6 +77,7 @@ target_link_libraries(marsTest PRIVATE Mars SDL3::SDL3 glm::glm)
 target_include_directories(marsTest PUBLIC
     "${CMAKE_SOURCE_DIR}/libraries/SDL/include"
     "${CMAKE_SOURCE_DIR}/libraries/GLM"
+    "${CMAKE_SOURCE_DIR}/src"
 )
 
 # Build for Debug Symbols

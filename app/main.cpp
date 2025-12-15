@@ -2,11 +2,13 @@ import mars;
 
 #include <SDL3/SDL.h>
 
+#include "mars_macros.h"
+
 using ErrorNoreturn = mars::Error<mars::noreturn>;
 
 ErrorNoreturn run() noexcept {
     mars::Game g;
-    if(!g.getProcResult().okay()) return g.getProcResult();
+    TRY(g.init());
     bool shouldKeepRunning = true;
     while(shouldKeepRunning) {
     	SDL_Event e;
@@ -19,8 +21,7 @@ ErrorNoreturn run() noexcept {
                 break;
     	    }
     	}
-        g.draw();
-        if(!g.getProcResult().okay()) return g.getProcResult();
+        TRY(g.draw());
     }
     return mars::success();
 }
