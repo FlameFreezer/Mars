@@ -25,6 +25,6 @@ func vertMain(VertexInput input, uniform Camera camera, ConstantBuffer<float4x4>
 }
 
 [shader("fragment")]
-    func fragMain(VertexOutput inVert) -> float4 {
+func fragMain(VertexOutput inVert) -> float4 {
     return float4(inVert.color, 1.0);
 }

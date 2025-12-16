@@ -110,9 +110,9 @@ namespace mars {
     };	
 
     constexpr std::array<Vertex, 3> vertices = {
-        Vertex{glm::vec3(-0.5f, -0.5f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.0f, 0.5f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, -0.5f, 1.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)}
+        Vertex{glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+        Vertex{glm::vec3(0.0f, 0.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+        Vertex{glm::vec3(0.5f, -0.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)}
     };
 
     export class Renderer {
@@ -134,6 +134,7 @@ namespace mars {
         VkExtent2D swapchainImageExtent;
     	VkCommandPool commandPool;
     	VkPipeline graphicsPipeline;
+        VkPipelineLayout graphicsPipelineLayout;
         std::uint32_t currentFrame;
 
 
@@ -169,7 +170,7 @@ namespace mars {
                 .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                 .pInheritanceInfo = nullptr
             };
-            if(vkBeginCommandBuffer(commandBuffers.front(), &beginInfo) != VK_SUCCESS) {
+            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
                 return {ErrorTag::COMMAND_BUFFER_BEGIN_FAIL, "Failed to begin transfer command buffer!"};
             }
             Error<GPUBuffer> buff = GPUBuffer::make(
@@ -202,14 +203,14 @@ namespace mars {
             VkBufferCopy const region = {
                 .srcOffset = 0, .dstOffset = 0, .size = vertices.max_size() * sizeof(Vertex)
             };
-            vkCmdCopyBuffer(commandBuffers.front(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
-            if(vkEndCommandBuffer(commandBuffers.front()) != VK_SUCCESS) {
+            vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
+            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
                 return {ErrorTag::COMMAND_BUFFER_END_FAIL, "Failed to end transfer command buffer"};
             }
             VkCommandBufferSubmitInfo const commandBufferInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
                 .pNext = nullptr,
-                .commandBuffer = commandBuffers.front(),
+                .commandBuffer = commandBuffers.back(),
                 .deviceMask = 0
             };
             VkSubmitInfo2 const submitInfo = {
@@ -227,7 +228,7 @@ namespace mars {
                 return {ErrorTag::QUEUE_SUBMIT_FAIL, "Failed to submit to transfer queue while creating vertex buffer"};
             }
             vkQueueWaitIdle(queues[0]);
-            vkResetCommandBuffer(commandBuffers.front(), 0);
+            vkResetCommandBuffer(commandBuffers.back(), 0);
             transferBuffer.destroy(device);
             return success();
         }
@@ -237,10 +238,9 @@ namespace mars {
             if(!shaderFile.is_open()) {
                 return {ErrorTag::FILE_OPEN_ERROR, "Failed to find shader code!"};
             }
-            std::vector<char> code;
-            code.resize(shaderFile.tellg());
-            shaderFile.seekg(0);
-            shaderFile.read(code.data(), code.size());
+            std::vector<char> code(shaderFile.tellg());
+            shaderFile.seekg(0, std::ios::beg);
+            shaderFile.read(code.data(), static_cast<std::streamsize>(code.size()));
             shaderFile.close();
 
             VkShaderModuleCreateInfo const shaderModuleInfo = {
@@ -260,7 +260,7 @@ namespace mars {
         Error<noreturn> createGraphicsPipeline() noexcept {
             std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos;
             Error<VkShaderModule> shaderModule = createShaderModule();
-            if(!shaderModule.okay()) return {shaderModule.getTag(), shaderModule.getMessage()};
+            if(!shaderModule.okay()) return shaderModule.moveError<noreturn>();
 
             shaderStageInfos[0] = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -335,7 +335,7 @@ namespace mars {
                 .flags = 0,
                 .depthTestEnable = VK_FALSE,
                 .depthWriteEnable = VK_FALSE,
-                .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+                .depthCompareOp = VK_COMPARE_OP_LESS,
                 .depthBoundsTestEnable = VK_FALSE,
                 .stencilTestEnable = VK_FALSE,
                 .front = {},
@@ -363,7 +363,7 @@ namespace mars {
                 .logicOp = VK_LOGIC_OP_NO_OP,
                 .attachmentCount = 1,
                 .pAttachments = &colorBlendAttachmentState,
-                .blendConstants = {1.0f, 1.0f, 1.0f, 1.0f}
+                .blendConstants = {0.0f, 0.0f, 0.0f, 0.0f}
             };
 
             std::array<VkFormat, 1> const colorAttachmentFormats = {VK_FORMAT_B8G8R8A8_SRGB};
@@ -389,6 +389,12 @@ namespace mars {
                 .dynamicStateCount = dynamicStates.max_size(),
                 .pDynamicStates = dynamicStates.data()
             };
+
+            VkPushConstantRange range = {
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .offset = 0,
+                .size = 4
+            };
             
             VkPipelineLayoutCreateInfo const pipelineLayoutInfo = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -396,10 +402,14 @@ namespace mars {
                 .flags = 0,
                 .setLayoutCount = 0,
                 .pSetLayouts = nullptr,
-                .pushConstantRangeCount = 0,
-                .pPushConstantRanges = nullptr
+                .pushConstantRangeCount = 1,
+                .pPushConstantRanges = &range
             };
-            
+
+            if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout) != VK_SUCCESS) {
+                return {ErrorTag::GRAPHICS_PIPELINE_CREATION_FAIL, "Failed to create graphics pipeline layout!"};
+            }
+           
             VkGraphicsPipelineCreateInfo pipelineInfo = {
                 .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
                 .pNext = &pipelineRenderingInfo,
@@ -415,22 +425,17 @@ namespace mars {
                 .pDepthStencilState = &depthStencilStateInfo,
                 .pColorBlendState = &colorBlendStateInfo,
                 .pDynamicState = &dynamicStateInfo,
-                .layout = nullptr, //initialized by next function call
+                .layout = graphicsPipelineLayout, //initialized by next function call
                 .renderPass = nullptr,
                 .subpass = 0,
                 .basePipelineHandle = nullptr,
                 .basePipelineIndex = 0
             };
 
-            if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineInfo.layout) != VK_SUCCESS) {
-                return {ErrorTag::GRAPHICS_PIPELINE_CREATION_FAIL, "Failed to create graphics pipeline layout!"};
-            }
-
             if(vkCreateGraphicsPipelines(device, nullptr, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
                 return {ErrorTag::GRAPHICS_PIPELINE_CREATION_FAIL, "Failed to create graphics pipeline!"};
             }
 
-            vkDestroyPipelineLayout(device, pipelineInfo.layout, nullptr);
             vkDestroyShaderModule(device, shaderModule.getData(), nullptr);
             return success();
         }
@@ -536,7 +541,7 @@ namespace mars {
                 .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
                 .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
                 .presentMode = surfaceInfo.presentMode,
-                .clipped = VK_FALSE,
+                .clipped = VK_TRUE,
                 .oldSwapchain = nullptr
             };
 
@@ -905,7 +910,7 @@ namespace mars {
             graphicsPipeline(nullptr),
             currentFrame(0)
         {}
-        virtual ~Renderer() noexcept {
+        ~Renderer() noexcept {
             //If something went wrong during initialization, we can't destory vulkan objects, so 
             // we'll quickly end program execution
             if(initFail) return;
@@ -922,6 +927,7 @@ namespace mars {
             }
             vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
             vkDestroyCommandPool(device, commandPool, nullptr);
+            vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr);
             vkDestroyPipeline(device, graphicsPipeline, nullptr);
             vertexBuffer.destroy(device);
             vkDestroyDevice(device, nullptr);
@@ -1024,7 +1030,7 @@ namespace mars {
                 .pNext = nullptr,
                 .flags = 0,
                 .renderArea = VkRect2D {
-                    .offset = VkOffset2D{0, 0},
+                    .offset = {0, 0},
                     .extent = swapchainImageExtent
                 },
                 .layerCount = 1,
@@ -1036,6 +1042,9 @@ namespace mars {
             };
             vkCmdBeginRendering(commandBuffers[currentFrame], &renderingInfo);
             vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+            int push = 1;
+            vkCmdPushConstants(commandBuffers[currentFrame], graphicsPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &push);
 
             VkViewport const viewport = {
                 .x = 0.0f, .y = 0.0f, 

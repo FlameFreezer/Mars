@@ -1,6 +1,7 @@
 module;
 
 #include <cstddef>
+#include <initializer_list>
 
 export module array;
 
@@ -45,6 +46,14 @@ namespace mars {
                 mSize = rhs.mSize;
             }
             return *this;
+        }
+        Array<T>& operator=(std::initializer_list<T> list) noexcept {
+            delete[] mPtr;
+            mSize = list.size();
+            mPtr = new T[mSize];
+            int i = 0;
+            for(T const& x : list) mPtr[i++] = x;
+            return *this; 
         }
         T* data() const noexcept {
             return mPtr;

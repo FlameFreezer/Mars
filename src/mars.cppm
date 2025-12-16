@@ -18,7 +18,7 @@ namespace mars {
         public:
         Game() noexcept;
         Game(const std::string& name) noexcept;
-        virtual ~Game() noexcept;
+        ~Game() noexcept;
         Error<noreturn> init() noexcept;
         Error<noreturn> draw() noexcept;
         private:
