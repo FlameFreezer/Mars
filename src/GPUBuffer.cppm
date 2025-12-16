@@ -32,7 +32,7 @@ namespace mars {
                     return i;
                 }
             }
-            return {ErrorTag::MEMORY_TYPE_UNAVAILABLE, "Physical Device does not support needed memory type"};
+            return {ErrorTag::FATAL_ERROR, "Physical Device does not support needed memory type"};
         }
         static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
             GPUBuffer buffer;
@@ -47,7 +47,7 @@ namespace mars {
                 .pQueueFamilyIndices = nullptr
             };
             if(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer.handle) != VK_SUCCESS) {
-                return {ErrorTag::BUFFER_CREATION_FAIL, "Failed to create VkBuffer while initializing GPUBuffer"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create VkBuffer while initializing GPUBuffer"};
             }
             VkMemoryRequirements memRequirements{};
             vkGetBufferMemoryRequirements(device, buffer.handle, &memRequirements);
@@ -61,10 +61,10 @@ namespace mars {
         		.memoryTypeIndex = memType.getData()
             };
             if(vkAllocateMemory(device, &allocInfo, nullptr, &buffer.memory) != VK_SUCCESS) {
-                return {ErrorTag::MEMORY_ALLOC_FAIL, "Failed to allocate device memory while initializing GPUBuffer"};
+                return {ErrorTag::FATAL_ERROR, "Failed to allocate device memory while initializing GPUBuffer"};
             }
             if(vkBindBufferMemory(device, buffer.handle, buffer.memory, 0) != VK_SUCCESS) {
-                return {ErrorTag::BUFFER_CREATION_FAIL, "Failed to bind buffer memory while initializing GPUBuffer!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to bind buffer memory while initializing GPUBuffer!"};
             }
             return buffer;
         }

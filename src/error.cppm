@@ -14,43 +14,22 @@ namespace mars {
 
     export enum class ErrorTag : uint32_t {
         ALL_OKAY = 0,
-        MISC_ERROR,
-        ARRAY_OUT_OF_BOUNDS,
-        BAD_FUNCTION_CALL,
         SEARCH_FAIL,
-        MEMORY_ALLOC_FAIL,
-        RENDERER_INIT_FAIL,
-        VULKAN_QUERY_ERROR,
-        VULKAN_VALIDATION_LAYER,
-        INIT_SDL_FAIL,
-        WINDOW_CREATION_FAIL,
-        INSTANCE_CREATION_FAIL,
-        SURFACE_CREATION_FAIL,
-        DEBUG_MESSENGER_CREATION_FAIL,
-        FIND_SUITABLE_GPU_FAIL,
-        DEVICE_CREATION_FAIL,
-        SWAPCHAIN_CREATION_FAIL,
-        SDL_QUERY_FAIL,
-        COMMAND_POOL_CREATE_FAIL,
-        COMMAND_BUFFER_ALLOC_FAIL,
-        SWAPCHAIN_IMAGE_ACQUISITION_FAIL,
-        IMAGE_VIEW_CREATE_FAIL,
-        GRAPHICS_PIPELINE_CREATION_FAIL,
-        FILE_OPEN_ERROR,
-        SHADER_MODULE_CREATE_FAIL,
-        BUFFER_CREATION_FAIL,
-        MEMORY_MAP_FAIL,
-        MEMORY_TYPE_UNAVAILABLE,
-        COMMAND_BUFFER_BEGIN_FAIL,
-        COMMAND_BUFFER_END_FAIL,
-        QUEUE_SUBMIT_FAIL,
-        SEMAPHORE_CREATION_FAIL,
-        FENCE_CREATION_FAIL,
-        WAIT_ERROR,
-        FENCE_RESET_FAIL,
-        ACQUIRE_SWAPCHAIN_IMAGE_FAIL,
-        COMMAND_BUFFER_RESET_FAIL,
+        FATAL_ERROR,
     };
+
+    export constexpr std::string tagToString(ErrorTag tag) noexcept {
+        switch(tag) {
+        case ErrorTag::ALL_OKAY:
+            return "All Okay";
+        case ErrorTag::SEARCH_FAIL:
+            return "Search Fail";
+        case ErrorTag::FATAL_ERROR:
+            return "Fatal Error";
+        default:
+            return "";
+        }
+    }
 
     export template <class T>
     class [[nodiscard("Potentially unhandled error value")]] Error {
@@ -161,13 +140,13 @@ namespace mars {
     	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     	bool report() const noexcept {
     	    if(okay()) return true;
-    	    std::println("Error: {}", message);
+            std::println("{}: {}", tagToString(tag), message);
     	    return false;
     	}
     	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     	bool report(std::ostream& ostrm) const noexcept {
     	    if(okay()) return true;
-    	    std::println(ostrm, "Error: {}", message);
+            std::println(ostrm, "{}: {}", tagToString(tag), message);
     	    return false;
     	}
     };

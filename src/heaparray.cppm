@@ -1,35 +1,34 @@
 module;
 
 #include <cstddef>
-#include <initializer_list>
 
-export module array;
+export module heap_array;
 
 namespace mars {
     //Essentially implements the "fat pointer" from zig
     export template <class T>
-    class Array {
+    class HeapArray {
         protected:
         T* mPtr;
         std::size_t mSize;
-        Array(T* inPtr, std::size_t inSize) noexcept : mPtr(inPtr), mSize(inSize) {}
+        HeapArray(T* inPtr, std::size_t inSize) noexcept : mPtr(inPtr), mSize(inSize) {}
         public:
-        Array() noexcept : mPtr(nullptr), mSize(0) {}
-        Array(std::size_t inSize) noexcept : mPtr(new T[inSize]), mSize(inSize) {}
-        Array(std::size_t inSize, T initial) noexcept : mPtr(new T[inSize]), mSize(inSize) {
+        HeapArray() noexcept : mPtr(nullptr), mSize(0) {}
+        HeapArray(std::size_t inSize) noexcept : mPtr(new T[inSize]), mSize(inSize) {}
+        HeapArray(std::size_t inSize, T initial) noexcept : mPtr(new T[inSize]), mSize(inSize) {
             for(std::size_t i = 0; i < mSize; i++) mPtr[i] = initial;
         }
-        virtual ~Array() noexcept {
+        virtual ~HeapArray() noexcept {
             delete[] mPtr;
             mSize = 0;
         }
         std::size_t size() const noexcept {
             return mSize;
         }
-        T& operator[](std::size_t index) noexcept {
+        T& operator[](std::size_t index) const noexcept {
             return mPtr[index];
         }
-        Array<T>& operator=(Array<T>&& rhs) noexcept {
+        HeapArray<T>& operator=(HeapArray<T>&& rhs) noexcept {
             if(this != &rhs) {
                 mPtr = rhs.mPtr;
                 mSize = rhs.mSize;
@@ -38,7 +37,7 @@ namespace mars {
             }
             return *this;
         }
-        Array<T>& operator=(Array<T> const& rhs) noexcept {
+        HeapArray<T>& operator=(HeapArray<T> const& rhs) noexcept {
             if(this != &rhs) {
                 delete[] mPtr;
                 mPtr = new T[rhs.mSize];
@@ -47,26 +46,18 @@ namespace mars {
             }
             return *this;
         }
-        Array<T>& operator=(std::initializer_list<T> list) noexcept {
-            delete[] mPtr;
-            mSize = list.size();
-            mPtr = new T[mSize];
-            int i = 0;
-            for(T const& x : list) mPtr[i++] = x;
-            return *this; 
-        }
         T* data() const noexcept {
             return mPtr;
         }
 
         class Iterator {
             private:
-            Array<T> const& mArray;
+            HeapArray<T> const& mArray;
             std::size_t mIndex;
             public:
-            friend class Array<T>;
+            friend class HeapArray<T>;
             Iterator() = delete;
-            Iterator(Array<T> const& arr, std::size_t index) noexcept : mArray(arr), mIndex(index) {}
+            Iterator(HeapArray<T> const& arr, std::size_t index) noexcept : mArray(arr), mIndex(index) {}
             Iterator operator++(int) noexcept {
                 return Iterator(mArray, mIndex++);
             }
@@ -95,26 +86,27 @@ namespace mars {
         }
     };
 
+    //A non-owning reference to a range within a heap-allocated array
     export template <class T>
-    class Slice : public Array<T> {
+    class Slice : public HeapArray<T> {
         public:
         Slice() noexcept {}
-        Slice(Array<T> const& array) noexcept : Array<T>(array.data(), array.size()) {}
-        Slice(Array<T> const& array, std::size_t start) noexcept : Array<T>(array.data() + start, array.size() - start) {
+        Slice(HeapArray<T> const& array) noexcept : HeapArray<T>(array.data(), array.size()) {}
+        Slice(HeapArray<T> const& array, std::size_t start) noexcept : HeapArray<T>(array.data() + start, array.size() - start) {
             if(start >= array.size()) {
                 this->mSize = 0;
                 this->mPtr = nullptr;
             }
         }
-        Slice(Array<T> const& array, std::size_t start, std::size_t count) noexcept : Array<T>(array.data() + start, count) {
+        Slice(HeapArray<T> const& array, std::size_t start, std::size_t count) noexcept : HeapArray<T>(array.data() + start, count) {
             if(start + count >= array.size() or start >= array.size()) {
                 this->mSize = 0;
                 this->mPtr = nullptr;
             }
         }
-        Slice(Array<T>&& array) noexcept = delete;
-        Slice(Slice<T> const& other) noexcept : Array<T>(other.mPtr, other.mSize) {}
-        Slice(Slice<T>&& other) noexcept : Array<T>(other.mPtr, other.mSize) {
+        Slice(HeapArray<T>&& array) noexcept = delete;
+        Slice(Slice<T> const& other) noexcept : HeapArray<T>(other.mPtr, other.mSize) {}
+        Slice(Slice<T>&& other) noexcept : HeapArray<T>(other.mPtr, other.mSize) {
             other.mPtr = nullptr;
             other.mSize = 0;
         }
@@ -123,7 +115,7 @@ namespace mars {
             this->mSize = 0;
         }
         //Override behavior of copy assignment operator so that slices do not construct new arrays
-        Slice<T>& operator=(Array<T> const& rhs) noexcept {
+        Slice<T>& operator=(HeapArray<T> const& rhs) noexcept {
             if(this != &rhs) {
                 this->mPtr = rhs.data();
                 this->mSize = rhs.size();
@@ -131,7 +123,7 @@ namespace mars {
             return *this;
         }
         //A slice can never be assigned to a temporary array
-        Slice<T>& operator=(Array<T>&& rhs) = delete;
+        Slice<T>& operator=(HeapArray<T>&& rhs) = delete;
         Slice<T>& operator=(Slice<T> const& rhs) noexcept {
             if(this != &rhs) {
                 this->mPtr = rhs.mPtr;

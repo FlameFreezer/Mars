@@ -9,7 +9,7 @@ module;
 export module mars;
 import :renderer;
 export import error;
-export import array;
+export import heap_array;
 
 namespace mars {
     export Error<noreturn> init() noexcept;

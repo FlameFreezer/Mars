@@ -13,7 +13,7 @@ module mars;
 namespace mars {
     Error<noreturn> init() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO)) {
-            return {ErrorTag::INIT_SDL_FAIL, SDL_GetError()};
+            return {ErrorTag::FATAL_ERROR, SDL_GetError()};
         }
         return success();
     }

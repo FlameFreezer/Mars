@@ -21,7 +21,7 @@ module;
 export module mars:renderer;
 import gpubuffer;
 import error;
-import array;
+import heap_array;
 
 #define INIT_TRY(proc) do {\
     internal::procResult = proc;\
@@ -29,6 +29,11 @@ import array;
         initFail = true;\
         return internal::procResult;\
     } \
+} while(false)
+
+#define TRY(proc) do {\
+    internal::procResult = proc;\
+    if(!internal::procResult.okay()) return internal::procResult;\
 } while(false)
 
 namespace mars {
@@ -117,12 +122,12 @@ namespace mars {
 
     export class Renderer {
     private:
-    	Array<VkImage> swapchainImages;
-    	Array<VkImageView> swapchainImageViews;	
-        Array<VkQueue> queues;
+    	HeapArray<VkImage> swapchainImages;
+    	HeapArray<VkImageView> swapchainImageViews;	
+        HeapArray<VkQueue> queues;
+        HeapArray<VkSemaphore> semaphores;
     	std::array<VkCommandBuffer, maxConcurrentFrames + 1> commandBuffers;
         std::array<VkFence, maxConcurrentFrames> fences;
-        Array<VkSemaphore> semaphores;
     	GPUBuffer vertexBuffer;
         VkInstance instance;
         SDL_Window* window;
@@ -137,9 +142,65 @@ namespace mars {
         VkPipelineLayout graphicsPipelineLayout;
         std::uint32_t currentFrame;
 
+        Error<noreturn> recreateSwapchain() {
+            return success();
+        }
+
+        void renderPass(VkImageView imageView, VkCommandBuffer commandBuffer) noexcept {
+            VkRenderingAttachmentInfo const colorAttachment = {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                .pNext = nullptr,
+                .imageView = imageView,
+                .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .resolveMode = VK_RESOLVE_MODE_NONE,
+                .resolveImageView = nullptr,
+                .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .clearValue = {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}},
+            };
+            VkRenderingInfo const renderingInfo = {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .renderArea = {
+                    .offset = {0, 0},
+                    .extent = swapchainImageExtent
+                },
+                .layerCount = 1,
+                .viewMask = 0,
+                .colorAttachmentCount = 1,
+                .pColorAttachments = &colorAttachment,
+                .pDepthAttachment = nullptr,
+                .pStencilAttachment = nullptr
+            };
+            vkCmdBeginRendering(commandBuffer, &renderingInfo);
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+            VkViewport const viewport = {
+                .x = 0.0f, .y = 0.0f, 
+                .width = static_cast<float>(swapchainImageExtent.width), 
+                .height = static_cast<float>(swapchainImageExtent.height), 
+                .minDepth = 0.0f, .maxDepth = 1.0f
+            };
+            vkCmdSetViewportWithCount(commandBuffer, 1, &viewport);
+            VkRect2D const scissor = {
+                .offset = {0, 0},
+                .extent = swapchainImageExtent 
+            };
+            vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
+
+            VkDeviceSize offset = 0ULL;
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.handle, &offset);
+
+            vkCmdDraw(commandBuffer, vertices.max_size(), 1, 0, 0);
+
+            vkCmdEndRendering(commandBuffer);
+
+        }        
 
         Error<noreturn> createSyncObjects() noexcept {
-            semaphores = Array<VkSemaphore>(swapchainImages.size() + maxConcurrentFrames);
+            semaphores = HeapArray<VkSemaphore>(swapchainImages.size() + maxConcurrentFrames);
             VkSemaphoreCreateInfo const semaphoreInfo = {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 .pNext = nullptr,
@@ -147,7 +208,7 @@ namespace mars {
             };
             for(VkSemaphore& semaphore : semaphores) {
                 if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS) {
-                    return {ErrorTag::SEMAPHORE_CREATION_FAIL, "Failed to create semaphores"};
+                    return {ErrorTag::FATAL_ERROR, "Failed to create semaphores"};
                 }
             }
             VkFenceCreateInfo const fenceInfo = {
@@ -157,7 +218,7 @@ namespace mars {
             };
             for(VkFence& fence : fences) {
                 if(vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS) {
-                    return {ErrorTag::FENCE_CREATION_FAIL, "Failed to create fences!"};
+                    return {ErrorTag::FATAL_ERROR, "Failed to create fences!"};
                 }
             }
             return success();
@@ -171,7 +232,7 @@ namespace mars {
                 .pInheritanceInfo = nullptr
             };
             if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::COMMAND_BUFFER_BEGIN_FAIL, "Failed to begin transfer command buffer!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to begin transfer command buffer!"};
             }
             Error<GPUBuffer> buff = GPUBuffer::make(
                 device, 
@@ -195,7 +256,7 @@ namespace mars {
 
             void* memory = nullptr;
             if(vkMapMemory(device, transferBuffer.memory, 0, vertices.max_size() * sizeof(Vertex), 0, &memory) != VK_SUCCESS) {
-                return {ErrorTag::MEMORY_MAP_FAIL, "Failed to map memory while creating transfer buffer"};
+                return {ErrorTag::FATAL_ERROR, "Failed to map memory while creating transfer buffer"};
             }
             std::memcpy(memory, static_cast<void const*>(vertices.data()), vertices.max_size() * sizeof(Vertex));
             vkUnmapMemory(device, transferBuffer.memory);
@@ -205,7 +266,7 @@ namespace mars {
             };
             vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
-                return {ErrorTag::COMMAND_BUFFER_END_FAIL, "Failed to end transfer command buffer"};
+                return {ErrorTag::FATAL_ERROR, "Failed to end transfer command buffer"};
             }
             VkCommandBufferSubmitInfo const commandBufferInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -225,7 +286,7 @@ namespace mars {
                 .pSignalSemaphoreInfos = nullptr
             };
             if(vkQueueSubmit2(queues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::QUEUE_SUBMIT_FAIL, "Failed to submit to transfer queue while creating vertex buffer"};
+                return {ErrorTag::FATAL_ERROR, "Failed to submit to transfer queue while creating vertex buffer"};
             }
             vkQueueWaitIdle(queues[0]);
             vkResetCommandBuffer(commandBuffers.back(), 0);
@@ -236,7 +297,7 @@ namespace mars {
         Error<VkShaderModule> createShaderModule() noexcept {
             std::ifstream shaderFile("slang.spv", std::ios::binary | std::ios::ate);
             if(!shaderFile.is_open()) {
-                return {ErrorTag::FILE_OPEN_ERROR, "Failed to find shader code!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to find shader code!"};
             }
             std::vector<char> code(shaderFile.tellg());
             shaderFile.seekg(0, std::ios::beg);
@@ -252,7 +313,7 @@ namespace mars {
             };
             VkShaderModule result;
             if(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &result) != VK_SUCCESS) {
-                return {ErrorTag::SHADER_MODULE_CREATE_FAIL, "Failed to create shader module!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create shader module!"};
             }
             return result;
         }
@@ -401,7 +462,7 @@ namespace mars {
             };
 
             if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout) != VK_SUCCESS) {
-                return {ErrorTag::GRAPHICS_PIPELINE_CREATION_FAIL, "Failed to create graphics pipeline layout!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline layout!"};
             }
            
             VkGraphicsPipelineCreateInfo pipelineInfo = {
@@ -427,7 +488,7 @@ namespace mars {
             };
 
             if(vkCreateGraphicsPipelines(device, nullptr, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
-                return {ErrorTag::GRAPHICS_PIPELINE_CREATION_FAIL, "Failed to create graphics pipeline!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline!"};
             }
 
             vkDestroyShaderModule(device, shaderModule.getData(), nullptr);
@@ -436,13 +497,13 @@ namespace mars {
         Error<noreturn> getSwapchainImages(SurfaceInfo const& surfaceInfo) noexcept {
             std::uint32_t imageCount;
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
             }
-            swapchainImages = Array<VkImage>(imageCount, nullptr);
+            swapchainImages = HeapArray<VkImage>(imageCount, nullptr);
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
-                return {ErrorTag::SWAPCHAIN_IMAGE_ACQUISITION_FAIL, "Failed to get swapchain images!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
             }
-            swapchainImageViews = Array<VkImageView>(imageCount, nullptr);
+            swapchainImageViews = HeapArray<VkImageView>(imageCount, nullptr);
 
             VkImageViewCreateInfo imageViewInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -468,7 +529,7 @@ namespace mars {
             for(std::uint32_t i = 0; i < imageCount; i++) {
                 imageViewInfo.image = swapchainImages[i];
                 if(vkCreateImageView(device, &imageViewInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
-                    return {ErrorTag::IMAGE_VIEW_CREATE_FAIL, std::format("Failed to create swapchain image view {}!", i)};
+                    return {ErrorTag::FATAL_ERROR, std::format("Failed to create swapchain image view {}!", i)};
                 }
             }
             return success();
@@ -481,7 +542,7 @@ namespace mars {
                 .queueFamilyIndex = queueFamilyIndex
             };
             if(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
-                return {ErrorTag::COMMAND_POOL_CREATE_FAIL, "Failed to create VkCommandPool!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create VkCommandPool!"};
             }
             VkCommandBufferAllocateInfo const allocInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -491,7 +552,7 @@ namespace mars {
                 .commandBufferCount = static_cast<std::uint32_t>(commandBuffers.max_size())
             };
             if(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-                return {ErrorTag::COMMAND_BUFFER_ALLOC_FAIL, "Failed to allocate command buffers!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to allocate command buffers!"};
             }
             return success();
         }
@@ -502,7 +563,7 @@ namespace mars {
             int width = 0; 
             int height = 0;
             if(!SDL_GetWindowSize(window, &width, &height)) {
-                return {ErrorTag::SDL_QUERY_FAIL, SDL_GetError()};
+                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
             return VkExtent2D{
                 .width = std::clamp<std::uint32_t>(width, 
@@ -540,7 +601,7 @@ namespace mars {
             };
 
             if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
-                return {ErrorTag::SWAPCHAIN_CREATION_FAIL, "Failed to create VkSwapchainKHR!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create VkSwapchainKHR!"};
             }
 
             return success();
@@ -569,7 +630,7 @@ namespace mars {
                 if(queueFamilyProperties[i].queueFamilyProperties.queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
                     VkBool32 surfaceSupport;
                     if(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &surfaceSupport) != VK_SUCCESS) {
-                        return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface support!"};
+                        return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface support!"};
                     }
                     if(surfaceSupport == VK_TRUE) {
                         //At this point, we have found our desired queue family index
@@ -592,7 +653,7 @@ namespace mars {
                 &presentModeCount, 
                 nullptr
             ) != VK_SUCCESS) {
-                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface present modes!"};
             }
             std::vector<VkPresentModeKHR> presentModes(presentModeCount);
             if(vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -601,7 +662,7 @@ namespace mars {
                 &presentModeCount, 
                 presentModes.data()
             ) != VK_SUCCESS) {
-                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface present modes!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface present modes!"};
             }
             //Select correct present mode
             for(int i = 0; i < presentModeCount; i++) {
@@ -626,11 +687,11 @@ namespace mars {
             //Get physical device's surface formats
             std::uint32_t surfaceFormatCount = 0;
             if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface formats!"};
             }
             std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
             if(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()) != VK_SUCCESS) {
-                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface formats!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface formats!"};
             }
             for(int i = 0; i < surfaceFormatCount; i++) {
                 if(surfaceFormats[i].format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -644,11 +705,11 @@ namespace mars {
             //Check that the device supports the extensions needed by the application
             std::uint32_t deviceExtensionPropertyCount = 0;
             if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical device extension properties!"};
             }
             std::vector<VkExtensionProperties> extensionProperties(deviceExtensionPropertyCount);
             if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionPropertyCount, extensionProperties.data()) != VK_SUCCESS) {
-                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical device extension properties!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical device extension properties!"};
             }
             //Construct set of extension names
             std::set<std::string> physicalDeviceExtensions;
@@ -674,11 +735,11 @@ namespace mars {
             //Get all the physical devices installed on the system
             std::uint32_t physicalDeviceCount = 0;
             if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical devices!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical devices!"};
             }
             std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
             if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices.data()) != VK_SUCCESS) {
-                return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate physical devices!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical devices!"};
             }
 
             //Iterate through each of these devices
@@ -693,7 +754,7 @@ namespace mars {
                     surface, 
                     &surfaceInfo.capabilities
                 ) != VK_SUCCESS) {
-                    return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to get physical device surface capabilities!"};
+                    return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface capabilities!"};
                 }
 
                 //Get a surface format to use
@@ -723,7 +784,7 @@ namespace mars {
                 goto Device_Creation;
             } 
             //If we got here, none of the physical devices supported the features we needed
-            return {ErrorTag::FIND_SUITABLE_GPU_FAIL, "Failed to find a suitable GPU!"};
+            return {ErrorTag::FATAL_ERROR, "Failed to find a suitable GPU!"};
 
         Device_Creation:
             std::vector<float> const queuePriorities(queueCount, 0.0f);
@@ -755,11 +816,11 @@ namespace mars {
             };
 
             if(vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &device) != VK_SUCCESS) {
-                return {ErrorTag::DEVICE_CREATION_FAIL, "Failed to create VkDevice!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create VkDevice!"};
             }
 
             //Acquire handles to all the GPU queues we just created
-            queues = Array<VkQueue>(queueCount);
+            queues = HeapArray<VkQueue>(queueCount);
             for(std::uint32_t i = 0; i < queueCount; i++) {
                 vkGetDeviceQueue(device, queueFamilyIndex, i, &queues[i]);
             }
@@ -784,16 +845,16 @@ namespace mars {
             };
             vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
             if(vkCreateDebugUtilsMessengerEXT == nullptr) {
-                return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
             }
             if(vkCreateDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-                return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to create vkDebugUtilsMessengerEXT!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create vkDebugUtilsMessengerEXT!"};
             }
             vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
                 instance, "vkDestroyDebugUtilsMessengerEXT"
             );
             if(vkDestroyDebugUtilsMessengerEXT == nullptr) {
-                return {ErrorTag::DEBUG_MESSENGER_CREATION_FAIL, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
             }
             return success();
         }
@@ -802,11 +863,11 @@ namespace mars {
             if constexpr(enableValidationLayers) {
                 std::uint32_t layerPropertyCount = 0;
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
-                    return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
+                    return {ErrorTag::FATAL_ERROR, "Failed to enumerate instance layer properties!"};
                 }
                 std::vector<VkLayerProperties> layerProperties(layerPropertyCount);
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, layerProperties.data()) != VK_SUCCESS) {
-                    return {ErrorTag::VULKAN_QUERY_ERROR, "Failed to enumerate instance layer properties!"};
+                    return {ErrorTag::FATAL_ERROR, "Failed to enumerate instance layer properties!"};
                 }
                 std::println("Available Layers:");
                 for(char const* layer : validationLayers) {
@@ -816,7 +877,7 @@ namespace mars {
                             goto Next_Layer;
                         }
                     }
-                    return {ErrorTag::INSTANCE_CREATION_FAIL, "Needed instance layers not found!"};
+                    return {ErrorTag::FATAL_ERROR, "Needed instance layers not found!"};
                     Next_Layer:
                 }
             }
@@ -861,7 +922,7 @@ namespace mars {
             }
 
             if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS) {
-                return {ErrorTag::INSTANCE_CREATION_FAIL, "Failed to create VkInstance!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to create VkInstance!"};
             }
             return success();
         }
@@ -874,11 +935,11 @@ namespace mars {
             window = SDL_CreateWindow(name.c_str(), width, height, SDL_WINDOW_VULKAN);
             if(window == nullptr) {
                 initFail = true;
-                return {ErrorTag::WINDOW_CREATION_FAIL, SDL_GetError()};
+                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
             if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
                 initFail = true;
-                return {ErrorTag::SURFACE_CREATION_FAIL, SDL_GetError()};
+                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
             SurfaceInfo surfaceInfo{};
             std::uint32_t queueFamilyIndex;
@@ -935,15 +996,12 @@ namespace mars {
 
         Error<noreturn> drawFrame() noexcept {
             if(vkWaitForFences(device, 1, &fences[currentFrame], VK_TRUE, std::numeric_limits<std::uint64_t>::max()) != VK_SUCCESS) {
-                return {ErrorTag::WAIT_ERROR, std::format("Something went from while waiitng on fence {}", currentFrame)};
-            }
-            if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::FENCE_RESET_FAIL, std::format("Failed to reset fence {}", currentFrame)};
+                return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiitng on fence {}", currentFrame)};
             }
             //These semaphores indicate that we have successfully acquired an image on this frame
-            Slice<VkSemaphore> imageAcquiredSemaphores(semaphores, 0, maxConcurrentFrames);
+            Slice<VkSemaphore> const imageAcquiredSemaphores(semaphores, 0, maxConcurrentFrames);
             //These semaphores indicate that the image acquired is ready to present
-            Slice<VkSemaphore> presentReadySemaphores(semaphores, maxConcurrentFrames);
+            Slice<VkSemaphore> const presentReadySemaphores(semaphores, maxConcurrentFrames);
 
             std::uint32_t imageViewIndex;
             VkResult res = vkAcquireNextImageKHR(
@@ -954,12 +1012,19 @@ namespace mars {
                 nullptr, 
                 &imageViewIndex
             );
-            if(res != VK_SUCCESS and res != VK_SUBOPTIMAL_KHR) {
-                return {ErrorTag::ACQUIRE_SWAPCHAIN_IMAGE_FAIL, "Failed to acquire next swapchain image index"};
+            if(res == VK_ERROR_OUT_OF_DATE_KHR or res == VK_SUBOPTIMAL_KHR) {
+                TRY(recreateSwapchain());
+                return drawFrame();
+            }
+            else if(res != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to acquire next swapchain image index"};
             }
 
+            if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, std::format("Failed to reset fence {}", currentFrame)};
+            }
             if(vkResetCommandBuffer(commandBuffers[currentFrame], 0) != VK_SUCCESS) {
-                return {ErrorTag::COMMAND_BUFFER_RESET_FAIL, "Failed to reset command buffer"};
+                return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer"};
             }
             VkCommandBufferBeginInfo beginInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -968,7 +1033,7 @@ namespace mars {
                 .pInheritanceInfo = nullptr
             };
             if(vkBeginCommandBuffer(commandBuffers[currentFrame], &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::COMMAND_BUFFER_BEGIN_FAIL, std::format("Failed to begin command buffer {}", currentFrame)};
+                return {ErrorTag::FATAL_ERROR, std::format("Failed to begin command buffer {}", currentFrame)};
             }
 
             //Transition image layout for color writing
@@ -981,8 +1046,8 @@ namespace mars {
                 .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                 .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                 .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .srcQueueFamilyIndex = 0,
-                .dstQueueFamilyIndex = 0,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .image = swapchainImages[imageViewIndex],
                 .subresourceRange = VkImageSubresourceRange{
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -1007,55 +1072,7 @@ namespace mars {
 
             vkCmdPipelineBarrier2(commandBuffers[currentFrame], &colorWriteDependency);
 
-            VkRenderingAttachmentInfo colorAttachment = {
-                .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-                .pNext = nullptr,
-                .imageView = swapchainImageViews[imageViewIndex],
-                .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .resolveMode = VK_RESOLVE_MODE_NONE,
-                .resolveImageView = nullptr,
-                .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .clearValue = {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}},
-            };
-            VkRenderingInfo renderingInfo = {
-                .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .renderArea = VkRect2D {
-                    .offset = {0, 0},
-                    .extent = swapchainImageExtent
-                },
-                .layerCount = 1,
-                .viewMask = 0,
-                .colorAttachmentCount = 1,
-                .pColorAttachments = &colorAttachment,
-                .pDepthAttachment = nullptr,
-                .pStencilAttachment = nullptr
-            };
-            vkCmdBeginRendering(commandBuffers[currentFrame], &renderingInfo);
-            vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-            VkViewport const viewport = {
-                .x = 0.0f, .y = 0.0f, 
-                .width = static_cast<float>(swapchainImageExtent.width), 
-                .height = static_cast<float>(swapchainImageExtent.height), 
-                .minDepth = 0.0f, .maxDepth = 1.0f
-            };
-            vkCmdSetViewportWithCount(commandBuffers[currentFrame], 1, &viewport);
-            VkRect2D const scissor = {
-                .offset = {0, 0},
-                .extent = swapchainImageExtent 
-            };
-            vkCmdSetScissorWithCount(commandBuffers[currentFrame], 1, &scissor);
-
-            VkDeviceSize offset = 0ULL;
-            vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, &vertexBuffer.handle, &offset);
-
-            vkCmdDraw(commandBuffers[currentFrame], vertices.max_size(), 1, 0, 0);
-
-            vkCmdEndRendering(commandBuffers[currentFrame]);
+            renderPass(swapchainImageViews[imageViewIndex], commandBuffers[currentFrame]);
 
             //Transition image layout for presentation
             VkImageMemoryBarrier2 const presentSrcBarrier = {
@@ -1067,10 +1084,10 @@ namespace mars {
                 .dstAccessMask = VK_ACCESS_2_NONE,
                 .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                .srcQueueFamilyIndex = 0,
-                .dstQueueFamilyIndex = 0,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .image = swapchainImages[imageViewIndex],
-                .subresourceRange = VkImageSubresourceRange{
+                .subresourceRange = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel = 0,
                     .levelCount = 1,
@@ -1093,7 +1110,7 @@ namespace mars {
             vkCmdPipelineBarrier2(commandBuffers[currentFrame], &presentDependency);
 
             if(vkEndCommandBuffer(commandBuffers[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::COMMAND_BUFFER_END_FAIL, std::format("Failed to end command buffer {}", currentFrame)};
+                return {ErrorTag::FATAL_ERROR, std::format("Failed to end command buffer {}", currentFrame)};
             }
 
             VkSemaphoreSubmitInfo const imageAcquisition = {
@@ -1134,7 +1151,7 @@ namespace mars {
             };
 
             if(vkQueueSubmit2(queues[1], 1, &submitInfo, fences[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::QUEUE_SUBMIT_FAIL, "Failed to submit draw commands to queue"};
+                return {ErrorTag::FATAL_ERROR, "Failed to submit draw commands to queue"};
             }
 
             VkPresentInfoKHR const presentInfo = {
@@ -1148,7 +1165,7 @@ namespace mars {
                 .pResults = nullptr
             };
             if(vkQueuePresentKHR(queues[1], &presentInfo) != VK_SUCCESS) {
-                return {ErrorTag::QUEUE_SUBMIT_FAIL, "Failed to present graphics queue"};
+                return {ErrorTag::FATAL_ERROR, "Failed to present graphics queue"};
             }
 
             currentFrame = (currentFrame + 1) % maxConcurrentFrames;
