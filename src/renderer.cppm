@@ -110,9 +110,9 @@ namespace mars {
     };	
 
     constexpr std::array<Vertex, 3> vertices = {
-        Vertex{glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.0f, 0.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, -0.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)}
+        Vertex{glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+        Vertex{glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+        Vertex{glm::vec3(0.5f, 0.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)}
     };
 
     export class Renderer {
@@ -390,20 +390,14 @@ namespace mars {
                 .pDynamicStates = dynamicStates.data()
             };
 
-            VkPushConstantRange range = {
-                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .offset = 0,
-                .size = 4
-            };
-            
             VkPipelineLayoutCreateInfo const pipelineLayoutInfo = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
                 .setLayoutCount = 0,
                 .pSetLayouts = nullptr,
-                .pushConstantRangeCount = 1,
-                .pPushConstantRanges = &range
+                .pushConstantRangeCount = 0,
+                .pPushConstantRanges = nullptr
             };
 
             if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout) != VK_SUCCESS) {
@@ -425,7 +419,7 @@ namespace mars {
                 .pDepthStencilState = &depthStencilStateInfo,
                 .pColorBlendState = &colorBlendStateInfo,
                 .pDynamicState = &dynamicStateInfo,
-                .layout = graphicsPipelineLayout, //initialized by next function call
+                .layout = graphicsPipelineLayout, 
                 .renderPass = nullptr,
                 .subpass = 0,
                 .basePipelineHandle = nullptr,
@@ -1043,9 +1037,6 @@ namespace mars {
             vkCmdBeginRendering(commandBuffers[currentFrame], &renderingInfo);
             vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-            int push = 1;
-            vkCmdPushConstants(commandBuffers[currentFrame], graphicsPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &push);
-
             VkViewport const viewport = {
                 .x = 0.0f, .y = 0.0f, 
                 .width = static_cast<float>(swapchainImageExtent.width), 
@@ -1062,7 +1053,7 @@ namespace mars {
             VkDeviceSize offset = 0ULL;
             vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, &vertexBuffer.handle, &offset);
 
-            vkCmdDraw(commandBuffers[currentFrame], vertices.max_size(), 0, 0, 0);
+            vkCmdDraw(commandBuffers[currentFrame], vertices.max_size(), 1, 0, 0);
 
             vkCmdEndRendering(commandBuffers[currentFrame]);
 
