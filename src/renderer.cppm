@@ -1216,8 +1216,9 @@ namespace mars {
                 .signalSemaphoreInfoCount = 1,
                 .pSignalSemaphoreInfos = &presentationReady
             };
+	    std::uint32_t const queueIndex = queues.size() > 1 ? 1 : 0;
 
-            if(vkQueueSubmit2(queues[1], 1, &submitInfo, fences[currentFrame]) != VK_SUCCESS) {
+            if(vkQueueSubmit2(queues[queueIndex], 1, &submitInfo, fences[currentFrame]) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to submit draw commands to queue"};
             }
 
@@ -1231,7 +1232,7 @@ namespace mars {
                 .pImageIndices = &imageViewIndex,
                 .pResults = nullptr
             };
-            if(vkQueuePresentKHR(queues[1], &presentInfo) != VK_SUCCESS) {
+            if(vkQueuePresentKHR(queues[queueIndex], &presentInfo) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to present graphics queue"};
             }
 

@@ -5,6 +5,7 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <string>
+#include <cstdint>
 
 #include "mars_macros.h"
 
