@@ -8,10 +8,12 @@ module;
 
 export module mars;
 import :renderer;
+export import flag_bits;
 export import error;
 export import heap_array;
 
 namespace mars {
+
     export Error<noreturn> init() noexcept;
     export void quit() noexcept; 
     export class Game {
@@ -21,9 +23,11 @@ namespace mars {
         ~Game() noexcept;
         Error<noreturn> init() noexcept;
         Error<noreturn> draw() noexcept;
+        void setFlag(std::uint64_t flag) noexcept;
         private:
         std::string windowName;
         std::string appName;
         Renderer renderer;
     };
+
 };

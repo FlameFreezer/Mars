@@ -33,4 +33,7 @@ namespace mars {
         TRY(renderer.drawFrame());
         return success();
     }
+    void Game::setFlag(std::uint64_t flag) noexcept {
+        renderer.flags |= flag;
+    }
 }

@@ -45,7 +45,7 @@ target_sources(Mars PUBLIC
     FILE_SET mars_module 
     TYPE CXX_MODULES 
     BASE_DIRS src
-    FILES src/mars.cppm src/error.cppm src/renderer.cppm src/gpubuffer.cppm src/heaparray.cppm
+    FILES src/mars.cppm src/error.cppm src/renderer.cppm src/gpubuffer.cppm src/heaparray.cppm src/flagBits.cppm
     PRIVATE src/mars.cpp
 )
 

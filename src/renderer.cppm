@@ -22,6 +22,7 @@ export module mars:renderer;
 import gpubuffer;
 import error;
 import heap_array;
+import flag_bits;
 
 #define INIT_TRY(proc) do {\
     internal::procResult = proc;\
@@ -141,8 +142,62 @@ namespace mars {
     	VkPipeline graphicsPipeline;
         VkPipelineLayout graphicsPipelineLayout;
         std::uint32_t currentFrame;
+        RendererFlags flags;
 
         Error<noreturn> recreateSwapchain() {
+            vkDeviceWaitIdle(device);
+            SurfaceInfo surfaceInfo{};
+
+            Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevice); 
+            if(!presentMode.okay()) return presentMode.moveError<noreturn>();
+            surfaceInfo.presentMode = presentMode.getData();
+
+            if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceInfo.capabilities) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface capabilities while recreating the swapchain"};
+            }
+
+            Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevice);
+            if(!surfaceFormat.okay()) return surfaceFormat.moveError<noreturn>();
+            surfaceInfo.format = surfaceFormat.getData();
+
+            Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceInfo.capabilities);
+            if(!imageExtent.okay()) return imageExtent.moveError<noreturn>();
+            swapchainImageExtent = imageExtent.getData();
+
+            VkSwapchainKHR newSwapchain;
+            VkSwapchainCreateInfoKHR const swapchainInfo = {
+                .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+                .pNext = nullptr,
+                .flags = 0,
+                .surface = surface,
+                .minImageCount = surfaceInfo.capabilities.minImageCount + 1,
+                .imageFormat = surfaceInfo.format.format,
+                .imageColorSpace = surfaceInfo.format.colorSpace,
+                .imageExtent = swapchainImageExtent,
+                .imageArrayLayers = 1,
+                .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 1,
+                .pQueueFamilyIndices = nullptr,
+                .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+                .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+                .presentMode = surfaceInfo.presentMode,
+                .clipped = VK_TRUE,
+                .oldSwapchain = swapchain
+            };
+            if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &newSwapchain) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to recreate swapchain"};
+            }
+            vkDestroySwapchainKHR(device, swapchain, nullptr);
+            swapchain = newSwapchain;
+
+            for(VkImageView imageView : swapchainImageViews) vkDestroyImageView(device, imageView, nullptr);
+            swapchainImageViews.clear();
+            swapchainImages.clear();
+
+            internal::procResult = getSwapchainImages(surfaceInfo);
+            if(!internal::procResult.okay()) return internal::procResult;
+
             return success();
         }
 
@@ -927,12 +982,13 @@ namespace mars {
             return success();
         }
         public:
+        friend class Game;
         Error<noreturn> init(std::string const& name) noexcept {
             INIT_TRY(createVkInstance(name));
             if constexpr(enableValidationLayers) {
                 INIT_TRY(createVkDebugUtilsMessenger());
             }
-            window = SDL_CreateWindow(name.c_str(), width, height, SDL_WINDOW_VULKAN);
+            window = SDL_CreateWindow(name.c_str(), width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
             if(window == nullptr) {
                 initFail = true;
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
@@ -963,7 +1019,8 @@ namespace mars {
             swapchain(nullptr),
             commandPool(nullptr),
             graphicsPipeline(nullptr),
-            currentFrame(0)
+            currentFrame(0),
+            flags(0)
         {}
         ~Renderer() noexcept {
             //If something went wrong during initialization, we can't destory vulkan objects, so 
@@ -1012,8 +1069,18 @@ namespace mars {
                 nullptr, 
                 &imageViewIndex
             );
-            if(res == VK_ERROR_OUT_OF_DATE_KHR or res == VK_SUBOPTIMAL_KHR) {
+            if(res == VK_ERROR_OUT_OF_DATE_KHR or res == VK_SUBOPTIMAL_KHR or flags & flagBits::recreateSwapchain) {
                 TRY(recreateSwapchain());
+                vkDestroySemaphore(device, imageAcquiredSemaphores[currentFrame], nullptr);
+                VkSemaphoreCreateInfo const semaphoreInfo = {
+                    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0
+                };
+                if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAcquiredSemaphores[currentFrame]) != VK_SUCCESS) {
+                    return {ErrorTag::FATAL_ERROR, "Failed to recreate semaphore while recreating swapchain during draw"};
+                }
+                flags &= ~flagBits::recreateSwapchain;
                 return drawFrame();
             }
             else if(res != VK_SUCCESS) {

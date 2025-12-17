@@ -6,6 +6,19 @@ import mars;
 
 using ErrorNoreturn = mars::Error<mars::noreturn>;
 
+bool handleEvent(mars::Game& game, SDL_Event const& e) noexcept {
+    switch(e.type) {
+        case SDL_EVENT_QUIT:
+            return false;
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            return false;
+        case SDL_EVENT_WINDOW_RESIZED:
+            game.setFlag(mars::flagBits::recreateSwapchain);
+            break;
+    }
+    return true;
+}
+
 ErrorNoreturn run() noexcept {
     mars::Game g;
     TRY(g.init());
@@ -13,6 +26,7 @@ ErrorNoreturn run() noexcept {
     while(shouldKeepRunning) {
     	SDL_Event e;
     	while(SDL_PollEvent(&e) and shouldKeepRunning) {
+            shouldKeepRunning = handleEvent(g, e);
     	    switch(e.type) {
     	    case SDL_EVENT_QUIT:
                 shouldKeepRunning = false;

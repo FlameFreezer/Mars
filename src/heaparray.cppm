@@ -50,6 +50,11 @@ namespace mars {
             return mPtr;
         }
 
+        virtual void clear() noexcept {
+            delete[] mPtr;
+            mSize = 0;
+        }
+
         class Iterator {
             private:
             HeapArray<T> const& mArray;
@@ -139,6 +144,10 @@ namespace mars {
                 rhs.mSize = 0;
             }
             return *this;
+        }
+        void clear() noexcept override {
+            this->mPtr = nullptr;
+            this->mSize = 0;
         }
     };
 }
