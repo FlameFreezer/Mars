@@ -49,7 +49,7 @@ namespace mars {
     constexpr std::uint32_t maxConcurrentFrames = 2;
     constexpr std::array<char const*, 2> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME
+        VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
     };
     constexpr std::array<char const*, 1> validationLayers = {
         "VK_LAYER_KHRONOS_validation"
@@ -134,6 +134,7 @@ namespace mars {
         HeapArray<VkSemaphore> semaphores;
     	std::array<VkCommandBuffer, maxConcurrentFrames + 1> commandBuffers;
         std::array<VkFence, maxConcurrentFrames> fences;
+        std::array<VkDescriptorSet, maxConcurrentFrames> descriptorSets;
     	GPUBuffer vertexBuffer;
         VkInstance instance;
         SDL_Window* window;
@@ -151,6 +152,59 @@ namespace mars {
         VkImage textureImage;
         VkDeviceMemory textureImageMemory;
         VkImageView textureImageView;
+        VkSampler sampler;
+        VkDescriptorSetLayout descriptorSetLayout;
+
+        Error<noreturn> createDescriptorSetLayout() noexcept {
+            VkDescriptorSetLayoutBinding const samplerLayoutBinding = {
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .pImmutableSamplers = nullptr
+            };
+            VkDescriptorSetLayoutCreateInfo const descriptorSetLayoutInfo = {
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT,
+                .bindingCount = 1,
+                .pBindings = &samplerLayoutBinding
+            };
+            if(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to create descriptor set layout"};
+            }
+            return success();
+        }
+
+        Error<noreturn> createSampler() noexcept {
+            VkPhysicalDeviceProperties2 props{};
+            props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+            vkGetPhysicalDeviceProperties2(physicalDevice, &props);
+            VkSamplerCreateInfo const samplerInfo = {
+                .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .magFilter = VK_FILTER_LINEAR,
+                .minFilter = VK_FILTER_LINEAR,
+                .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+                .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                .mipLodBias = 0.0f,
+                .anisotropyEnable = VK_TRUE,
+                .maxAnisotropy = props.properties.limits.maxSamplerAnisotropy,
+                .compareEnable = VK_FALSE,
+                .compareOp = VK_COMPARE_OP_ALWAYS,
+                .minLod = 0.0f,
+                .maxLod = 0.0f,
+                .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+                .unnormalizedCoordinates = VK_FALSE
+            };
+            if(vkCreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to create texture sampler"};
+            }
+            return success();
+        }
 
         Error<noreturn> createTexture() noexcept {
             int texWidth, texHeight, texChannels;
@@ -205,6 +259,7 @@ namespace mars {
             vkGetImageMemoryRequirements(device, textureImage, &memRequirements);
             Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             if(!memType.okay()) return memType.moveError<noreturn>();
+
             VkMemoryAllocateInfo const allocInfo = {
                 .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                 .pNext = nullptr,
@@ -225,10 +280,10 @@ namespace mars {
                 .pInheritanceInfo = nullptr
             };
             if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to begin command buffer while creating texture image"};
+                return {ErrorTag::FATAL_ERROR, "Failed to begin single time command buffer"};
             }
 
-            VkImageMemoryBarrier2 const preBufferCopy = {
+            VkImageMemoryBarrier2 const firstTransition = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
                 .pNext = nullptr,
                 .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
@@ -257,9 +312,10 @@ namespace mars {
                 .bufferMemoryBarrierCount = 0,
                 .pBufferMemoryBarriers = nullptr,
                 .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &preBufferCopy
+                .pImageMemoryBarriers = &firstTransition
             };
             vkCmdPipelineBarrier2(commandBuffers.back(), &dep1);
+
             VkBufferImageCopy2 const copyRegion = {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
                 .pNext = nullptr,
@@ -285,6 +341,7 @@ namespace mars {
                 .pRegions = &copyRegion
             };
             vkCmdCopyBufferToImage2(commandBuffers.back(), &bufferToImageInfo);
+
             VkImageMemoryBarrier2 const preShaderRead = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
                 .pNext = nullptr,
@@ -317,6 +374,7 @@ namespace mars {
                 .pImageMemoryBarriers = &preShaderRead
             };
             vkCmdPipelineBarrier2(commandBuffers.back(), &dep2);
+
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to end command buffer while creating texture image"};
             }
@@ -331,6 +389,12 @@ namespace mars {
             };
             if(vkQueueSubmit2(queues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to submit to queue while creating texture image"};
+            }
+            if(vkQueueWaitIdle(queues[0]) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to wait for queue while creating texture image"};
+            }
+            if(vkResetCommandBuffer(commandBuffers.back(), 0) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer while creating texture image"};
             }
 
             VkImageViewCreateInfo const textureViewInfo = {
@@ -462,6 +526,27 @@ namespace mars {
                 .extent = swapchainImageExtent 
             };
             vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
+
+
+            VkDescriptorImageInfo const samplerImageInfo = {
+                .sampler = sampler,
+                .imageView = textureImageView,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            };
+
+            VkWriteDescriptorSet const writeTextureSampler = {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .pNext = nullptr,
+                .dstSet = descriptorSets[currentFrame],
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .pImageInfo = &samplerImageInfo,
+                .pBufferInfo = nullptr,
+                .pTexelBufferView = nullptr
+            };
+            vkCmdPushDescriptorSet(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, 1, &writeTextureSampler);
 
             VkDeviceSize offset = 0ULL;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.handle, &offset);
@@ -733,8 +818,8 @@ namespace mars {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
-                .setLayoutCount = 0,
-                .pSetLayouts = nullptr,
+                .setLayoutCount = 1,
+                .pSetLayouts = &descriptorSetLayout,
                 .pushConstantRangeCount = 0,
                 .pPushConstantRanges = nullptr
             };
@@ -1075,12 +1160,19 @@ namespace mars {
                 .queueCount = queueCount,
                 .pQueuePriorities = queuePriorities.data()
             };
-
+            VkPhysicalDeviceVulkan14Features vulkan14Features{};
+            vulkan14Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
+            vulkan14Features.pushDescriptor = VK_TRUE;
+            VkPhysicalDeviceFeatures2 features2 = {};
+            features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+            features2.features.samplerAnisotropy = VK_TRUE;
+            features2.pNext = &vulkan14Features;
             VkPhysicalDeviceVulkan13Features vulkan13Features{};
             vulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
             vulkan13Features.synchronization2 = VK_TRUE;
             vulkan13Features.dynamicRendering = VK_TRUE;
             vulkan13Features.maintenance4 = VK_TRUE;
+            vulkan13Features.pNext = &features2;
 
             VkDeviceCreateInfo const deviceInfo = {
                 .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -1225,10 +1317,12 @@ namespace mars {
             INIT_TRY(createVkSwapchainKHR(surfaceInfo));
             INIT_TRY(getSwapchainImages(surfaceInfo));
             INIT_TRY(createCommandBuffers(queueFamilyIndex));
+            INIT_TRY(createDescriptorSetLayout());
             INIT_TRY(createGraphicsPipeline());
+            INIT_TRY(createTexture());
+            INIT_TRY(createSampler());
             INIT_TRY(createVertexBuffer());
             INIT_TRY(createSyncObjects());
-            INIT_TRY(createTexture());
 
             return success();
         }
@@ -1245,6 +1339,7 @@ namespace mars {
             textureImage(nullptr),
             textureImageMemory(nullptr),
             textureImageView(nullptr),
+            descriptorSetLayout(nullptr),
             currentFrame(0),
             flags(0)
         {}
@@ -1263,6 +1358,8 @@ namespace mars {
             vkDestroyImage(device, textureImage, nullptr);
             vkFreeMemory(device, textureImageMemory, nullptr);
             vkDestroyImageView(device, textureImageView, nullptr);
+            vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+            vkDestroySampler(device, sampler, nullptr);
             for(VkFence fence : fences) {
                 vkDestroyFence(device, fence, nullptr);
             }
@@ -1467,6 +1564,7 @@ namespace mars {
 
             currentFrame = (currentFrame + 1) % maxConcurrentFrames;
 
+            return {ErrorTag::FATAL_ERROR, "Early Exit!"};
             return success();
         }
     };

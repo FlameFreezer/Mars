@@ -19,7 +19,8 @@ func vertMain(VertexIn input) -> VertexOut {
     return output;
 }
 
+Sampler2D texture;
 [shader("fragment")]
-func fragMain(VertexOut input) -> float4 {
-    return float4(input.color, 1.0);
+func fragMain(VertexOut input)->float4 {
+    return texture.Sample(input.texCoord);
 }
