@@ -35,52 +35,52 @@ namespace mars {
     class [[nodiscard("Potentially unhandled error value")]] Error {
         private:
         union {
-            T data;
-            std::string message;
+            T mData;
+            std::string mMessage;
         };
-        ErrorTag tag;
+        ErrorTag mtag;
         //Writes zeroes to the entire memory space taken up by the Error union, then sets the tag to 
         // `ALL_OKAY`. Does NOT call destructors to the member `data` or `memory`.
         void reset() {
             std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-            tag = ErrorTag::ALL_OKAY;
+            mtag = ErrorTag::ALL_OKAY;
         }
         //Calls the destructor of the active data member, then resets the union.
         void clear() {
             if(okay()) {
-                data.~T();
+                mData.~T();
             }
             else {
-                message.~basic_string();
+                mMessage.~basic_string();
             }
             reset();
         }
         public:
-        Error() noexcept : tag(ErrorTag::ALL_OKAY), data() {}
-        Error(T const& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(inData) {}
-        Error(T&& inData) noexcept : tag(ErrorTag::ALL_OKAY), data(std::move(inData)) {}
-        Error(ErrorTag inTag, std::string const& inMessage) noexcept : tag(inTag), message(inMessage) {}
-        Error(ErrorTag inTag, std::string&& inMessage) noexcept : tag(inTag), message(std::move(inMessage)) {}
+        Error() noexcept : mtag(ErrorTag::ALL_OKAY), mData() {}
+        Error(T const& inData) noexcept : mtag(ErrorTag::ALL_OKAY), mData(inData) {}
+        Error(T&& inData) noexcept : mtag(ErrorTag::ALL_OKAY), mData(std::move(inData)) {}
+        Error(ErrorTag inTag, std::string const& inMessage) noexcept : mtag(inTag), mMessage(inMessage) {}
+        Error(ErrorTag inTag, std::string&& inMessage) noexcept : mtag(inTag), mMessage(std::move(inMessage)) {}
         Error(Error<T> const& other) noexcept {
             //Zero memory, so that any pointers stored within data members are null before any attempted initialization
             std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-            tag = other.tag;
+            mtag = other.mtag;
             if(other.okay()) {
-                data = other.data;
+                mData = other.mData;
             }
             else {
-                message = other.message;
+                mMessage = other.mMessage;
             }
         }
         Error(Error<T>&& other) noexcept {
             //Zero memory, so that any pointers stored within data members are null before any attempted initialization
             std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-            tag = other.tag;
+            mtag = other.mtag;
             if(other.okay()) {
-                data = std::move(other.data);
+                mData = std::move(other.mData);
             }
             else {
-                message = std::move(other.message);
+                mMessage = std::move(other.mMessage);
             }
             other.reset();
         }
@@ -91,12 +91,12 @@ namespace mars {
                 // memory is reinterpreted
                 clear();
                 //Now we can safely assign data members
-                tag = rhs.tag;
+                mtag = rhs.mtag;
                 if(rhs.okay()) {
-                    data = std::move(rhs.data);
+                    mData = std::move(rhs.mData);
                 }
                 else {
-                    message = std::move(rhs.message);
+                    mMessage = std::move(rhs.mMessage);
                 }
                 rhs.reset();
             }
@@ -107,52 +107,55 @@ namespace mars {
         // Error union that is `okay` raises a compile error.
         template<class U>
         Error<U> moveError() noexcept {
-            Error<U> result(tag, std::move(message));
+            Error<U> result(mtag, std::move(mMessage));
             reset();
             return result;
         }
         ~Error() noexcept {
             if(okay()) {
-                data.~T();
+                mData.~T();
             }
             else {
-                message.~basic_string();
+                mMessage.~basic_string();
             }
         }
         //Returns `true` if `this->tag` is of a value not indicating an error during execution.
         bool okay() const noexcept {
-            return tag == ErrorTag::ALL_OKAY;
+            return mtag == ErrorTag::ALL_OKAY;
         }
-        ErrorTag getTag() const noexcept {
-            return tag;
+        ErrorTag tag() const noexcept {
+            return mtag;
         }
-        T const& getData() const noexcept {
-            return data;
+        T const& data() const noexcept {
+            return mData;
+        }
+        T& data() noexcept {
+            return mData;
         }
         //Creates an rvalue reference to `data`. `data` is invalid after calling this, 
         // though it is still considered the active union field.
         T&& moveData() noexcept {
-            return std::move(data);
+            return std::move(mData);
         }
-        std::string const& getMessage() const noexcept {
-            return message;
+        std::string const& message() const noexcept {
+            return mMessage;
         }
     	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     	bool report() const noexcept {
     	    if(okay()) return true;
-            std::println("{}: {}", tagToString(tag), message);
+            std::println("{}: {}", tagToString(mtag), mMessage);
     	    return false;
     	}
     	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     	bool report(std::ostream& ostrm) const noexcept {
     	    if(okay()) return true;
-            std::println(ostrm, "{}: {}", tagToString(tag), message);
+            std::println(ostrm, "{}: {}", tagToString(mtag), mMessage);
     	    return false;
     	}
     };
 
     template<>
-    noreturn const& Error<noreturn>::getData() const noexcept = delete;
+    noreturn const& Error<noreturn>::data() const noexcept = delete;
 
     //Returns an `Error<noreturn>` with `key == ALL_OKAY`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
     export Error<noreturn> success() {

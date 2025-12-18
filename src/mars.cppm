@@ -18,6 +18,9 @@ namespace mars {
     export Error<noreturn> init() noexcept;
     export void quit() noexcept; 
     export class Game {
+        std::string windowName;
+        std::string appName;
+        Renderer renderer;
         public:
         Game() noexcept;
         Game(const std::string& name) noexcept;
@@ -25,10 +28,6 @@ namespace mars {
         Error<noreturn> init() noexcept;
         Error<noreturn> draw() noexcept;
         void setFlag(std::uint64_t flag) noexcept;
-        private:
-        std::string windowName;
-        std::string appName;
-        Renderer renderer;
     };
 
 };

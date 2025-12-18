@@ -45,9 +45,10 @@ target_sources(Mars PUBLIC
     FILE_SET mars_module 
     TYPE CXX_MODULES 
     BASE_DIRS src
-    FILES src/mars.cppm src/error.cppm src/renderer.cppm src/gpubuffer.cppm src/heaparray.cppm src/flagbits.cppm
+    FILES src/mars.cppm src/error.cppm src/renderer.cppm src/gpubuffer.cppm src/heaparray.cppm src/flagbits.cppm src/vkhelper.cppm
     PRIVATE src/mars.cpp
 )
+target_compile_definitions(Mars PUBLIC MARS_TEXTURE_PATH="${CMAKE_SOURCE_DIR}/textures")
 
 # Link libraries to mars
 target_link_libraries(Mars PRIVATE SDL3::SDL3 glm::glm)
@@ -66,6 +67,7 @@ target_include_directories(Mars PUBLIC
     "${CMAKE_SOURCE_DIR}/libraries/SDL/include" 
     "${CMAKE_SOURCE_DIR}/libraries/GLM"
     "$ENV{VULKAN_SDK}/include" 
+    "${CMAKE_SOURCE_DIR}/libraries"
 )
 target_link_directories(Mars INTERFACE
     "$ENV{VULKAN_SDK}/lib"

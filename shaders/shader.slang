@@ -20,6 +20,6 @@ func vertMain(VertexIn input) -> VertexOut {
 }
 
 [shader("fragment")]
-func fragMain(VertexOut input)->float4 {
+func fragMain(VertexOut input) -> float4 {
     return float4(input.color, 1.0);
 }

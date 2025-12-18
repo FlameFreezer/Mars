@@ -1,8 +1,10 @@
 module;
 
 #include <cstddef>
+#include <format>
 
 export module heap_array;
+import error;
 
 namespace mars {
     //Essentially implements the "fat pointer" from zig
@@ -27,6 +29,10 @@ namespace mars {
         }
         T& operator[](std::size_t index) const noexcept {
             return mPtr[index];
+        }
+        Error<T&> at(std::size_t index) const noexcept {
+            if(index < mSize) return mPtr[index];
+            return {ErrorTag::FATAL_ERROR, std::format("Index out of bounds: {} >= {}", index, mSize)};
         }
         HeapArray<T>& operator=(HeapArray<T>&& rhs) noexcept {
             if(this != &rhs) {

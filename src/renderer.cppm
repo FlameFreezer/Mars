@@ -5,6 +5,8 @@ module;
 #include <vulkan/vulkan.h>
 #include <glm/vec3.hpp>
 #include <glm/vec2.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #include <print>
 #include <array>
@@ -23,11 +25,12 @@ import gpubuffer;
 import error;
 import heap_array;
 import flag_bits;
+import vkhelper;
 
 #define INIT_TRY(proc) do {\
     internal::procResult = proc;\
     if(!internal::procResult.okay()) {\
-        initFail = true;\
+        flags |= flagBits::failedInitialization;\
         return internal::procResult;\
     } \
 } while(false)
@@ -60,8 +63,6 @@ namespace mars {
 
     PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = nullptr;
     PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = nullptr;
-
-    bool initFail = false;
 
     VkBool32 debugCallback(
 	    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -115,14 +116,18 @@ namespace mars {
         }
     };	
 
-    constexpr std::array<Vertex, 3> vertices = {
-        Vertex{glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, 0.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)}
+    constexpr std::array<Vertex, 4> vertices = {
+        Vertex{glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+        Vertex{glm::vec3(0.5f, -0.5f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(0.0f, 0.0f)},
+        Vertex{glm::vec3(0.5f, 0.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)},
+        Vertex{glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)}
+    };
+    constexpr std::array<std::uint32_t, 6> indices = {
+        0, 1, 2, 0, 2, 3
     };
 
     export class Renderer {
-    private:
+        friend class Game;
     	HeapArray<VkImage> swapchainImages;
     	HeapArray<VkImageView> swapchainImageViews;	
         HeapArray<VkQueue> queues;
@@ -143,14 +148,227 @@ namespace mars {
         VkPipelineLayout graphicsPipelineLayout;
         std::uint32_t currentFrame;
         RendererFlags flags;
+        VkImage textureImage;
+        VkDeviceMemory textureImageMemory;
+        VkImageView textureImageView;
 
-        Error<noreturn> recreateSwapchain() {
+        Error<noreturn> createTexture() noexcept {
+            int texWidth, texHeight, texChannels;
+            stbi_uc* pixels = nullptr;
+            std::string texturePath(MARS_TEXTURE_PATH);
+            texturePath.append("/texture.jpg");
+            pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+            if(pixels == nullptr) {
+                return {ErrorTag::FATAL_ERROR, "Failed to find/load texture file"};
+            }
+            VkDeviceSize imageSize = texWidth * texHeight * STBI_rgb_alpha; 
+
+            Error<GPUBuffer> transferBuffer = GPUBuffer::make(
+                device, 
+                physicalDevice, 
+                imageSize, 
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            );
+            if(!transferBuffer.okay()) return transferBuffer.moveError<noreturn>();
+
+            void* memory;
+            if(vkMapMemory(device, transferBuffer.data().memory, 0, imageSize, 0, &memory) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to map buffer memory to the host"};
+            }
+            std::memcpy(memory, pixels, imageSize);
+            vkUnmapMemory(device, transferBuffer.data().memory);
+
+            stbi_image_free(pixels);
+
+            VkImageCreateInfo const imageInfo = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format = VK_FORMAT_R8G8B8A8_SRGB,
+                .extent = {.width = static_cast<std::uint32_t>(texWidth), .height = static_cast<std::uint32_t>(texHeight), .depth = 1},
+                .mipLevels = 1, 
+                .arrayLayers = 1,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .tiling = VK_IMAGE_TILING_OPTIMAL,
+                .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 0,
+                .pQueueFamilyIndices = nullptr,
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
+            };
+            if(vkCreateImage(device, &imageInfo, nullptr, &textureImage) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to create texture image"};
+            }
+            VkMemoryRequirements memRequirements = {};
+            vkGetImageMemoryRequirements(device, textureImage, &memRequirements);
+            Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            if(!memType.okay()) return memType.moveError<noreturn>();
+            VkMemoryAllocateInfo const allocInfo = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .pNext = nullptr,
+                .allocationSize = memRequirements.size,
+                .memoryTypeIndex = memType.data()
+            };
+            if(vkAllocateMemory(device, &allocInfo, nullptr, &textureImageMemory) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to allocate texture image memory"};
+            }
+            if(vkBindImageMemory(device, textureImage, textureImageMemory, 0) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to bind texture image memory"};
+            }
+
+            VkCommandBufferBeginInfo const beginInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .pNext = nullptr,
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                .pInheritanceInfo = nullptr
+            };
+            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to begin command buffer while creating texture image"};
+            }
+
+            VkImageMemoryBarrier2 const preBufferCopy = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = textureImage,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            VkDependencyInfo const dep1 = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = nullptr,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &preBufferCopy
+            };
+            vkCmdPipelineBarrier2(commandBuffers.back(), &dep1);
+            VkBufferImageCopy2 const copyRegion = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+                .pNext = nullptr,
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                },
+                .imageOffset = {0,0,0},
+                .imageExtent = {static_cast<std::uint32_t>(texWidth), static_cast<std::uint32_t>(texHeight), 1}
+            };
+            VkCopyBufferToImageInfo2 const bufferToImageInfo = {
+                .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+                .pNext = nullptr,
+                .srcBuffer = transferBuffer.data().handle,
+                .dstImage = textureImage,
+                .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .regionCount = 1,
+                .pRegions = &copyRegion
+            };
+            vkCmdCopyBufferToImage2(commandBuffers.back(), &bufferToImageInfo);
+            VkImageMemoryBarrier2 const preShaderRead = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = textureImage,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            VkDependencyInfo const dep2 = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = nullptr,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &preShaderRead
+            };
+            vkCmdPipelineBarrier2(commandBuffers.back(), &dep2);
+            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to end command buffer while creating texture image"};
+            }
+            VkSubmitInfo2 const submitInfo = {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .pNext = nullptr,
+                .flags = 0,
+                .waitSemaphoreInfoCount = 0,
+                .pWaitSemaphoreInfos = nullptr,
+                .signalSemaphoreInfoCount = 0,
+                .pSignalSemaphoreInfos = nullptr
+            };
+            if(vkQueueSubmit2(queues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to submit to queue while creating texture image"};
+            }
+
+            VkImageViewCreateInfo const textureViewInfo = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .image = textureImage,
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format = VK_FORMAT_R8G8B8A8_SRGB,
+                .components = {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY
+                },
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            if(vkCreateImageView(device, &textureViewInfo, nullptr, &textureImageView) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to create texture image view"};
+            }
+
+            transferBuffer.data().destroy(device);
+            return success();
+        }
+
+        Error<noreturn> recreateSwapchain() noexcept {
             vkDeviceWaitIdle(device);
             SurfaceInfo surfaceInfo{};
 
             Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevice); 
             if(!presentMode.okay()) return presentMode.moveError<noreturn>();
-            surfaceInfo.presentMode = presentMode.getData();
+            surfaceInfo.presentMode = presentMode.data();
 
             if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceInfo.capabilities) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface capabilities while recreating the swapchain"};
@@ -158,11 +376,11 @@ namespace mars {
 
             Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevice);
             if(!surfaceFormat.okay()) return surfaceFormat.moveError<noreturn>();
-            surfaceInfo.format = surfaceFormat.getData();
+            surfaceInfo.format = surfaceFormat.data();
 
             Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceInfo.capabilities);
             if(!imageExtent.okay()) return imageExtent.moveError<noreturn>();
-            swapchainImageExtent = imageExtent.getData();
+            swapchainImageExtent = imageExtent.data();
 
             VkSwapchainKHR newSwapchain;
             VkSwapchainCreateInfoKHR const swapchainInfo = {
@@ -247,8 +465,8 @@ namespace mars {
 
             VkDeviceSize offset = 0ULL;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.handle, &offset);
-
-            vkCmdDraw(commandBuffer, vertices.max_size(), 1, 0, 0);
+            vkCmdBindIndexBuffer(commandBuffer, vertexBuffer.handle, vertices.max_size() * sizeof(Vertex), VK_INDEX_TYPE_UINT32);
+            vkCmdDrawIndexed(commandBuffer, indices.max_size(), 1, 0, 0, 0);
 
             vkCmdEndRendering(commandBuffer);
 
@@ -292,8 +510,8 @@ namespace mars {
             Error<GPUBuffer> buff = GPUBuffer::make(
                 device, 
                 physicalDevice,
-                vertices.max_size() * sizeof(Vertex),
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                vertices.max_size() * sizeof(Vertex) + indices.max_size() * sizeof(std::uint32_t),
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
             );
             if(!buff.okay()) return buff.moveError<noreturn>();
@@ -302,7 +520,7 @@ namespace mars {
             buff = GPUBuffer::make(
                 device,
                 physicalDevice,
-                vertices.max_size() * sizeof(Vertex),
+                vertices.max_size() * sizeof(Vertex) + indices.max_size() * sizeof(std::uint32_t),
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             );
@@ -315,9 +533,14 @@ namespace mars {
             }
             std::memcpy(memory, static_cast<void const*>(vertices.data()), vertices.max_size() * sizeof(Vertex));
             vkUnmapMemory(device, transferBuffer.memory);
+            if(vkMapMemory(device, transferBuffer.memory, vertices.max_size() * sizeof(Vertex), indices.max_size() * sizeof(std::uint32_t), 0, &memory) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to map memory while creating transfer buffer"};
+            }
+            std::memcpy(memory, static_cast<void const*>(indices.data()), indices.max_size() * sizeof(std::uint32_t));
+            vkUnmapMemory(device, transferBuffer.memory);
 
             VkBufferCopy const region = {
-                .srcOffset = 0, .dstOffset = 0, .size = vertices.max_size() * sizeof(Vertex)
+                .srcOffset = 0, .dstOffset = 0, .size = vertices.max_size() * sizeof(Vertex) + indices.max_size() * sizeof(std::uint32_t)
             };
             vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
@@ -383,7 +606,7 @@ namespace mars {
                 .pNext = nullptr, 
                 .flags = 0,
                 .stage = VK_SHADER_STAGE_VERTEX_BIT,
-                .module = shaderModule.getData(),
+                .module = shaderModule.data(),
                 .pName = "vertMain",
                 .pSpecializationInfo = nullptr
             };
@@ -392,7 +615,7 @@ namespace mars {
                 .pNext = nullptr, 
                 .flags = 0,
                 .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .module = shaderModule.getData(),
+                .module = shaderModule.data(),
                 .pName = "fragMain",
                 .pSpecializationInfo = nullptr
             };
@@ -546,7 +769,7 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline!"};
             }
 
-            vkDestroyShaderModule(device, shaderModule.getData(), nullptr);
+            vkDestroyShaderModule(device, shaderModule.data(), nullptr);
             return success();
         }
         Error<noreturn> getSwapchainImages(SurfaceInfo const& surfaceInfo) noexcept {
@@ -633,7 +856,7 @@ namespace mars {
             if(!imageExtent.okay()){
                 return imageExtent.moveError<noreturn>();
             }
-            swapchainImageExtent = imageExtent.getData();
+            swapchainImageExtent = imageExtent.data();
             VkSwapchainCreateInfoKHR const swapchainInfo = {
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
                 .pNext = nullptr,
@@ -801,7 +1024,7 @@ namespace mars {
             for(int i = 0; i < physicalDeviceCount; i++) {
                 //Check device extension support for the current physical device
                 internal::procResult = checkDeviceExtensionSupport(physicalDevices[i]);
-                if(internal::procResult.getTag() == ErrorTag::SEARCH_FAIL) continue;
+                if(internal::procResult.tag() == ErrorTag::SEARCH_FAIL) continue;
                 else if(!internal::procResult.okay()) return internal::procResult;
                 //Get physical device's capabilities with the surface
                 if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -815,23 +1038,23 @@ namespace mars {
                 //Get a surface format to use
                 Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevices[i]);
                 if(surfaceFormat.okay()) {
-                    surfaceInfo.format = surfaceFormat.getData();
+                    surfaceInfo.format = surfaceFormat.data();
                 }
                 else {
                     return surfaceFormat.moveError<noreturn>();
                 }
                 //Choose a present mode to use
                 Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevices[i]);
-                if(presentMode.getTag() == ErrorTag::SEARCH_FAIL) continue;
+                if(presentMode.tag() == ErrorTag::SEARCH_FAIL) continue;
                 else if(presentMode.okay()) {
-                    surfaceInfo.presentMode = presentMode.getData();
+                    surfaceInfo.presentMode = presentMode.data();
                 }
                 else {
                     return presentMode.moveError<noreturn>();
                 }
                 //Pick the desired queue family index
                 internal::procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i]);
-                if(internal::procResult.getTag() == ErrorTag::SEARCH_FAIL) continue;
+                if(internal::procResult.tag() == ErrorTag::SEARCH_FAIL) continue;
                 else if(!internal::procResult.okay()) return internal::procResult;
                 //At this point if all has succeeded, we are ready to use the current physical device and
                 // create the logical device
@@ -982,7 +1205,6 @@ namespace mars {
             return success();
         }
         public:
-        friend class Game;
         Error<noreturn> init(std::string const& name) noexcept {
             INIT_TRY(createVkInstance(name));
             if constexpr(enableValidationLayers) {
@@ -990,11 +1212,11 @@ namespace mars {
             }
             window = SDL_CreateWindow(name.c_str(), width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
             if(window == nullptr) {
-                initFail = true;
+                flags |= flagBits::failedInitialization;
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
             if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
-                initFail = true;
+                flags |= flagBits::failedInitialization;
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
             SurfaceInfo surfaceInfo{};
@@ -1006,6 +1228,7 @@ namespace mars {
             INIT_TRY(createGraphicsPipeline());
             INIT_TRY(createVertexBuffer());
             INIT_TRY(createSyncObjects());
+            INIT_TRY(createTexture());
 
             return success();
         }
@@ -1019,13 +1242,16 @@ namespace mars {
             swapchain(nullptr),
             commandPool(nullptr),
             graphicsPipeline(nullptr),
+            textureImage(nullptr),
+            textureImageMemory(nullptr),
+            textureImageView(nullptr),
             currentFrame(0),
             flags(0)
         {}
         ~Renderer() noexcept {
             //If something went wrong during initialization, we can't destory vulkan objects, so 
             // we'll quickly end program execution
-            if(initFail) return;
+            if(flags & flagBits::failedInitialization) return;
             vkDeviceWaitIdle(device);
             vkDestroySwapchainKHR(device, swapchain, nullptr);
             for(VkImageView view : swapchainImageViews) {
@@ -1034,6 +1260,9 @@ namespace mars {
             for(VkSemaphore semaphore : semaphores) {
                 vkDestroySemaphore(device, semaphore, nullptr);
             }
+            vkDestroyImage(device, textureImage, nullptr);
+            vkFreeMemory(device, textureImageMemory, nullptr);
+            vkDestroyImageView(device, textureImageView, nullptr);
             for(VkFence fence : fences) {
                 vkDestroyFence(device, fence, nullptr);
             }
@@ -1216,7 +1445,7 @@ namespace mars {
                 .signalSemaphoreInfoCount = 1,
                 .pSignalSemaphoreInfos = &presentationReady
             };
-	    std::uint32_t const queueIndex = queues.size() > 1 ? 1 : 0;
+            std::uint32_t const queueIndex = queues.size() > 1 ? 1 : 0;
 
             if(vkQueueSubmit2(queues[queueIndex], 1, &submitInfo, fences[currentFrame]) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to submit draw commands to queue"};

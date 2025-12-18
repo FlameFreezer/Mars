@@ -6,6 +6,7 @@ module;
 
 export module gpubuffer;
 import error;
+import vkhelper;
 
 namespace mars {
     export struct GPUBuffer {
@@ -21,18 +22,6 @@ namespace mars {
         void destroy(VkDevice device) {
             vkDestroyBuffer(device, handle, nullptr);
             vkFreeMemory(device, memory, nullptr);
-        }
-        static Error<std::uint32_t> findPhysicalDeviceMemoryTypeIndex(VkPhysicalDevice physicalDevice, std::uint32_t availableTypes, VkMemoryPropertyFlags memProperties) noexcept {
-            VkPhysicalDeviceMemoryProperties2 deviceMemProperties{};
-            deviceMemProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
-            vkGetPhysicalDeviceMemoryProperties2(physicalDevice, &deviceMemProperties);
-            for(std::uint32_t i = 0; i < deviceMemProperties.memoryProperties.memoryTypeCount; i++) {
-                std::uint32_t const currentTypeBit = 1U << i;
-                if(availableTypes & currentTypeBit and deviceMemProperties.memoryProperties.memoryTypes[i].propertyFlags & memProperties) {
-                    return i;
-                }
-            }
-            return {ErrorTag::FATAL_ERROR, "Physical Device does not support needed memory type"};
         }
         static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
             GPUBuffer buffer;
@@ -58,7 +47,7 @@ namespace mars {
         		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         		.pNext = nullptr,
         		.allocationSize = memRequirements.size,
-        		.memoryTypeIndex = memType.getData()
+        		.memoryTypeIndex = memType.data()
             };
             if(vkAllocateMemory(device, &allocInfo, nullptr, &buffer.memory) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to allocate device memory while initializing GPUBuffer"};
