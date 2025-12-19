@@ -118,9 +118,9 @@ namespace mars {
 
     constexpr std::array<Vertex, 4> vertices = {
         Vertex{glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, -0.5f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, 0.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)}
+        Vertex{glm::vec3(0.5f, -0.5f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(1.0f, 0.0f)},
+        Vertex{glm::vec3(0.5f, 0.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(1.0f, 1.0f)},
+        Vertex{glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 1.0f)}
     };
     constexpr std::array<std::uint32_t, 6> indices = {
         0, 1, 2, 0, 2, 3
@@ -378,12 +378,21 @@ namespace mars {
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to end command buffer while creating texture image"};
             }
+
+            VkCommandBufferSubmitInfo const commandInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .pNext = nullptr,
+                .commandBuffer = commandBuffers.back(),
+                .deviceMask = 0
+            };
             VkSubmitInfo2 const submitInfo = {
                 .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
                 .pNext = nullptr,
                 .flags = 0,
                 .waitSemaphoreInfoCount = 0,
                 .pWaitSemaphoreInfos = nullptr,
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &commandInfo,
                 .signalSemaphoreInfoCount = 0,
                 .pSignalSemaphoreInfos = nullptr
             };
@@ -1564,7 +1573,6 @@ namespace mars {
 
             currentFrame = (currentFrame + 1) % maxConcurrentFrames;
 
-            return {ErrorTag::FATAL_ERROR, "Early Exit!"};
             return success();
         }
     };
