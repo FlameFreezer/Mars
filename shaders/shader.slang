@@ -18,15 +18,12 @@ struct UniformBuffers {
     ConstantBuffer<MVP> mvp;
 };
 
-ParameterBlock<UniformBuffers> uniformBuffers;
-
 struct Samplers {
     Sampler2D texture;
 };
-ParameterBlock<Samplers> samplers;
 
 [shader("vertex")]
-func vertMain(VertexIn input) -> VertexOut {
+func vertMain(VertexIn input, uniform ParameterBlock<UniformBuffers> uniformBuffers) -> VertexOut {
     VertexOut output;
     output.position = mul(float4(input.position, 1.0), uniformBuffers.mvp.model);
     output.color = input.color;
@@ -35,6 +32,6 @@ func vertMain(VertexIn input) -> VertexOut {
 }
 
 [shader("fragment")]
-func fragMain(VertexOut input) -> float4 {
+func fragMain(VertexOut input, uniform ParameterBlock<Samplers> samplers) -> float4 {
     return samplers.texture.Sample(input.texCoord);
 }
