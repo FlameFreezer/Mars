@@ -11,16 +11,15 @@ struct VertexOut {
 };
 
 [shader("vertex")]
-func vertMain(VertexIn input) -> VertexOut {
+func vertMain(VertexIn input, uniform ConstantBuffer<float4x4> model) -> VertexOut {
     VertexOut output;
-    output.position = float4(input.position, 1.0);
+    output.position = mul(float4(input.position, 1.0), model);
     output.color = input.color;
     output.texCoord = input.texCoord;
     return output;
 }
 
-Sampler2D texture;
 [shader("fragment")]
-func fragMain(VertexOut input)->float4 {
+func fragMain(VertexOut input, uniform Sampler2D texture) -> float4 {
     return texture.Sample(input.texCoord);
 }

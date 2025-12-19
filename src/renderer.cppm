@@ -5,6 +5,8 @@ module;
 #include <vulkan/vulkan.h>
 #include <glm/vec3.hpp>
 #include <glm/vec2.hpp>
+#include "glm/ext/matrix_transform.hpp"
+#include "glm/fwd.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -19,6 +21,7 @@ module;
 #include <cstring>
 #include <cstdint>
 #include <limits>
+#include <chrono>
 
 export module mars:renderer;
 import gpubuffer;
@@ -28,22 +31,19 @@ import flag_bits;
 import vkhelper;
 
 #define INIT_TRY(proc) do {\
-    internal::procResult = proc;\
-    if(!internal::procResult.okay()) {\
-        flags |= flagBits::failedInitialization;\
-        return internal::procResult;\
+    mars::Error<mars::noreturn> procResult = proc;\
+    if(!procResult.okay()) {\
+        flags |= mars::flagBits::failedInitialization;\
+        return procResult;\
     } \
 } while(false)
 
 #define TRY(proc) do {\
-    internal::procResult = proc;\
-    if(!internal::procResult.okay()) return internal::procResult;\
+    mars::Error<mars::noreturn> procResult = proc;\
+    if(!procResult.okay()) return procResult;\
 } while(false)
 
 namespace mars {
-    namespace internal {
-        Error<noreturn> procResult;
-    }
     constexpr int width = 800;
     constexpr int height = 600;
     constexpr std::uint32_t maxConcurrentFrames = 2;
@@ -134,7 +134,7 @@ namespace mars {
         HeapArray<VkSemaphore> semaphores;
     	std::array<VkCommandBuffer, maxConcurrentFrames + 1> commandBuffers;
         std::array<VkFence, maxConcurrentFrames> fences;
-        std::array<VkDescriptorSet, maxConcurrentFrames> descriptorSets;
+        UniformBuffer<glm::mat4> uniformBuffer;
     	GPUBuffer vertexBuffer;
         VkInstance instance;
         SDL_Window* window;
@@ -156,8 +156,16 @@ namespace mars {
         VkDescriptorSetLayout descriptorSetLayout;
 
         Error<noreturn> createDescriptorSetLayout() noexcept {
-            VkDescriptorSetLayoutBinding const samplerLayoutBinding = {
+            std::array<VkDescriptorSetLayoutBinding, 2> layoutBindings;
+            layoutBindings[0] = {
                 .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                .pImmutableSamplers = nullptr
+            };
+            layoutBindings[1] = {
+                .binding = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 .descriptorCount = 1,
                 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -167,8 +175,8 @@ namespace mars {
                 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT,
-                .bindingCount = 1,
-                .pBindings = &samplerLayoutBinding
+                .bindingCount = layoutBindings.max_size(),
+                .pBindings = layoutBindings.data()
             };
             if(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create descriptor set layout"};
@@ -215,7 +223,7 @@ namespace mars {
             if(pixels == nullptr) {
                 return {ErrorTag::FATAL_ERROR, "Failed to find/load texture file"};
             }
-            VkDeviceSize imageSize = texWidth * texHeight * STBI_rgb_alpha; 
+            VkDeviceSize const imageSize = texWidth * texHeight * STBI_rgb_alpha; 
 
             Error<GPUBuffer> transferBuffer = GPUBuffer::make(
                 device, 
@@ -486,8 +494,7 @@ namespace mars {
             swapchainImageViews.clear();
             swapchainImages.clear();
 
-            internal::procResult = getSwapchainImages(surfaceInfo);
-            if(!internal::procResult.okay()) return internal::procResult;
+            TRY(getSwapchainImages(surfaceInfo));
 
             return success();
         }
@@ -536,18 +543,40 @@ namespace mars {
             };
             vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
 
+            static auto startTime = std::chrono::high_resolution_clock::now();
+            auto const now = std::chrono::high_resolution_clock::now();
+            float const angle = std::chrono::duration<float, std::chrono::seconds::period>(now - startTime).count() * glm::radians(90.0f);
+            *uniformBuffer.mappedMemory = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+
+            std::array<VkWriteDescriptorSet, 2> writeDescriptorSets;
+            VkDescriptorBufferInfo const uniformBufferInfo = {
+                .buffer = uniformBuffer.handle,
+                .offset = 0,
+                .range = sizeof(glm::mat4)
+            };
+            writeDescriptorSets[0] = {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .pNext = nullptr,
+                .dstSet = nullptr,
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .pImageInfo = nullptr,
+                .pBufferInfo = &uniformBufferInfo,
+                .pTexelBufferView = nullptr
+            };
 
             VkDescriptorImageInfo const samplerImageInfo = {
                 .sampler = sampler,
                 .imageView = textureImageView,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
-
-            VkWriteDescriptorSet const writeTextureSampler = {
+            writeDescriptorSets[1] = {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .pNext = nullptr,
-                .dstSet = descriptorSets[currentFrame],
-                .dstBinding = 0,
+                .dstSet = nullptr,
+                .dstBinding = 1,
                 .dstArrayElement = 0,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -555,15 +584,14 @@ namespace mars {
                 .pBufferInfo = nullptr,
                 .pTexelBufferView = nullptr
             };
-            vkCmdPushDescriptorSet(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, 1, &writeTextureSampler);
+            vkCmdPushDescriptorSet(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, writeDescriptorSets.max_size(), writeDescriptorSets.data());
 
-            VkDeviceSize offset = 0ULL;
+            VkDeviceSize const offset = 0ULL;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.handle, &offset);
             vkCmdBindIndexBuffer(commandBuffer, vertexBuffer.handle, vertices.max_size() * sizeof(Vertex), VK_INDEX_TYPE_UINT32);
             vkCmdDrawIndexed(commandBuffer, indices.max_size(), 1, 0, 0, 0);
 
             vkCmdEndRendering(commandBuffer);
-
         }        
 
         Error<noreturn> createSyncObjects() noexcept {
@@ -871,11 +899,11 @@ namespace mars {
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
             }
-            swapchainImages = HeapArray<VkImage>(imageCount, nullptr);
+            swapchainImages = HeapArray<VkImage>(imageCount);
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
             }
-            swapchainImageViews = HeapArray<VkImageView>(imageCount, nullptr);
+            swapchainImageViews = HeapArray<VkImageView>(imageCount);
 
             VkImageViewCreateInfo imageViewInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -1117,9 +1145,9 @@ namespace mars {
             //Iterate through each of these devices
             for(int i = 0; i < physicalDeviceCount; i++) {
                 //Check device extension support for the current physical device
-                internal::procResult = checkDeviceExtensionSupport(physicalDevices[i]);
-                if(internal::procResult.tag() == ErrorTag::SEARCH_FAIL) continue;
-                else if(!internal::procResult.okay()) return internal::procResult;
+                Error<noreturn> procResult = checkDeviceExtensionSupport(physicalDevices[i]);
+                if(procResult.tag() == ErrorTag::SEARCH_FAIL) continue;
+                else if(!procResult.okay()) return procResult;
                 //Get physical device's capabilities with the surface
                 if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
                     physicalDevices[i], 
@@ -1147,9 +1175,9 @@ namespace mars {
                     return presentMode.moveError<noreturn>();
                 }
                 //Pick the desired queue family index
-                internal::procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i]);
-                if(internal::procResult.tag() == ErrorTag::SEARCH_FAIL) continue;
-                else if(!internal::procResult.okay()) return internal::procResult;
+                procResult = pickQueueFamilyIndex(queueFamilyIndex, queueCount, physicalDevices[i]);
+                if(procResult.tag() == ErrorTag::SEARCH_FAIL) continue;
+                else if(!procResult.okay()) return procResult;
                 //At this point if all has succeeded, we are ready to use the current physical device and
                 // create the logical device
                 physicalDevice = physicalDevices[i];
@@ -1159,7 +1187,7 @@ namespace mars {
             return {ErrorTag::FATAL_ERROR, "Failed to find a suitable GPU!"};
 
         Device_Creation:
-            std::vector<float> const queuePriorities(queueCount, 0.0f);
+            HeapArray<float> const queuePriorities(queueCount, 0.0f);
 
             VkDeviceQueueCreateInfo const queueInfo = {
                 .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -1208,6 +1236,16 @@ namespace mars {
         }
 
         Error<noreturn> createVkDebugUtilsMessenger() noexcept {
+            vkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+                vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+            if(vkCreateDebugUtilsMessengerEXT == nullptr) {
+                return {ErrorTag::FATAL_ERROR, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
+            }
+            vkDestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+                vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+            if(vkDestroyDebugUtilsMessengerEXT == nullptr) {
+                return {ErrorTag::FATAL_ERROR, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
+            }
             VkDebugUtilsMessengerCreateInfoEXT const debugMessengerInfo = {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
                 .pNext = nullptr,
@@ -1222,18 +1260,9 @@ namespace mars {
                 .pfnUserCallback = debugCallback,
                 .pUserData = nullptr,
             };
-            vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-            if(vkCreateDebugUtilsMessengerEXT == nullptr) {
-                return {ErrorTag::FATAL_ERROR, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
-            }
+
             if(vkCreateDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create vkDebugUtilsMessengerEXT!"};
-            }
-            vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-                instance, "vkDestroyDebugUtilsMessengerEXT"
-            );
-            if(vkDestroyDebugUtilsMessengerEXT == nullptr) {
-                return {ErrorTag::FATAL_ERROR, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
             }
             return success();
         }
@@ -1256,7 +1285,7 @@ namespace mars {
                             goto Next_Layer;
                         }
                     }
-                    return {ErrorTag::FATAL_ERROR, "Needed instance layers not found!"};
+                    return {ErrorTag::FATAL_ERROR, std::format("Needed layer \"{}\" not found", layer)};
                     Next_Layer:
                 }
             }
@@ -1332,6 +1361,9 @@ namespace mars {
             INIT_TRY(createSampler());
             INIT_TRY(createVertexBuffer());
             INIT_TRY(createSyncObjects());
+            Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, sizeof(glm::mat4));
+            if(!res.okay()) return res.moveError<noreturn>();
+            uniformBuffer = res.moveData();
 
             return success();
         }
@@ -1353,7 +1385,7 @@ namespace mars {
             flags(0)
         {}
         ~Renderer() noexcept {
-            //If something went wrong during initialization, we can't destory vulkan objects, so 
+            //If something went wrong during initialization, we can't destroy vulkan objects, so 
             // we'll quickly end program execution
             if(flags & flagBits::failedInitialization) return;
             vkDeviceWaitIdle(device);
@@ -1376,6 +1408,7 @@ namespace mars {
             vkDestroyCommandPool(device, commandPool, nullptr);
             vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr);
             vkDestroyPipeline(device, graphicsPipeline, nullptr);
+            uniformBuffer.destroy(device);
             vertexBuffer.destroy(device);
             vkDestroyDevice(device, nullptr);
             SDL_Vulkan_DestroySurface(instance, surface, nullptr);

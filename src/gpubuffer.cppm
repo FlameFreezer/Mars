@@ -19,7 +19,7 @@ namespace mars {
             other.handle = nullptr;
             other.memory = nullptr;
         }
-        void destroy(VkDevice device) {
+        virtual void destroy(VkDevice device) {
             vkDestroyBuffer(device, handle, nullptr);
             vkFreeMemory(device, memory, nullptr);
         }
@@ -67,5 +67,34 @@ namespace mars {
             return *this;
         }
         GPUBuffer& operator=(GPUBuffer const& rhs) = delete;
+    };
+    export template<class T>
+    struct UniformBuffer : public GPUBuffer {
+        T* mappedMemory;
+        UniformBuffer() noexcept : mappedMemory(nullptr) {}
+        static Error<UniformBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size) noexcept {
+            Error<GPUBuffer> buffer = GPUBuffer::make(
+                device, 
+                physicalDevice, 
+                size, 
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            ); 
+            if(!buffer.okay()) return buffer.moveError<UniformBuffer>();
+
+            UniformBuffer result;
+            GPUBuffer* const ptr = &result;
+            *ptr = buffer.moveData();
+
+            if(vkMapMemory(device, result.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to map device memory to host while creating uniform buffer"};
+            }
+            return result;
+        }
+
+        void destroy(VkDevice device) override {
+            vkUnmapMemory(device, memory);
+            this->GPUBuffer::destroy(device);
+        }
     };
 }

@@ -60,7 +60,7 @@ else()
 endif()
 
 if(NOT DEFINED ENV{VULKAN_SDK})
-    message(FATAL_ERROR "Environment variable "VULKAN_SDK" not defined! Set this to the path to the Vulkan SDK installed on your system.")
+    message(FATAL_ERROR "Environment variable \"VULKAN_SDK\" not defined! Set this to the path to the Vulkan SDK installed on your system.")
 endif()
 
 target_include_directories(Mars PUBLIC 

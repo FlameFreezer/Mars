@@ -18,7 +18,7 @@ namespace mars {
         FATAL_ERROR,
     };
 
-    export constexpr std::string tagToString(ErrorTag tag) noexcept {
+    export constexpr char const* tagToString(ErrorTag tag) noexcept {
         switch(tag) {
         case ErrorTag::ALL_OKAY:
             return "All Okay";
@@ -27,7 +27,7 @@ namespace mars {
         case ErrorTag::FATAL_ERROR:
             return "Fatal Error";
         default:
-            return "";
+            std::unreachable();
         }
     }
 
