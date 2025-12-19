@@ -499,7 +499,7 @@ namespace mars {
             return success();
         }
 
-        void renderPass(VkImageView imageView, VkCommandBuffer commandBuffer) noexcept {
+        void doRenderPass(VkImageView imageView, VkCommandBuffer commandBuffer) noexcept {
             VkRenderingAttachmentInfo const colorAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .pNext = nullptr,
@@ -542,11 +542,6 @@ namespace mars {
                 .extent = swapchainImageExtent 
             };
             vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
-
-            static auto startTime = std::chrono::high_resolution_clock::now();
-            auto const now = std::chrono::high_resolution_clock::now();
-            float const angle = std::chrono::duration<float, std::chrono::seconds::period>(now - startTime).count() * glm::radians(90.0f);
-            *uniformBuffer.mappedMemory = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
 
             std::array<VkWriteDescriptorSet, 2> writeDescriptorSets;
             VkDescriptorBufferInfo const uniformBufferInfo = {
@@ -1384,7 +1379,7 @@ namespace mars {
             currentFrame(0),
             flags(0)
         {}
-        ~Renderer() noexcept {
+        void destroy() noexcept {
             //If something went wrong during initialization, we can't destroy vulkan objects, so 
             // we'll quickly end program execution
             if(flags & flagBits::failedInitialization) return;
@@ -1458,6 +1453,12 @@ namespace mars {
             if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, std::format("Failed to reset fence {}", currentFrame)};
             }
+
+            static auto startTime = std::chrono::high_resolution_clock::now();
+            auto const now = std::chrono::high_resolution_clock::now();
+            float const angle = std::chrono::duration<float, std::chrono::seconds::period>(now - startTime).count() * glm::radians(90.0f);
+            *uniformBuffer.mappedMemory = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+
             if(vkResetCommandBuffer(commandBuffers[currentFrame], 0) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer"};
             }
@@ -1507,7 +1508,7 @@ namespace mars {
 
             vkCmdPipelineBarrier2(commandBuffers[currentFrame], &colorWriteDependency);
 
-            renderPass(swapchainImageViews[imageViewIndex], commandBuffers[currentFrame]);
+            doRenderPass(swapchainImageViews[imageViewIndex], commandBuffers[currentFrame]);
 
             //Transition image layout for presentation
             VkImageMemoryBarrier2 const presentSrcBarrier = {

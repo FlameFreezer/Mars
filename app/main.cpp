@@ -37,6 +37,7 @@ ErrorNoreturn run() noexcept {
     	}
         TRY(g.draw());
     }
+    g.destroy();
     return mars::success();
 }
 

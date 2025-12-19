@@ -24,7 +24,7 @@ namespace mars {
         public:
         Game() noexcept;
         Game(const std::string& name) noexcept;
-        ~Game() noexcept;
+        void destroy() noexcept;
         Error<noreturn> init() noexcept;
         Error<noreturn> draw() noexcept;
         void setFlag(std::uint64_t flag) noexcept;

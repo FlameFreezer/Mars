@@ -83,8 +83,7 @@ namespace mars {
             if(!buffer.okay()) return buffer.moveError<UniformBuffer>();
 
             UniformBuffer result;
-            GPUBuffer* const ptr = &result;
-            *ptr = buffer.moveData();
+            *reinterpret_cast<GPUBuffer*>(&result) = buffer.moveData();
 
             if(vkMapMemory(device, result.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to map device memory to host while creating uniform buffer"};
