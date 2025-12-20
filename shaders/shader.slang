@@ -10,16 +10,31 @@ struct VertexOut {
     float2 texCoord;
 };
 
+struct MVP {
+    float4x4 model;
+};
+
+struct UniformBuffers {
+    ConstantBuffer<MVP> mvp;
+};
+
+ParameterBlock<UniformBuffers> uniformBuffers;
+
+struct Samplers {
+    Sampler2D texture;
+};
+ParameterBlock<Samplers> samplers;
+
 [shader("vertex")]
-func vertMain(VertexIn input, uniform ConstantBuffer<float4x4> model) -> VertexOut {
+func vertMain(VertexIn input) -> VertexOut {
     VertexOut output;
-    output.position = mul(float4(input.position, 1.0), model);
+    output.position = mul(float4(input.position, 1.0), uniformBuffers.mvp.model);
     output.color = input.color;
     output.texCoord = input.texCoord;
     return output;
 }
 
 [shader("fragment")]
-func fragMain(VertexOut input, uniform Sampler2D texture) -> float4 {
-    return texture.Sample(input.texCoord);
+func fragMain(VertexOut input) -> float4 {
+    return samplers.texture.Sample(input.texCoord);
 }

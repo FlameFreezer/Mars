@@ -153,32 +153,105 @@ namespace mars {
         VkDeviceMemory textureImageMemory;
         VkImageView textureImageView;
         VkSampler sampler;
-        VkDescriptorSetLayout descriptorSetLayout;
+        VkDescriptorSetLayout pushDescriptorSetLayout;
+        VkDescriptorSetLayout bindDescriptorSetLayout;
+        VkDescriptorPool descriptorPool;
+        std::vector<VkDescriptorSet> descriptorSets;
 
-        Error<noreturn> createDescriptorSetLayout() noexcept {
-            std::array<VkDescriptorSetLayoutBinding, 2> layoutBindings;
-            layoutBindings[0] = {
-                .binding = 0,
+        Error<noreturn> createDescriptorSets() noexcept {
+            descriptorSets.resize(1);
+            VkDescriptorSetAllocateInfo const allocInfo = {
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+                .pNext = nullptr,
+                .descriptorPool = descriptorPool,
+                .descriptorSetCount = static_cast<std::uint32_t>(descriptorSets.size()),
+                .pSetLayouts = &bindDescriptorSetLayout
+            };
+            if(vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to allocate descriptor sets"};
+            }
+            std::array<VkWriteDescriptorSet, 1> writeDescriptorSets;
+            VkDescriptorBufferInfo const uniformBufferInfo = {
+                .buffer = uniformBuffer.handle,
+                .offset = 0,
+                .range = sizeof(glm::mat4)
+            };
+            writeDescriptorSets[0] = {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .pNext = nullptr,
+                .dstSet = descriptorSets[0],
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .descriptorCount = 1,
-                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-                .pImmutableSamplers = nullptr
+                .pImageInfo = nullptr,
+                .pBufferInfo = &uniformBufferInfo,
+                .pTexelBufferView = nullptr
             };
-            layoutBindings[1] = {
-                .binding = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptorCount = 1,
-                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .pImmutableSamplers = nullptr
+            vkUpdateDescriptorSets(device, writeDescriptorSets.max_size(), writeDescriptorSets.data(), 0, nullptr);
+
+            return success();
+        }
+
+        Error<noreturn> createDescriptorPools() noexcept {
+            std::array<VkDescriptorPoolSize, 1> const descriptorPoolSizes = {
+                VkDescriptorPoolSize{
+                    .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    .descriptorCount = 1
+                }
             };
-            VkDescriptorSetLayoutCreateInfo const descriptorSetLayoutInfo = {
+            VkDescriptorPoolCreateInfo const descriptorPoolInfo = {
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+                .maxSets = 1,
+                .poolSizeCount = descriptorPoolSizes.max_size(),
+                .pPoolSizes = descriptorPoolSizes.data()
+            };
+            if(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to create descriptor pool"};
+            }
+            return success();
+        }
+
+        Error<noreturn> createDescriptorSetLayouts() noexcept {
+            std::array<VkDescriptorSetLayoutBinding, 1> constexpr bindLayoutBindings = {
+                VkDescriptorSetLayoutBinding{
+                    .binding = 0,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    .descriptorCount = 1,
+                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                    .pImmutableSamplers = nullptr
+                }
+            };
+            VkDescriptorSetLayoutCreateInfo const bindDescriptorLayoutInfo = {
+                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .bindingCount = bindLayoutBindings.max_size(),
+                .pBindings = bindLayoutBindings.data()
+            };
+            if(vkCreateDescriptorSetLayout(device, &bindDescriptorLayoutInfo, nullptr, &bindDescriptorSetLayout) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to create descriptor set layout"};
+            }
+ 
+            std::array<VkDescriptorSetLayoutBinding, 1> constexpr pushLayoutBindings = {
+               VkDescriptorSetLayoutBinding{
+                    .binding = 0,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorCount = 1,
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pImmutableSamplers = nullptr
+                }
+            };
+            VkDescriptorSetLayoutCreateInfo const pushDescriptorLayoutInfo = {
                 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT,
-                .bindingCount = layoutBindings.max_size(),
-                .pBindings = layoutBindings.data()
+                .bindingCount = pushLayoutBindings.max_size(),
+                .pBindings = pushLayoutBindings.data()
             };
-            if(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            if(vkCreateDescriptorSetLayout(device, &pushDescriptorLayoutInfo, nullptr, &pushDescriptorSetLayout) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create descriptor set layout"};
             }
             return success();
@@ -543,11 +616,22 @@ namespace mars {
             };
             vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
 
-            std::array<VkWriteDescriptorSet, 2> writeDescriptorSets;
-            VkDescriptorBufferInfo const uniformBufferInfo = {
-                .buffer = uniformBuffer.handle,
-                .offset = 0,
-                .range = sizeof(glm::mat4)
+            vkCmdBindDescriptorSets(
+                commandBuffer, 
+                VK_PIPELINE_BIND_POINT_GRAPHICS, 
+                graphicsPipelineLayout, 
+                0, 
+                descriptorSets.size(), 
+                descriptorSets.data(), 
+                0, 
+                nullptr
+            );
+
+            std::array<VkWriteDescriptorSet, 1> writeDescriptorSets;
+            VkDescriptorImageInfo const samplerImageInfo = {
+                .sampler = sampler,
+                .imageView = textureImageView,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
             writeDescriptorSets[0] = {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -556,30 +640,19 @@ namespace mars {
                 .dstBinding = 0,
                 .dstArrayElement = 0,
                 .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pImageInfo = nullptr,
-                .pBufferInfo = &uniformBufferInfo,
-                .pTexelBufferView = nullptr
-            };
-
-            VkDescriptorImageInfo const samplerImageInfo = {
-                .sampler = sampler,
-                .imageView = textureImageView,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            };
-            writeDescriptorSets[1] = {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .pNext = nullptr,
-                .dstSet = nullptr,
-                .dstBinding = 1,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 .pImageInfo = &samplerImageInfo,
                 .pBufferInfo = nullptr,
                 .pTexelBufferView = nullptr
             };
-            vkCmdPushDescriptorSet(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, writeDescriptorSets.max_size(), writeDescriptorSets.data());
+            vkCmdPushDescriptorSet(
+                commandBuffer, 
+                VK_PIPELINE_BIND_POINT_GRAPHICS, 
+                graphicsPipelineLayout, 
+                1, 
+                writeDescriptorSets.max_size(), 
+                writeDescriptorSets.data()
+            );
 
             VkDeviceSize const offset = 0ULL;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.handle, &offset);
@@ -846,12 +919,15 @@ namespace mars {
                 .pDynamicStates = dynamicStates.data()
             };
 
+            std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+            descriptorSetLayouts.push_back(bindDescriptorSetLayout);
+            descriptorSetLayouts.push_back(pushDescriptorSetLayout);
             VkPipelineLayoutCreateInfo const pipelineLayoutInfo = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
-                .setLayoutCount = 1,
-                .pSetLayouts = &descriptorSetLayout,
+                .setLayoutCount = static_cast<std::uint32_t>(descriptorSetLayouts.size()),
+                .pSetLayouts = descriptorSetLayouts.data(),
                 .pushConstantRangeCount = 0,
                 .pPushConstantRanges = nullptr
             };
@@ -1350,15 +1426,17 @@ namespace mars {
             INIT_TRY(createVkSwapchainKHR(surfaceInfo));
             INIT_TRY(getSwapchainImages(surfaceInfo));
             INIT_TRY(createCommandBuffers(queueFamilyIndex));
-            INIT_TRY(createDescriptorSetLayout());
+            Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, sizeof(glm::mat4));
+            if(!res.okay()) return res.moveError<noreturn>();
+            uniformBuffer = res.moveData();
+            INIT_TRY(createDescriptorSetLayouts());
+            INIT_TRY(createDescriptorPools());
+            INIT_TRY(createDescriptorSets());
             INIT_TRY(createGraphicsPipeline());
             INIT_TRY(createTexture());
             INIT_TRY(createSampler());
             INIT_TRY(createVertexBuffer());
             INIT_TRY(createSyncObjects());
-            Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, sizeof(glm::mat4));
-            if(!res.okay()) return res.moveError<noreturn>();
-            uniformBuffer = res.moveData();
 
             return success();
         }
@@ -1375,7 +1453,9 @@ namespace mars {
             textureImage(nullptr),
             textureImageMemory(nullptr),
             textureImageView(nullptr),
-            descriptorSetLayout(nullptr),
+            pushDescriptorSetLayout(nullptr),
+            bindDescriptorSetLayout(nullptr),
+            descriptorPool(nullptr),
             currentFrame(0),
             flags(0)
         {}
@@ -1388,13 +1468,16 @@ namespace mars {
             for(VkImageView view : swapchainImageViews) {
                 vkDestroyImageView(device, view, nullptr);
             }
+            vkFreeDescriptorSets(device, descriptorPool, static_cast<std::uint32_t>(descriptorSets.size()), descriptorSets.data());
+            vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+            vkDestroyDescriptorSetLayout(device, pushDescriptorSetLayout, nullptr);
+            vkDestroyDescriptorSetLayout(device, bindDescriptorSetLayout, nullptr);
             for(VkSemaphore semaphore : semaphores) {
                 vkDestroySemaphore(device, semaphore, nullptr);
             }
             vkDestroyImage(device, textureImage, nullptr);
             vkFreeMemory(device, textureImageMemory, nullptr);
             vkDestroyImageView(device, textureImageView, nullptr);
-            vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
             vkDestroySampler(device, sampler, nullptr);
             for(VkFence fence : fences) {
                 vkDestroyFence(device, fence, nullptr);
@@ -1454,6 +1537,7 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, std::format("Failed to reset fence {}", currentFrame)};
             }
 
+            //Update uniform buffer
             static auto startTime = std::chrono::high_resolution_clock::now();
             auto const now = std::chrono::high_resolution_clock::now();
             float const angle = std::chrono::duration<float, std::chrono::seconds::period>(now - startTime).count() * glm::radians(90.0f);

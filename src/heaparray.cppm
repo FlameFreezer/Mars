@@ -121,7 +121,7 @@ namespace mars {
             other.mPtr = nullptr;
             other.mSize = 0;
         }
-        virtual ~Slice() noexcept override {
+        ~Slice() noexcept override {
             this->mPtr = nullptr;
             this->mSize = 0;
         }

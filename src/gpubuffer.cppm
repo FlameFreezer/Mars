@@ -3,6 +3,7 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
+#include <utility>
 
 export module gpubuffer;
 import error;
@@ -82,8 +83,7 @@ namespace mars {
             ); 
             if(!buffer.okay()) return buffer.moveError<UniformBuffer>();
 
-            UniformBuffer result;
-            *reinterpret_cast<GPUBuffer*>(&result) = buffer.moveData();
+            UniformBuffer result(buffer.moveData());
 
             if(vkMapMemory(device, result.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to map device memory to host while creating uniform buffer"};
@@ -95,5 +95,7 @@ namespace mars {
             vkUnmapMemory(device, memory);
             this->GPUBuffer::destroy(device);
         }
+        private:
+        UniformBuffer(GPUBuffer&& other) noexcept : GPUBuffer(std::move(other)), mappedMemory(nullptr) {}
     };
 }
