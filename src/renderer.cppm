@@ -131,6 +131,7 @@ namespace mars {
         alignas(16) glm::mat4 proj;
     };
 
+    //Members are in the order of their set number
     struct DescriptorSetLayouts {
         VkDescriptorSetLayout bind;
         VkDescriptorSetLayout push;
@@ -144,10 +145,22 @@ namespace mars {
         }
     };
 
+    struct Camera {
+        UniformBuffer<glm::mat4> uniformBuffer;
+
+        glm::mat4* view(std::uint32_t index) noexcept {
+            return uniformBuffer.mappedMemory + 2 * index;
+        }
+        glm::mat4* proj(std::uint32_t index) noexcept {
+            return uniformBuffer.mappedMemory + 2 * index + 1;
+        }
+    };
+
     export class Renderer {
         friend class Game;
-        std::array<UniformBuffer<MVP>, maxConcurrentFrames> uniformBuffers;
-        std::array<VkDescriptorSet, maxConcurrentFrames> descriptorSets;
+        std::vector<VkDescriptorSet> descriptorSets;
+        std::array<glm::mat4, maxConcurrentFrames> models;
+        Camera camera;
     	HeapArray<VkImage> swapchainImages;
     	HeapArray<VkImageView> swapchainImageViews;	
         HeapArray<VkQueue> queues;
@@ -176,41 +189,35 @@ namespace mars {
         RendererFlags flags;
 
         Error<noreturn> createDescriptorSets() noexcept {
-            std::array<VkDescriptorSetLayout, maxConcurrentFrames> layouts;
-            layouts[0] = descriptorSetLayouts.bind;
-            layouts[1] = descriptorSetLayouts.bind;
+            descriptorSets.resize(descriptorSets.size() + 1);
             VkDescriptorSetAllocateInfo const allocInfo = {
                 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
                 .pNext = nullptr,
                 .descriptorPool = descriptorPool,
-                .descriptorSetCount = static_cast<std::uint32_t>(descriptorSets.size()),
-                .pSetLayouts = layouts.data()
+                .descriptorSetCount = 1,
+                .pSetLayouts = &descriptorSetLayouts.bind
             };
             if(vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to allocate descriptor sets"};
             }
-            std::array<VkWriteDescriptorSet, maxConcurrentFrames> writeDescriptorSets;
-            std::array<VkDescriptorBufferInfo, maxConcurrentFrames> uniformBufferInfo;
-            for(std::uint32_t i = 0; i < maxConcurrentFrames; i++) {
-                uniformBufferInfo[i] = {
-                    .buffer = uniformBuffers[i].handle,
-                    .offset = 0,
-                    .range = sizeof(MVP)
-                };
-                writeDescriptorSets[i] = {
-                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    .pNext = nullptr,
-                    .dstSet = descriptorSets[i],
-                    .dstBinding = 0,
-                    .dstArrayElement = 0,
-                    .descriptorCount = 1,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                    .pImageInfo = nullptr,
-                    .pBufferInfo = &uniformBufferInfo[i],
-                    .pTexelBufferView = nullptr
-                };
+            VkDescriptorImageInfo const samplerImageInfo = {
+                .sampler = sampler,
+                .imageView = textureImageView,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
-            vkUpdateDescriptorSets(device, writeDescriptorSets.max_size(), writeDescriptorSets.data(), 0, nullptr);
+            VkWriteDescriptorSet const writeSampler = {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .pNext = nullptr,
+                .dstSet = descriptorSets[0],
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .pImageInfo = &samplerImageInfo,
+                .pBufferInfo = nullptr,
+                .pTexelBufferView = nullptr
+            };
+            vkUpdateDescriptorSets(device, 1, &writeSampler, 0, nullptr);
 
             return success();
         }
@@ -218,15 +225,15 @@ namespace mars {
         Error<noreturn> createDescriptorPools() noexcept {
             std::array<VkDescriptorPoolSize, 1> const descriptorPoolSizes = {
                 VkDescriptorPoolSize{
-                    .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                    .descriptorCount = maxConcurrentFrames
+                    .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorCount = 1
                 }
             };
             VkDescriptorPoolCreateInfo const descriptorPoolInfo = {
                 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-                .maxSets = maxConcurrentFrames,
+                .maxSets = 1,
                 .poolSizeCount = descriptorPoolSizes.max_size(),
                 .pPoolSizes = descriptorPoolSizes.data()
             };
@@ -240,9 +247,9 @@ namespace mars {
             std::array<VkDescriptorSetLayoutBinding, 1> constexpr bindLayoutBindings = {
                 VkDescriptorSetLayoutBinding{
                     .binding = 0,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                     .descriptorCount = 1,
-                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
                     .pImmutableSamplers = nullptr
                 }
             };
@@ -260,9 +267,9 @@ namespace mars {
             std::array<VkDescriptorSetLayoutBinding, 1> constexpr pushLayoutBindings = {
                VkDescriptorSetLayoutBinding{
                     .binding = 0,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                     .descriptorCount = 1,
-                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                     .pImmutableSamplers = nullptr
                 }
             };
@@ -643,28 +650,27 @@ namespace mars {
                 VK_PIPELINE_BIND_POINT_GRAPHICS, 
                 graphicsPipelineLayout, 
                 0, 
-                1, 
-                &descriptorSets[currentFrame], 
+                descriptorSets.size(), 
+                descriptorSets.data(), 
                 0, 
                 nullptr
             );
 
-            std::array<VkWriteDescriptorSet, 1> writeDescriptorSets;
-            VkDescriptorImageInfo const samplerImageInfo = {
-                .sampler = sampler,
-                .imageView = textureImageView,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            VkDescriptorBufferInfo const cameraBufferInfo = {
+                .buffer = camera.uniformBuffer.handle,
+                .offset = sizeof(glm::mat4) * currentFrame * 2,
+                .range = sizeof(glm::mat4) * 2
             };
-            writeDescriptorSets[0] = {
+            VkWriteDescriptorSet const writeCamera = {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .pNext = nullptr,
                 .dstSet = nullptr,
                 .dstBinding = 0,
                 .dstArrayElement = 0,
                 .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .pImageInfo = &samplerImageInfo,
-                .pBufferInfo = nullptr,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .pImageInfo = nullptr,
+                .pBufferInfo = &cameraBufferInfo,
                 .pTexelBufferView = nullptr
             };
             vkCmdPushDescriptorSet(
@@ -672,9 +678,11 @@ namespace mars {
                 VK_PIPELINE_BIND_POINT_GRAPHICS, 
                 graphicsPipelineLayout, 
                 1, 
-                writeDescriptorSets.max_size(), 
-                writeDescriptorSets.data()
+                1, 
+                &writeCamera
             );
+
+            vkCmdPushConstants(commandBuffer, graphicsPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &models[currentFrame]);
 
             VkDeviceSize const offset = 0ULL;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.handle, &offset);
@@ -941,14 +949,20 @@ namespace mars {
                 .pDynamicStates = dynamicStates.data()
             };
 
+            VkPushConstantRange const pushConstantRange = {
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                .offset = 0,
+                .size = sizeof(glm::mat4)
+            };
+
             VkPipelineLayoutCreateInfo const pipelineLayoutInfo = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
                 .setLayoutCount = DescriptorSetLayouts::numLayouts(),
                 .pSetLayouts = descriptorSetLayouts.ptr(),
-                .pushConstantRangeCount = 0,
-                .pPushConstantRanges = nullptr
+                .pushConstantRangeCount = 1,
+                .pPushConstantRanges = &pushConstantRange
             };
 
             if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout) != VK_SUCCESS) {
@@ -1445,19 +1459,18 @@ namespace mars {
             INIT_TRY(createVkSwapchainKHR(surfaceInfo));
             INIT_TRY(getSwapchainImages(surfaceInfo));
             INIT_TRY(createCommandBuffers(queueFamilyIndex));
-            for(auto& uniformBuffer : uniformBuffers) {
-                Error<UniformBuffer<MVP>> res = UniformBuffer<MVP>::make(device, physicalDevice, sizeof(MVP));
-                if(!res.okay()) return res.moveError<noreturn>();
-                uniformBuffer = res.moveData();
-            }
-            INIT_TRY(createDescriptorSetLayouts());
-            INIT_TRY(createDescriptorPools());
-            INIT_TRY(createDescriptorSets());
-            INIT_TRY(createGraphicsPipeline());
+            Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, sizeof(glm::mat4) * 2 * maxConcurrentFrames);
+            if(!res.okay()) return res.moveError<noreturn>();
+            camera.uniformBuffer = res.moveData();
             INIT_TRY(createTexture());
             INIT_TRY(createSampler());
             INIT_TRY(createVertexBuffer());
             INIT_TRY(createSyncObjects());
+            INIT_TRY(createDescriptorSetLayouts());
+            INIT_TRY(createDescriptorPools());
+            INIT_TRY(createDescriptorSets());
+            INIT_TRY(createGraphicsPipeline());
+            for(glm::mat4& model : models) model = glm::mat4(1.0f);
 
             return success();
         }
@@ -1488,7 +1501,7 @@ namespace mars {
             for(VkImageView view : swapchainImageViews) {
                 vkDestroyImageView(device, view, nullptr);
             }
-            vkFreeDescriptorSets(device, descriptorPool, static_cast<std::uint32_t>(descriptorSets.size()), descriptorSets.data());
+            vkResetDescriptorPool(device, descriptorPool, 0);
             vkDestroyDescriptorPool(device, descriptorPool, nullptr);
             vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.bind, nullptr);
             vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.push, nullptr);
@@ -1506,7 +1519,7 @@ namespace mars {
             vkDestroyCommandPool(device, commandPool, nullptr);
             vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr);
             vkDestroyPipeline(device, graphicsPipeline, nullptr);
-            for(auto& uniformBuffer : uniformBuffers) uniformBuffer.destroy(device);
+            camera.uniformBuffer.destroy(device);
             vertexBuffer.destroy(device);
             vkDestroyDevice(device, nullptr);
             SDL_Vulkan_DestroySurface(instance, surface, nullptr);
@@ -1517,7 +1530,7 @@ namespace mars {
             vkDestroyInstance(instance, nullptr);
         }
 
-        Error<noreturn> drawFrame() noexcept {
+        Error<noreturn> drawFrame(std::chrono::duration<std::int64_t, std::chrono::nanoseconds::period> deltaTime) noexcept {
             if(vkWaitForFences(device, 1, &fences[currentFrame], VK_TRUE, std::numeric_limits<std::uint64_t>::max()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiitng on fence {}", currentFrame)};
             }
@@ -1547,7 +1560,7 @@ namespace mars {
                     return {ErrorTag::FATAL_ERROR, "Failed to recreate semaphore while recreating swapchain during draw"};
                 }
                 flags &= ~flagBits::recreateSwapchain;
-                return drawFrame();
+                return drawFrame(deltaTime);
             }
             else if(res != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to acquire next swapchain image index"};
@@ -1558,17 +1571,18 @@ namespace mars {
             }
 
             //Update uniform buffer
-            static auto startTime = std::chrono::high_resolution_clock::now();
-            auto const now = std::chrono::high_resolution_clock::now();
-            float const angle = std::chrono::duration<float, std::chrono::seconds::period>(now - startTime).count() * glm::radians(90.0f);
-            uniformBuffers[currentFrame].mappedMemory->model = glm::rotate(glm::mat4(1.0f), 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-            uniformBuffers[currentFrame].mappedMemory->view = glm::lookAt(glm::vec3(0.0f, 2.0f, -2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            uniformBuffers[currentFrame].mappedMemory->proj = glm::perspective(
+            constexpr float rotationRateNanos = glm::radians(90.0f / std::nano::den);
+            float const angle = deltaTime.count() * rotationRateNanos;
+            std::uint32_t const prevFrame = (static_cast<std::int32_t>(currentFrame) - 1) % maxConcurrentFrames;
+
+            models[currentFrame] = glm::rotate(models[prevFrame], angle, glm::vec3(0.0f, 0.0f, 1.0f));
+            *camera.view(currentFrame) = glm::lookAt(glm::vec3(0.0f, 2.0f, -2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+            *camera.proj(currentFrame) = glm::perspective(
                 glm::radians(45.0f), 
                 static_cast<float>(swapchainImageExtent.width) / static_cast<float>(swapchainImageExtent.height), 
                 0.1f, 10.0f
             );
-            uniformBuffers[currentFrame].mappedMemory->proj[1][1] *= -1.0f;
+            (*camera.proj(currentFrame))[1][1] *= -1.0f;
 
             if(vkResetCommandBuffer(commandBuffers[currentFrame], 0) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer"};

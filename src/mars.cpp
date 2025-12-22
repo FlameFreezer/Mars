@@ -7,6 +7,7 @@ module;
 #include <string>
 #include <cstdint>
 #include <print>
+#include <chrono>
 
 #include "mars_macros.h"
 
@@ -26,14 +27,16 @@ namespace mars {
         deinitializedLibrary = true;
     }
 
-    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game") {}
-    Game::Game(const std::string& name) noexcept : windowName(name), appName(name) {}
+    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), prevTime(std::chrono::high_resolution_clock::now()) {}
+    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), prevTime(std::chrono::high_resolution_clock::now()) {}
     Error<noreturn> Game::init() noexcept {
         TRY(renderer.init(appName));
         return success();
     }
     Error<noreturn> Game::draw() noexcept {
-        TRY(renderer.drawFrame());
+        auto const deltaTime = std::chrono::duration<std::int64_t, std::chrono::nanoseconds::period>(std::chrono::high_resolution_clock::now() - prevTime);
+        prevTime = std::chrono::high_resolution_clock::now();
+        TRY(renderer.drawFrame(deltaTime));
         return success();
     }
     void Game::destroy() noexcept {

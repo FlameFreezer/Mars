@@ -6,6 +6,7 @@ module;
 
 #include <string>
 #include <cstdint>
+#include <chrono>
 
 export module mars;
 import :renderer;
@@ -21,6 +22,7 @@ namespace mars {
         std::string windowName;
         std::string appName;
         Renderer renderer;
+        std::chrono::steady_clock::time_point prevTime;
         public:
         Game() noexcept;
         Game(const std::string& name) noexcept;
