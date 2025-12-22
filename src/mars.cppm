@@ -16,20 +16,22 @@ export import heap_array;
 
 namespace mars {
 
-    export Error<noreturn> init() noexcept;
-    export void quit() noexcept; 
     export class Game {
         std::string windowName;
         std::string appName;
         Renderer renderer;
         std::chrono::steady_clock::time_point prevTime;
+        GameFlags flags;
         public:
         Game() noexcept;
         Game(const std::string& name) noexcept;
-        void destroy() noexcept;
+        ~Game() noexcept;
         Error<noreturn> init() noexcept;
         Error<noreturn> draw() noexcept;
-        void setFlag(std::uint64_t flag) noexcept;
+        void setRendererFlags(RendererFlags flag) noexcept;
+        void setFlags(GameFlags flag) noexcept;
+        bool rendererHasFlags(RendererFlags flag) noexcept;
+        bool hasFlags(GameFlags flag) noexcept;
     };
 
 };
