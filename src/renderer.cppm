@@ -125,12 +125,6 @@ namespace mars {
         0, 1, 2, 0, 2, 3
     };
 
-    struct MVP {
-        alignas(16) glm::mat4 model;
-        alignas(16) glm::mat4 view;
-        alignas(16) glm::mat4 proj;
-    };
-
     //Members are in the order of their set number
     struct DescriptorSetLayouts {
         VkDescriptorSetLayout bind;
