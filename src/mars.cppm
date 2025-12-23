@@ -5,10 +5,10 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <string>
-#include <cstdint>
 #include <chrono>
 
 export module mars;
+export import :camera;
 import :renderer;
 export import flag_bits;
 export import error;
@@ -22,6 +22,7 @@ namespace mars {
         Renderer renderer;
         std::chrono::steady_clock::time_point prevTime;
         GameFlags flags;
+        Camera camera;
         public:
         Game() noexcept;
         Game(const std::string& name) noexcept;

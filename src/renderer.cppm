@@ -139,22 +139,11 @@ namespace mars {
         }
     };
 
-    struct Camera {
-        UniformBuffer<glm::mat4> uniformBuffer;
-
-        glm::mat4* view(std::uint32_t index) noexcept {
-            return uniformBuffer.mappedMemory + 2 * index;
-        }
-        glm::mat4* proj(std::uint32_t index) noexcept {
-            return uniformBuffer.mappedMemory + 2 * index + 1;
-        }
-    };
-
     export class Renderer {
         friend class Game;
         std::vector<VkDescriptorSet> descriptorSets;
         std::array<glm::mat4, maxConcurrentFrames> models;
-        Camera camera;
+        UniformBuffer<glm::mat4> cameraMatrices;
     	HeapArray<VkImage> swapchainImages;
     	HeapArray<VkImageView> swapchainImageViews;	
         HeapArray<VkQueue> queues;
@@ -651,7 +640,7 @@ namespace mars {
             );
 
             VkDescriptorBufferInfo const cameraBufferInfo = {
-                .buffer = camera.uniformBuffer.handle,
+                .buffer = cameraMatrices.buffer.handle,
                 .offset = sizeof(glm::mat4) * currentFrame * 2,
                 .range = sizeof(glm::mat4) * 2
             };
@@ -1455,7 +1444,7 @@ namespace mars {
             INIT_TRY(createCommandBuffers(queueFamilyIndex));
             Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, sizeof(glm::mat4) * 2 * maxConcurrentFrames);
             if(!res.okay()) return res.moveError<noreturn>();
-            camera.uniformBuffer = res.moveData();
+            cameraMatrices = res.moveData();
             INIT_TRY(createTexture());
             INIT_TRY(createSampler());
             INIT_TRY(createVertexBuffer());
@@ -1513,7 +1502,7 @@ namespace mars {
             vkDestroyCommandPool(device, commandPool, nullptr);
             vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr);
             vkDestroyPipeline(device, graphicsPipeline, nullptr);
-            camera.uniformBuffer.destroy(device);
+            cameraMatrices.destroy(device);
             vertexBuffer.destroy(device);
             vkDestroyDevice(device, nullptr);
             SDL_Vulkan_DestroySurface(instance, surface, nullptr);
@@ -1564,19 +1553,11 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, std::format("Failed to reset fence {}", currentFrame)};
             }
 
-            //Update uniform buffer
+            //Update model matrix
             constexpr float rotationRateNanos = glm::radians(90.0f / std::nano::den);
             float const angle = deltaTime.count() * rotationRateNanos;
             std::uint32_t const prevFrame = (static_cast<std::int32_t>(currentFrame) - 1) % maxConcurrentFrames;
-
             models[currentFrame] = glm::rotate(models[prevFrame], angle, glm::vec3(0.0f, 0.0f, 1.0f));
-            *camera.view(currentFrame) = glm::lookAt(glm::vec3(0.0f, 2.0f, -2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
-            *camera.proj(currentFrame) = glm::perspective(
-                glm::radians(45.0f), 
-                static_cast<float>(swapchainImageExtent.width) / static_cast<float>(swapchainImageExtent.height), 
-                0.1f, 10.0f
-            );
-            (*camera.proj(currentFrame))[1][1] *= -1.0f;
 
             if(vkResetCommandBuffer(commandBuffers[currentFrame], 0) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer"};

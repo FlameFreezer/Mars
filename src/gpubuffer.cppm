@@ -15,14 +15,15 @@ namespace mars {
         VkDeviceMemory memory;
 
         GPUBuffer() noexcept : handle(nullptr), memory(nullptr)  {}
-        GPUBuffer(GPUBuffer const& other) noexcept = delete;
         GPUBuffer(GPUBuffer&& other) noexcept : handle(other.handle), memory(other.memory) {
             other.handle = nullptr;
             other.memory = nullptr;
         }
-        virtual void destroy(VkDevice device) {
+        void destroy(VkDevice device) {
             vkDestroyBuffer(device, handle, nullptr);
             vkFreeMemory(device, memory, nullptr);
+            handle = nullptr;
+            memory = nullptr;
         }
         static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
             GPUBuffer buffer;
@@ -58,7 +59,7 @@ namespace mars {
             }
             return buffer;
         }
-        GPUBuffer& operator=(GPUBuffer&& rhs) {
+        GPUBuffer& operator=(GPUBuffer&& rhs) noexcept {
             if(this != &rhs) {
                 handle = rhs.handle;
                 memory = rhs.memory;
@@ -67,12 +68,20 @@ namespace mars {
             }
             return *this;
         }
-        GPUBuffer& operator=(GPUBuffer const& rhs) = delete;
     };
     export template<class T>
-    struct UniformBuffer : public GPUBuffer {
+    struct UniformBuffer {
+        GPUBuffer buffer;
         T* mappedMemory;
         UniformBuffer() noexcept : mappedMemory(nullptr) {}
+        UniformBuffer(UniformBuffer&& other) noexcept : buffer(std::move(other.buffer)), mappedMemory(other.mappedMemory) {
+            other.mappedMemory = nullptr;
+        }
+        void destroy(VkDevice device) noexcept {
+            vkUnmapMemory(device, buffer.memory);
+            mappedMemory = nullptr;
+            buffer.destroy(device);
+        }
         static Error<UniformBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size) noexcept {
             Error<GPUBuffer> buffer = GPUBuffer::make(
                 device, 
@@ -83,19 +92,21 @@ namespace mars {
             ); 
             if(!buffer.okay()) return buffer.moveError<UniformBuffer>();
 
-            UniformBuffer result(buffer.moveData());
+            UniformBuffer result;
+            result.buffer = buffer.moveData();
 
-            if(vkMapMemory(device, result.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
+            if(vkMapMemory(device, result.buffer.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to map device memory to host while creating uniform buffer"};
             }
             return result;
         }
-
-        void destroy(VkDevice device) override {
-            vkUnmapMemory(device, memory);
-            this->GPUBuffer::destroy(device);
+        UniformBuffer& operator=(UniformBuffer&& rhs) noexcept {
+            if(this != &rhs) {
+                buffer = std::move(rhs.buffer);
+                mappedMemory = rhs.mappedMemory;
+                rhs.mappedMemory = nullptr;
+            }
+            return *this;
         }
-        private:
-        UniformBuffer(GPUBuffer&& other) noexcept : GPUBuffer(std::move(other)), mappedMemory(nullptr) {}
     };
 }

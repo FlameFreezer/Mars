@@ -3,6 +3,7 @@ module;
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
 
 #include <string>
 #include <cstdint>
@@ -28,6 +29,11 @@ namespace mars {
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
         TRY(renderer.init(appName));
+        camera.pos = glm::vec3(2.0f, 0.0f, -2.0f);
+        camera.setTarget(glm::vec3(0.0f, 0.0f, 0.0f));
+        camera.up = glm::vec3(0.0f, -1.0f, 0.0f);
+        camera.fov = glm::radians(45.0f);
+        camera.aspect = static_cast<float>(renderer.swapchainImageExtent.width) / static_cast<float>(renderer.swapchainImageExtent.height);
         return success();
     }
     Game::~Game() noexcept {
@@ -48,9 +54,10 @@ namespace mars {
     }
     Error<noreturn> Game::draw() noexcept {
         auto const now = std::chrono::steady_clock::now();
-        auto const deltaTime = std::chrono::duration<std::int64_t, std::chrono::nanoseconds::period>(
-	    now - prevTime);
+        auto const deltaTime = std::chrono::duration<std::int64_t, std::chrono::nanoseconds::period>
+            (now - prevTime);
         prevTime = now;
+        TRY(camera.loadMatrices(&renderer.cameraMatrices.mappedMemory[renderer.currentFrame * 2]));
         TRY(renderer.drawFrame(deltaTime));
         return success();
     }

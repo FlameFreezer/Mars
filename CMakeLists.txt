@@ -41,11 +41,12 @@ set(CMAKE_LINK_WARNING_AS_ERROR True)
 # Set up mars target library
 add_library(Mars)
 add_dependencies(Mars marsShaders)
+file(GLOB_RECURSE MARS_MODULE_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cppm")
 target_sources(Mars PUBLIC 
     FILE_SET mars_module 
     TYPE CXX_MODULES 
     BASE_DIRS src
-    FILES src/mars.cppm src/error.cppm src/renderer.cppm src/gpubuffer.cppm src/heaparray.cppm src/flagbits.cppm src/vkhelper.cppm
+    FILES "${MARS_MODULE_FILES}"    
     PRIVATE src/mars.cpp
 )
 target_compile_definitions(Mars PUBLIC MARS_TEXTURE_PATH="${CMAKE_SOURCE_DIR}/textures")
