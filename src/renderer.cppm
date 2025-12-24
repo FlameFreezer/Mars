@@ -1427,7 +1427,7 @@ namespace mars {
             if constexpr(enableValidationLayers) {
                 INIT_TRY(createVkDebugUtilsMessenger());
             }
-            window = SDL_CreateWindow(name.c_str(), width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+            window = SDL_CreateWindow(name.c_str(), width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_GRABBED);
             if(window == nullptr) {
                 flags |= flagBits::failedInitialization;
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
@@ -1454,7 +1454,9 @@ namespace mars {
             INIT_TRY(createDescriptorSets());
             INIT_TRY(createGraphicsPipeline());
             for(glm::mat4& model : models) model = glm::mat4(1.0f);
-
+            if(!SDL_HideCursor()) {
+                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+            }
             return success();
         }
         Renderer() noexcept : 
@@ -1513,7 +1515,7 @@ namespace mars {
             vkDestroyInstance(instance, nullptr);
         }
 
-        Error<noreturn> drawFrame(std::chrono::duration<std::int64_t, std::chrono::nanoseconds::period> deltaTime) noexcept {
+        Error<noreturn> drawFrame(std::chrono::nanoseconds deltaTime) noexcept {
             if(vkWaitForFences(device, 1, &fences[currentFrame], VK_TRUE, std::numeric_limits<std::uint64_t>::max()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiitng on fence {}", currentFrame)};
             }
@@ -1554,8 +1556,8 @@ namespace mars {
             }
 
             //Update model matrix
-            constexpr float rotationRateNanos = glm::radians(90.0f / std::nano::den);
-            float const angle = deltaTime.count() * rotationRateNanos;
+            constexpr float rotationRate = glm::radians(90.0f / std::chrono::nanoseconds::period::den);
+            float const angle = deltaTime.count() * rotationRate;
             std::uint32_t const prevFrame = (static_cast<std::int32_t>(currentFrame) - 1) % maxConcurrentFrames;
             models[currentFrame] = glm::rotate(models[prevFrame], angle, glm::vec3(0.0f, 0.0f, 1.0f));
 

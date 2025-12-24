@@ -5,4 +5,5 @@
     mars::Error<mars::noreturn> procResult = proc;\
     if(!procResult.okay()) return procResult;\
 } while(false)
+
 #endif

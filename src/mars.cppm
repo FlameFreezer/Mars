@@ -15,15 +15,18 @@ export import error;
 export import heap_array;
 
 namespace mars {
-
     export class Game {
+        Renderer renderer;
         std::string windowName;
         std::string appName;
-        Renderer renderer;
-        std::chrono::steady_clock::time_point prevTime;
+        std::chrono::steady_clock::time_point time;
+        std::chrono::nanoseconds deltaTime;
         GameFlags flags;
-        Camera camera;
         public:
+        Camera camera;
+        bool const* keyState;
+        float mouseX;
+        float mouseY;
         Game() noexcept;
         Game(const std::string& name) noexcept;
         ~Game() noexcept;
@@ -33,6 +36,11 @@ namespace mars {
         void setFlags(GameFlags flag) noexcept;
         bool rendererHasFlags(RendererFlags flag) noexcept;
         bool hasFlags(GameFlags flag) noexcept;
+        std::chrono::steady_clock::time_point getFrameTime() const noexcept;
+        std::chrono::nanoseconds getDeltaTime() const noexcept;
+        std::chrono::duration<float, std::chrono::seconds::period> getDeltaTimeSeconds() const noexcept;
+        void updateTime() noexcept;
+        void updateKeyState() noexcept;
     };
 
 };

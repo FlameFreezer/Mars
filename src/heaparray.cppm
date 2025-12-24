@@ -102,6 +102,7 @@ namespace mars {
     class Slice : public HeapArray<T> {
         public:
         Slice() noexcept {}
+        Slice(T* ptr, std::size_t size) noexcept : HeapArray<T>(ptr, size) {}
         Slice(HeapArray<T> const& array) noexcept : HeapArray<T>(array.data(), array.size()) {}
         Slice(HeapArray<T> const& array, std::size_t start) noexcept : HeapArray<T>(array.data() + start, array.size() - start) {
             if(start >= array.size()) {

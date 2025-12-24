@@ -1,5 +1,6 @@
 module;
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -8,17 +9,15 @@ import error;
 
 namespace mars {
     export struct Camera {
+        static constexpr float autoAspect = 0.0f;
         glm::vec3 pos;
         glm::vec3 dir;
         glm::vec3 up;
         float fov;
         float aspect;
-        Camera() noexcept : aspect(0.0f), fov(0.0f) {}
+        Camera() noexcept : aspect(autoAspect), fov(0.0f) {}
         Camera(glm::vec3 const& inPos, glm::vec3 const& inDir, glm::vec3 inUp, float inFov, float inAspect) noexcept 
             : pos(inPos), dir(inDir), up(inUp), fov(inFov), aspect(inAspect) {}
-        void setTarget(glm::vec3 const& target) noexcept {
-            dir = target - pos;
-        }
         Error<noreturn> loadMatrices(glm::mat4* dst) const noexcept {
             if(dst == nullptr) return {ErrorTag::FATAL_ERROR, "nullptr passed to function loadMatrices"};
             glm::mat4& view = dst[0];

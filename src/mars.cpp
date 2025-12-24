@@ -6,7 +6,6 @@ module;
 #include <glm/glm.hpp>
 
 #include <string>
-#include <cstdint>
 #include <chrono>
 
 #include "mars_macros.h"
@@ -15,7 +14,7 @@ module mars;
 
 namespace mars {
     Error<noreturn> initLibrary() noexcept {
-        if(!SDL_Init(SDL_INIT_VIDEO)) {
+        if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
             return {ErrorTag::FATAL_ERROR, SDL_GetError()};
         }
         return success();
@@ -24,16 +23,13 @@ namespace mars {
         SDL_Quit();
     }
 
-    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game") {}
-    Game::Game(const std::string& name) noexcept : windowName(name), appName(name) {}
+    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0) {}
+    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0) {}
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
         TRY(renderer.init(appName));
-        camera.pos = glm::vec3(2.0f, 0.0f, -2.0f);
-        camera.setTarget(glm::vec3(0.0f, 0.0f, 0.0f));
-        camera.up = glm::vec3(0.0f, -1.0f, 0.0f);
-        camera.fov = glm::radians(45.0f);
-        camera.aspect = static_cast<float>(renderer.swapchainImageExtent.width) / static_cast<float>(renderer.swapchainImageExtent.height);
+        SDL_GetMouseState(&mouseX, &mouseY);
+        time = std::chrono::steady_clock::now();
         return success();
     }
     Game::~Game() noexcept {
@@ -52,12 +48,32 @@ namespace mars {
     bool Game::hasFlags(GameFlags flag) noexcept {
         return flags & flag;
     }
-    Error<noreturn> Game::draw() noexcept {
+    std::chrono::steady_clock::time_point Game::getFrameTime() const noexcept {
+        return time;
+    }
+    std::chrono::nanoseconds Game::getDeltaTime() const noexcept {
+        return deltaTime;
+    }
+    std::chrono::duration<float, std::chrono::seconds::period> Game::getDeltaTimeSeconds() const noexcept {
+        return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(deltaTime);
+    }
+    void Game::updateTime() noexcept {
         auto const now = std::chrono::steady_clock::now();
-        auto const deltaTime = std::chrono::duration<std::int64_t, std::chrono::nanoseconds::period>
-            (now - prevTime);
-        prevTime = now;
-        TRY(camera.loadMatrices(&renderer.cameraMatrices.mappedMemory[renderer.currentFrame * 2]));
+        deltaTime = now - time;
+        time = now;
+    }
+    void Game::updateKeyState() noexcept {
+        keyState = SDL_GetKeyboardState(nullptr);
+    }
+    Error<noreturn> Game::draw() noexcept {
+        if(camera.aspect == Camera::autoAspect) {
+            camera.aspect = static_cast<float>(renderer.swapchainImageExtent.width) / static_cast<float>(renderer.swapchainImageExtent.height);
+            TRY(camera.loadMatrices(&renderer.cameraMatrices.mappedMemory[renderer.currentFrame * 2]));
+            camera.aspect = Camera::autoAspect;
+        }
+        else {
+            TRY(camera.loadMatrices(&renderer.cameraMatrices.mappedMemory[renderer.currentFrame * 2]));
+        }
         TRY(renderer.drawFrame(deltaTime));
         return success();
     }
