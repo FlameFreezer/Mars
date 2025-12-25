@@ -28,7 +28,6 @@ namespace mars {
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
         TRY(renderer.init(appName));
-        SDL_GetMouseState(&mouseX, &mouseY);
         time = std::chrono::steady_clock::now();
         return success();
     }

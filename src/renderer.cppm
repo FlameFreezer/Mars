@@ -1432,6 +1432,10 @@ namespace mars {
                 flags |= flagBits::failedInitialization;
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
+            if(!SDL_SetWindowRelativeMouseMode(window, true)) {
+                flags |= flagBits::failedInitialization;
+                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+            }
             if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
                 flags |= flagBits::failedInitialization;
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
@@ -1454,9 +1458,6 @@ namespace mars {
             INIT_TRY(createDescriptorSets());
             INIT_TRY(createGraphicsPipeline());
             for(glm::mat4& model : models) model = glm::mat4(1.0f);
-            if(!SDL_HideCursor()) {
-                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
-            }
             return success();
         }
         Renderer() noexcept : 

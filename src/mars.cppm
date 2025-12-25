@@ -25,8 +25,6 @@ namespace mars {
         public:
         Camera camera;
         bool const* keyState;
-        float mouseX;
-        float mouseY;
         Game() noexcept;
         Game(const std::string& name) noexcept;
         ~Game() noexcept;

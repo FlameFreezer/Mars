@@ -5,8 +5,6 @@ import mars;
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <cmath>
-
 #include "mars_macros.h"
 
 using ErrorNoreturn = mars::Error<mars::noreturn>;
@@ -46,14 +44,22 @@ void handleKeyboardInput(mars::Game& game) noexcept {
 }
 
 void handleMouseInput(mars::Game& game) noexcept {
-    constexpr static float axis = 1000.0f;
-    float newX, newY;
-    SDL_GetMouseState(&newX, &newY);
-    if(newX != game.mouseX or newY != game.mouseY) {
-        float const angle = std::acos(glm::dot(glm::normalize(glm::vec2(game.mouseX, axis)), glm::normalize(glm::vec2(newX, axis))));
-        game.mouseX = newX;
-        game.mouseY = newY;
-        glm::vec4 const newDir = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, -1.0f, 0.0f)) * glm::vec4(game.camera.dir, 0.0f);
+    constexpr float sensitivity = 1500.0f;
+    constexpr float sensitivityY = sensitivity / 2.0f;
+    float dx, dy;
+    SDL_GetRelativeMouseState(&dx, &dy);
+    if(dx != 0.0f) {
+        //horizontal rotation
+        float angleX = dx / sensitivity * -1.0f;
+        float angleY = dy / sensitivity * -1.0f;
+        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), angleX, game.camera.up);
+        glm::vec4 newDir = rotation * glm::vec4(game.camera.dir, 0.0f);
+        //vertical rotation
+        if((game.camera.dir.y < 1.0f and angleY < 0) or (game.camera.dir.y >= -1.0f and angleY > 0)) {
+            glm::vec3 const axis = glm::cross(glm::vec3(newDir.x, newDir.y, newDir.z), game.camera.up);
+            rotation = glm::rotate(glm::mat4(1.0f), angleY, axis);
+        }
+        newDir = rotation * newDir;
         game.camera.dir = glm::vec3(newDir.x, newDir.y, newDir.z);
     }
 }
