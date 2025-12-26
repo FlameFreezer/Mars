@@ -8,12 +8,13 @@ module;
 export module flag_bits;
 
 namespace mars {
-    export using RendererFlags = std::uint8_t;
-    export using GameFlags = std::uint8_t;
+    export using RendererFlags = std::uint16_t;
+    export using GameFlags = std::uint16_t;
     namespace flagBits {
         constexpr RendererFlags rendererStart = __LINE__ + 1U;
-        RENDERER_NEXT_BIT(failedInitialization);
         RENDERER_NEXT_BIT(recreateSwapchain);
+        RENDERER_NEXT_BIT(deviceInvalid);
+        RENDERER_NEXT_BIT(instanceInvalid);
 
         constexpr GameFlags gameStart = __LINE__ + 1U;
         GAME_NEXT_BIT(stopExecution);

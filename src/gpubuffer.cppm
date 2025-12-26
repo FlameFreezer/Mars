@@ -43,13 +43,13 @@ namespace mars {
             VkMemoryRequirements memRequirements{};
             vkGetBufferMemoryRequirements(device, buffer.handle, &memRequirements);
             Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
-            if(!memType.okay()) return memType.moveError<GPUBuffer>();
+            if(!memType) return memType.moveError<GPUBuffer>();
 
             VkMemoryAllocateInfo const allocInfo = {
         		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         		.pNext = nullptr,
         		.allocationSize = memRequirements.size,
-        		.memoryTypeIndex = memType.data()
+        		.memoryTypeIndex = memType
             };
             if(vkAllocateMemory(device, &allocInfo, nullptr, &buffer.memory) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to allocate device memory while initializing GPUBuffer"};
@@ -73,6 +73,7 @@ namespace mars {
     struct UniformBuffer {
         GPUBuffer buffer;
         T* mappedMemory;
+
         UniformBuffer() noexcept : mappedMemory(nullptr) {}
         UniformBuffer(UniformBuffer&& other) noexcept : buffer(std::move(other.buffer)), mappedMemory(other.mappedMemory) {
             other.mappedMemory = nullptr;
@@ -90,10 +91,9 @@ namespace mars {
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             ); 
-            if(!buffer.okay()) return buffer.moveError<UniformBuffer>();
+            if(!buffer) return buffer.moveError<UniformBuffer>();
 
-            UniformBuffer result;
-            result.buffer = buffer.moveData();
+            UniformBuffer result{buffer.moveData()};
 
             if(vkMapMemory(device, result.buffer.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to map device memory to host while creating uniform buffer"};
@@ -108,5 +108,7 @@ namespace mars {
             }
             return *this;
         }
+        private:
+        UniformBuffer(GPUBuffer&& inBuffer) noexcept : buffer(std::move(inBuffer)), mappedMemory(nullptr) {}
     };
 }
