@@ -67,11 +67,11 @@ namespace mars {
     Error<noreturn> Game::draw() noexcept {
         if(camera.aspect == Camera::autoAspect) {
             camera.aspect = static_cast<float>(renderer.swapchainImageExtent.width) / static_cast<float>(renderer.swapchainImageExtent.height);
-            TRY(camera.loadMatrices(&renderer.cameraMatrices.mappedMemory[renderer.currentFrame * 2]));
+            renderer.cameraMatrices.mappedMemory[renderer.currentFrame] = camera.loadMatrices();
             camera.aspect = Camera::autoAspect;
         }
         else {
-            TRY(camera.loadMatrices(&renderer.cameraMatrices.mappedMemory[renderer.currentFrame * 2]));
+            renderer.cameraMatrices.mappedMemory[renderer.currentFrame] = camera.loadMatrices();
         }
         TRY(renderer.drawFrame(deltaTime));
         return success();

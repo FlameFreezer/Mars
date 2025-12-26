@@ -38,12 +38,12 @@ namespace mars {
             T mData;
             std::string mMessage;
         };
-        ErrorTag mtag;
+        ErrorTag mTag;
         //Writes zeroes to the entire memory space taken up by the Error union, then sets the tag to 
         // `ALL_OKAY`. Does NOT call destructors to the member `data` or `memory`.
         void reset() {
             std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-            mtag = ErrorTag::ALL_OKAY;
+            mTag = ErrorTag::ALL_OKAY;
         }
         //Calls the destructor of the active data member, then resets the union.
         void clear() {
@@ -56,15 +56,15 @@ namespace mars {
             reset();
         }
         public:
-        Error() noexcept : mtag(ErrorTag::ALL_OKAY), mData() {}
-        Error(T const& inData) noexcept : mtag(ErrorTag::ALL_OKAY), mData(inData) {}
-        Error(T&& inData) noexcept : mtag(ErrorTag::ALL_OKAY), mData(std::move(inData)) {}
-        Error(ErrorTag inTag, std::string const& inMessage) noexcept : mtag(inTag), mMessage(inMessage) {}
-        Error(ErrorTag inTag, std::string&& inMessage) noexcept : mtag(inTag), mMessage(std::move(inMessage)) {}
+        Error() noexcept : mTag(ErrorTag::ALL_OKAY), mData() {}
+        Error(T const& inData) noexcept : mTag(ErrorTag::ALL_OKAY), mData(inData) {}
+        Error(T&& inData) noexcept : mTag(ErrorTag::ALL_OKAY), mData(std::move(inData)) {}
+        Error(ErrorTag inTag, std::string const& inMessage) noexcept : mTag(inTag), mMessage(inMessage) {}
+        Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage(std::move(inMessage)) {}
         Error(Error<T> const& other) noexcept {
             //Zero memory, so that any pointers stored within data members are null before any attempted initialization
             std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-            mtag = other.mtag;
+            mTag = other.mTag;
             if(other.okay()) {
                 mData = other.mData;
             }
@@ -75,7 +75,7 @@ namespace mars {
         Error(Error<T>&& other) noexcept {
             //Zero memory, so that any pointers stored within data members are null before any attempted initialization
             std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-            mtag = other.mtag;
+            mTag = other.mTag;
             if(other.okay()) {
                 mData = std::move(other.mData);
             }
@@ -91,7 +91,7 @@ namespace mars {
                 // memory is reinterpreted
                 clear();
                 //Now we can safely assign data members
-                mtag = rhs.mtag;
+                mTag = rhs.mTag;
                 if(rhs.okay()) {
                     mData = std::move(rhs.mData);
                 }
@@ -107,7 +107,7 @@ namespace mars {
         // Error union that is `okay` raises a compile error.
         template<class U>
         Error<U> moveError() noexcept {
-            Error<U> result(mtag, std::move(mMessage));
+            Error<U> result(mTag, std::move(mMessage));
             reset();
             return result;
         }
@@ -121,10 +121,10 @@ namespace mars {
         }
         //Returns `true` if `this->tag` is of a value not indicating an error during execution.
         bool okay() const noexcept {
-            return mtag == ErrorTag::ALL_OKAY;
+            return mTag == ErrorTag::ALL_OKAY;
         }
         ErrorTag tag() const noexcept {
-            return mtag;
+            return mTag;
         }
         T const& data() const noexcept {
             return mData;
@@ -143,13 +143,13 @@ namespace mars {
     	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     	bool report() const noexcept {
     	    if(okay()) return true;
-            std::println("{}: {}", tagToString(mtag), mMessage);
+            std::println("{}: {}", tagToString(mTag), mMessage);
     	    return false;
     	}
     	//Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     	bool report(std::ostream& ostrm) const noexcept {
     	    if(okay()) return true;
-            std::println(ostrm, "{}: {}", tagToString(mtag), mMessage);
+            std::println(ostrm, "{}: {}", tagToString(mTag), mMessage);
     	    return false;
     	}
     };

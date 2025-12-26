@@ -10,22 +10,8 @@ struct VertexOut {
     float2 texCoord;
 };
 
-struct CameraMatrices {
-    float4x4 view;
-    float4x4 proj;
-};
-
 struct Camera {
-    ConstantBuffer<CameraMatrices> mats;
-
-    [ForceInline]
-    func view()->float4x4 {
-        return mats.view;
-    }
-    [ForceInline]
-    func proj()->float4x4 {
-        return mats.proj;
-    }
+    ConstantBuffer<float4x4> viewProj;
 };
 
 struct Samplers {
@@ -38,7 +24,7 @@ uniform ParameterBlock<Camera> camera;
 [shader("vertex")]
 func vertMain(input : VertexIn, uniform model: float4x4) -> VertexOut {
     VertexOut output;
-    output.position = mul(camera.proj(), mul(camera.view(), mul(model, float4(input.position, 1.0f))));
+    output.position = mul(camera.viewProj, mul(model, float4(input.position, 1.0f)));
     output.color = input.color;
     output.texCoord = input.texCoord;
     return output;

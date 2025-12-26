@@ -11,8 +11,10 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 
 # Add libraries to build
-add_subdirectory(libraries/SDL3 EXCLUDE_FROM_ALL)
-add_subdirectory(libraries/GLM EXCLUDE_FROM_ALL)
+set(SDL_STATIC True)
+set(SDL_SHARED False)
+add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)
+add_subdirectory(libraries/glm EXCLUDE_FROM_ALL)
 
 # Shader Compilation
 set(MARS_SHADER_PATH "${CMAKE_SOURCE_DIR}/shaders")

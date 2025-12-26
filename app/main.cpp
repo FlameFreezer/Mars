@@ -4,6 +4,7 @@ import mars;
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include "mars_macros.h"
 
@@ -44,23 +45,18 @@ void handleKeyboardInput(mars::Game& game) noexcept {
 }
 
 void handleMouseInput(mars::Game& game) noexcept {
-    constexpr float sensitivity = 1500.0f;
-    constexpr float sensitivityY = sensitivity / 2.0f;
+    constexpr float sensitivity = 1000.0f;
     float dx, dy;
     SDL_GetRelativeMouseState(&dx, &dy);
-    if(dx != 0.0f) {
-        //horizontal rotation
-        float angleX = dx / sensitivity * -1.0f;
-        float angleY = dy / sensitivity * -1.0f;
-        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), angleX, game.camera.up);
-        glm::vec4 newDir = rotation * glm::vec4(game.camera.dir, 0.0f);
-        //vertical rotation
-        if((game.camera.dir.y < 1.0f and angleY < 0) or (game.camera.dir.y >= -1.0f and angleY > 0)) {
-            glm::vec3 const axis = glm::cross(glm::vec3(newDir.x, newDir.y, newDir.z), game.camera.up);
-            rotation = glm::rotate(glm::mat4(1.0f), angleY, axis);
-        }
-        newDir = rotation * newDir;
-        game.camera.dir = glm::vec3(newDir.x, newDir.y, newDir.z);
+    if(dx != 0.0f or dy != 0.0f) {
+        float const angleX = dx / sensitivity;
+        float const angleY = dy / sensitivity;
+        constexpr glm::vec3 start(0.0f, 0.0f, 1.0f);
+        float const sqrMag = angleX * angleX + angleY * angleY;
+        glm::vec3 const end(angleX, angleY, std::sqrt(1.0f - sqrMag));
+        glm::quat const drag(glm::dot(start, end), glm::cross(start, end));
+        glm::quat const now = drag * glm::quat(0.0f, game.camera.dir);
+        game.camera.dir = glm::vec3(now.x, now.y, now.z);
     }
 }
 

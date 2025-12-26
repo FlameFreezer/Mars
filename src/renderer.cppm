@@ -641,8 +641,8 @@ namespace mars {
 
             VkDescriptorBufferInfo const cameraBufferInfo = {
                 .buffer = cameraMatrices.buffer.handle,
-                .offset = sizeof(glm::mat4) * currentFrame * 2,
-                .range = sizeof(glm::mat4) * 2
+                .offset = sizeof(glm::mat4) * currentFrame,
+                .range = sizeof(glm::mat4)
             };
             VkWriteDescriptorSet const writeCamera = {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -1446,7 +1446,7 @@ namespace mars {
             INIT_TRY(createVkSwapchainKHR(surfaceInfo));
             INIT_TRY(getSwapchainImages(surfaceInfo));
             INIT_TRY(createCommandBuffers(queueFamilyIndex));
-            Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, sizeof(glm::mat4) * 2 * maxConcurrentFrames);
+            Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, sizeof(glm::mat4) * maxConcurrentFrames);
             if(!res.okay()) return res.moveError<noreturn>();
             cameraMatrices = res.moveData();
             INIT_TRY(createTexture());
@@ -1557,7 +1557,7 @@ namespace mars {
             }
 
             //Update model matrix
-            constexpr float rotationRate = glm::radians(90.0f / std::chrono::nanoseconds::period::den);
+            constexpr float rotationRate = glm::radians(90.0f / std::chrono::nanoseconds::period::den) * 0.0f;
             float const angle = deltaTime.count() * rotationRate;
             std::uint32_t const prevFrame = (static_cast<std::int32_t>(currentFrame) - 1) % maxConcurrentFrames;
             models[currentFrame] = glm::rotate(models[prevFrame], angle, glm::vec3(0.0f, 0.0f, 1.0f));
