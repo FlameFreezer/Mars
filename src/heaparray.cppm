@@ -32,7 +32,7 @@ namespace mars {
         }
         Error<T&> at(std::size_t index) const noexcept {
             if(index < mSize) return mPtr[index];
-            return {ErrorTag::FATAL_ERROR, std::format("Index out of bounds: {} >= {}", index, mSize)};
+            else return {ErrorTag::FATAL_ERROR, std::format("Index out of bounds: {} >= {}", index, mSize)};
         }
         HeapArray<T>& operator=(HeapArray<T>&& rhs) noexcept {
             if(this != &rhs) {

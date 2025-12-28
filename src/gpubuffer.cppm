@@ -2,7 +2,6 @@ module;
 
 #include <vulkan/vulkan.h>
 
-#include <cstdint>
 #include <utility>
 
 export module gpubuffer;
@@ -40,23 +39,9 @@ namespace mars {
             if(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer.handle) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create VkBuffer while initializing GPUBuffer"};
             }
-            VkMemoryRequirements memRequirements{};
-            vkGetBufferMemoryRequirements(device, buffer.handle, &memRequirements);
-            Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
-            if(!memType) return memType.moveError<GPUBuffer>();
-
-            VkMemoryAllocateInfo const allocInfo = {
-        		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        		.pNext = nullptr,
-        		.allocationSize = memRequirements.size,
-        		.memoryTypeIndex = memType
-            };
-            if(vkAllocateMemory(device, &allocInfo, nullptr, &buffer.memory) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to allocate device memory while initializing GPUBuffer"};
-            }
-            if(vkBindBufferMemory(device, buffer.handle, buffer.memory, 0) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to bind buffer memory while initializing GPUBuffer!"};
-            }
+            Error<VkDeviceMemory> mem = vkhelper::allocateDeviceMemory(device, physicalDevice, buffer.handle, memProperties);
+            if(!mem) return mem.moveError<GPUBuffer>();
+            buffer.memory = mem;
             return buffer;
         }
         GPUBuffer& operator=(GPUBuffer&& rhs) noexcept {

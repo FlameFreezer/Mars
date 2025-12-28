@@ -18,8 +18,8 @@ struct Samplers {
     Sampler2D texture;
 };
 
-uniform ParameterBlock<Samplers> samplers;
-uniform ParameterBlock<Camera> camera;
+ParameterBlock<Samplers> samplers;
+ParameterBlock<Camera> camera;
 
 [shader("vertex")]
 func vertMain(input : VertexIn, uniform model: float4x4) -> VertexOut {
