@@ -35,8 +35,8 @@ namespace mars {
         bool rendererHasFlags(RendererFlags flag) noexcept;
         bool hasFlags(GameFlags flag) noexcept;
         std::chrono::steady_clock::time_point getFrameTime() const noexcept;
-        std::chrono::nanoseconds getDeltaTime() const noexcept;
-        std::chrono::duration<float, std::chrono::seconds::period> getDeltaTimeSeconds() const noexcept;
+        std::chrono::nanoseconds::rep getDeltaTime() const noexcept;
+        std::chrono::duration<float, std::chrono::seconds::period>::rep getDeltaTimeSeconds() const noexcept;
         void updateTime() noexcept;
         void updateKeyState() noexcept;
     };

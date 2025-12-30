@@ -28,18 +28,26 @@ void handleEvent(mars::Game& game, SDL_Event const& e) noexcept {
 
 void handleKeyboardInput(mars::Game& game) noexcept {
     game.updateKeyState();
-    if(game.keyState[SDL_SCANCODE_D])
-        game.camera.pos.x += speed * game.getDeltaTimeSeconds().count();
-    if(game.keyState[SDL_SCANCODE_A])
-        game.camera.pos.x -= speed * game.getDeltaTimeSeconds().count();
-    if(game.keyState[SDL_SCANCODE_S])
-        game.camera.pos.z -= speed * game.getDeltaTimeSeconds().count();
-    if(game.keyState[SDL_SCANCODE_W])
-        game.camera.pos.z += speed * game.getDeltaTimeSeconds().count();
-    if(game.keyState[SDL_SCANCODE_SPACE]) 
-        game.camera.pos.y -= speed * game.getDeltaTimeSeconds().count();
-    if(game.keyState[SDL_SCANCODE_LSHIFT])
-        game.camera.pos.y += speed * game.getDeltaTimeSeconds().count();
+    if(game.keyState[SDL_SCANCODE_D]) {
+        glm::vec3 const right = glm::cross(game.camera.dir, game.camera.up);
+        game.camera.pos += right * speed * game.getDeltaTimeSeconds();
+    }
+    if(game.keyState[SDL_SCANCODE_A]) {
+        glm::vec3 const left = glm::cross(game.camera.up, game.camera.dir);
+        game.camera.pos += left * speed * game.getDeltaTimeSeconds();
+    }
+    if(game.keyState[SDL_SCANCODE_S]) {
+        game.camera.pos -= game.camera.dir * speed * game.getDeltaTimeSeconds();
+    }
+    if(game.keyState[SDL_SCANCODE_W]) {
+        game.camera.pos += game.camera.dir * speed * game.getDeltaTimeSeconds();
+    }
+    if(game.keyState[SDL_SCANCODE_SPACE]) {
+        game.camera.pos += game.camera.up * speed * game.getDeltaTimeSeconds();
+    }
+    if(game.keyState[SDL_SCANCODE_LSHIFT]) {
+        game.camera.pos -= game.camera.up * speed * game.getDeltaTimeSeconds();
+    }
     if(game.keyState[SDL_SCANCODE_ESCAPE])
         game.setFlags(mars::flagBits::stopExecution);
 }

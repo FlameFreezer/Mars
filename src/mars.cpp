@@ -50,11 +50,11 @@ namespace mars {
     std::chrono::steady_clock::time_point Game::getFrameTime() const noexcept {
         return time;
     }
-    std::chrono::nanoseconds Game::getDeltaTime() const noexcept {
-        return deltaTime;
+    std::chrono::nanoseconds::rep Game::getDeltaTime() const noexcept {
+        return deltaTime.count();
     }
-    std::chrono::duration<float, std::chrono::seconds::period> Game::getDeltaTimeSeconds() const noexcept {
-        return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(deltaTime);
+    std::chrono::duration<float, std::chrono::seconds::period>::rep Game::getDeltaTimeSeconds() const noexcept {
+        return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(deltaTime).count();
     }
     void Game::updateTime() noexcept {
         auto const now = std::chrono::steady_clock::now();

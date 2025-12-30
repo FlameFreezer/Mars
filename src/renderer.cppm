@@ -144,6 +144,8 @@ namespace mars {
     	HeapArray<VkImage> swapchainImages;
     	HeapArray<VkImageView> swapchainImageViews;	
         HeapArray<VkQueue> queues;
+        Slice<VkQueue> graphicsQueues;
+        Slice<VkQueue> presentQueues;
         HeapArray<VkSemaphore> semaphores;
         GPUImage textureImage;
         GPUImage depthImage;
@@ -166,6 +168,8 @@ namespace mars {
         VkDescriptorPool descriptorPool;
         std::uint32_t currentFrame;
         RendererFlags flags;
+        std::uint32_t graphicsQueueFamilyIndex;
+        std::uint32_t presentQueueFamilyIndex;
 
         Error<noreturn> createDepthImage() noexcept {
             Error<GPUImage> dp = GPUImage::make(device, physicalDevice,
@@ -474,10 +478,10 @@ namespace mars {
                 .signalSemaphoreInfoCount = 0,
                 .pSignalSemaphoreInfos = nullptr
             };
-            if(vkQueueSubmit2(queues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to submit to queue while creating texture image"};
             }
-            if(vkQueueWaitIdle(queues[0]) != VK_SUCCESS) {
+            if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to wait for queue while creating texture image"};
             }
             if(vkResetCommandBuffer(commandBuffers.back(), 0) != VK_SUCCESS) {
@@ -646,7 +650,7 @@ namespace mars {
         }        
 
         Error<noreturn> createSyncObjects() noexcept {
-            semaphores = HeapArray<VkSemaphore>(swapchainImages.size() + maxConcurrentFrames);
+            semaphores.init(swapchainImages.size() + maxConcurrentFrames);
             VkSemaphoreCreateInfo const semaphoreInfo = {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 .pNext = nullptr,
@@ -720,7 +724,9 @@ namespace mars {
             vkUnmapMemory(device, transferBuffer.memory);
 
             VkBufferCopy const region = {
-                .srcOffset = 0, .dstOffset = 0, .size = vertices.max_size() * sizeof(Vertex) + indices.max_size() * sizeof(std::uint32_t)
+                .srcOffset = 0, .dstOffset = 0, 
+                .size = vertices.max_size() * sizeof(Vertex) 
+                    + indices.max_size() * sizeof(std::uint32_t)
             };
             vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
@@ -743,10 +749,10 @@ namespace mars {
                 .signalSemaphoreInfoCount = 0,
                 .pSignalSemaphoreInfos = nullptr
             };
-            if(vkQueueSubmit2(queues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to submit to transfer queue while creating vertex buffer"};
             }
-            vkQueueWaitIdle(queues[0]);
+            vkQueueWaitIdle(graphicsQueues[0]);
             vkResetCommandBuffer(commandBuffers.back(), 0);
             transferBuffer.destroy(device);
             return success();
@@ -777,10 +783,10 @@ namespace mars {
         }
 
         Error<noreturn> createGraphicsPipeline() noexcept {
-            std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos;
             Error<VkShaderModule> shaderModule = createShaderModule();
             if(!shaderModule) return shaderModule.moveError<noreturn>();
 
+            std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos;
             shaderStageInfos[0] = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 .pNext = nullptr, 
@@ -873,7 +879,6 @@ namespace mars {
                 .alphaBlendOp = VK_BLEND_OP_ADD,
                 .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
             };
-
             VkPipelineColorBlendStateCreateInfo const colorBlendStateInfo = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
                 .pNext = nullptr,
@@ -886,7 +891,6 @@ namespace mars {
             };
 
             std::array<VkFormat, 1> const colorAttachmentFormats = {VK_FORMAT_B8G8R8A8_SRGB};
-
             VkPipelineRenderingCreateInfo const pipelineRenderingInfo = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
                 .pNext = nullptr,
@@ -914,7 +918,6 @@ namespace mars {
                 .offset = 0,
                 .size = sizeof(glm::mat4)
             };
-
             VkPipelineLayoutCreateInfo const pipelineLayoutInfo = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
                 .pNext = nullptr,
@@ -924,7 +927,6 @@ namespace mars {
                 .pushConstantRangeCount = 1,
                 .pPushConstantRanges = &pushConstantRange
             };
-
             if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline layout!"};
             }
@@ -938,7 +940,7 @@ namespace mars {
                 .pVertexInputState = &vertexInputStateInfo,
                 .pInputAssemblyState = &inputAssemblyInfo,
                 .pTessellationState = nullptr,
-                .pViewportState = nullptr, //dynamic
+                .pViewportState = nullptr,
                 .pRasterizationState = &rasterizationStateInfo,
                 .pMultisampleState = &multisampleStateInfo,
                 .pDepthStencilState = &depthStencilStateInfo,
@@ -963,11 +965,11 @@ namespace mars {
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
             }
-            swapchainImages = HeapArray<VkImage>(imageCount);
+            swapchainImages.init(imageCount);
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
             }
-            swapchainImageViews = HeapArray<VkImageView>(imageCount);
+            swapchainImageViews.init(imageCount);
 
             VkImageViewCreateInfo imageViewInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -998,12 +1000,12 @@ namespace mars {
             }
             return success();
         }
-        Error<noreturn> createCommandBuffers(std::uint32_t queueFamilyIndex) noexcept {
+        Error<noreturn> createCommandBuffers() noexcept {
             VkCommandPoolCreateInfo const poolInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                .queueFamilyIndex = queueFamilyIndex
+                .queueFamilyIndex = graphicsQueueFamilyIndex
             };
             if(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create VkCommandPool!"};
@@ -1070,40 +1072,50 @@ namespace mars {
             return success();
         }
 
-
         struct PickQueueFamilyIndexResult {
-            std::uint32_t index;
-            std::uint32_t queueCount;
+            std::uint32_t presentIndex = std::numeric_limits<std::uint32_t>::max();
+            std::uint32_t presentCount = 0U;
+            std::uint32_t graphicsIndex = std::numeric_limits<std::uint32_t>::max();
+            std::uint32_t graphicsCount = 0U;
         };
 
         static Error<PickQueueFamilyIndexResult> pickQueueFamilyIndex(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) noexcept {
+            PickQueueFamilyIndexResult result{};
             //Get queue family properties for the current physical device
             std::uint32_t queueFamilyPropertyCount = 0;
             vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, nullptr);
-            std::vector<VkQueueFamilyProperties2> queueFamilyProperties(
+            HeapArray<VkQueueFamilyProperties2> queueFamilyProperties(
                 queueFamilyPropertyCount, 
                 VkQueueFamilyProperties2{
                     .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2, 
-                    .pNext = nullptr, 
-                    .queueFamilyProperties = {}
+                    .pNext = nullptr
                 }
             );
             vkGetPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties.data());
             //Check each queue family index for needed support
-            for(std::uint32_t i = 0; i < queueFamilyPropertyCount; i++) {
+            for(std::uint32_t i = 0; i < queueFamilyProperties.size(); i++) {
+                std::uint32_t const currentQueueCount = queueFamilyProperties[i].queueFamilyProperties.queueCount;
                 if(queueFamilyProperties[i].queueFamilyProperties.queueFlags & 
                         (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
-                    VkBool32 surfaceSupport;
-                    if(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &surfaceSupport) != VK_SUCCESS) {
-                        return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface support!"};
-                    }
-                    if(surfaceSupport == VK_TRUE) {
-                        //At this point, we have found our desired queue family index
-                        return {{i, queueFamilyProperties[i].queueFamilyProperties.queueCount}};
+                    if(currentQueueCount >= result.graphicsCount) {
+                        result.graphicsIndex = i;
+                        result.graphicsCount = currentQueueCount;
                     }
                 }
+                VkBool32 surfaceSupport;
+                if(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &surfaceSupport) != VK_SUCCESS) {
+                    return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface support!"};
+                }
+                if(surfaceSupport == VK_TRUE and currentQueueCount >= result.presentCount) {
+                    result.presentIndex = i;
+                    result.presentCount = currentQueueCount;
+                }
             }
-            return {ErrorTag::SEARCH_FAIL, "Physical Device did not have queue family with needed properties!"};
+            if(result.presentIndex == std::numeric_limits<std::uint32_t>::max() 
+                    or result.graphicsIndex == std::numeric_limits<std::uint32_t>::max()) {
+                return {ErrorTag::SEARCH_FAIL, "Physical Device did not have queue family with needed properties!"};
+            }
+            return result;
         }
 
         static Error<VkPresentModeKHR> choosePresentMode(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) noexcept {
@@ -1118,7 +1130,7 @@ namespace mars {
                 ) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface present modes!"};
             }
-            std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+            HeapArray<VkPresentModeKHR> presentModes(presentModeCount);
             if(vkGetPhysicalDeviceSurfacePresentModesKHR(
                     physicalDevice, 
                     surface, 
@@ -1128,22 +1140,12 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface present modes!"};
             }
             //Select correct present mode
-            for(int i = 0; i < presentModeCount; i++) {
-                //This is our preferred presentation mode
-                if(presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
-                    return VK_PRESENT_MODE_MAILBOX_KHR;
-                }
-                //We are willing to use this present mode if we have to, but we'll continue the search
-                else if(presentModes[i] == VK_PRESENT_MODE_FIFO_KHR) {
-                    presentMode = VK_PRESENT_MODE_FIFO_KHR;
-                }
+            for(VkPresentModeKHR mode : presentModes) {
+                //This is our preferred present mode
+                if(mode == VK_PRESENT_MODE_MAILBOX_KHR) return mode;
             }
-            //If we got here but didn't write to surfaceInfo.presentMode, then the current device did not
-            // support any of the desired present modes
-            if(presentMode == 0) {
-                return {ErrorTag::SEARCH_FAIL, "Physical device did not support needed present modes!"};
-            }
-            return presentMode;
+            //This mode is always supported, and is preferred over other options if mailbox isn't available
+            return VK_PRESENT_MODE_FIFO_KHR;
         }
 
         static Error<VkSurfaceFormatKHR> checkDeviceSurfaceFormats(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) noexcept {
@@ -1154,7 +1156,7 @@ namespace mars {
                 ) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface formats!"};
             }
-            std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
+            HeapArray<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
             if(vkGetPhysicalDeviceSurfaceFormatsKHR(
                     physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()
                 ) != VK_SUCCESS) {
@@ -1170,6 +1172,30 @@ namespace mars {
             return surfaceFormats[0];
         }
 
+        static bool checkDeviceFeatureSupport(VkPhysicalDevice physicalDevice) noexcept {
+            //Set up chain of feature structs
+            VkPhysicalDeviceVulkan14Features f14 = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+                .pNext = nullptr
+            };
+            VkPhysicalDeviceVulkan13Features f13 = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+                .pNext = &f14
+            };
+            VkPhysicalDeviceFeatures2 deviceFeatures = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+                .pNext = &f13
+            };
+            vkGetPhysicalDeviceFeatures2(physicalDevice, &deviceFeatures);
+            //Check features
+            if(deviceFeatures.features.samplerAnisotropy != VK_TRUE) return false;
+            if(f13.dynamicRendering != VK_TRUE 
+                or f13.maintenance4 != VK_TRUE 
+                or f13.synchronization2 != VK_TRUE) return false;
+            if(f14.pushDescriptor != VK_TRUE) return false;
+            return true;
+        }
+
         static Error<noreturn> checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice) noexcept {
             //Check that the device supports the extensions needed by the application
             std::uint32_t deviceExtensionPropertyCount = 0;
@@ -1178,7 +1204,7 @@ namespace mars {
                 ) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical device extension properties!"};
             }
-            std::vector<VkExtensionProperties> extensionProperties(deviceExtensionPropertyCount);
+            HeapArray<VkExtensionProperties> extensionProperties(deviceExtensionPropertyCount);
             if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, 
                 &deviceExtensionPropertyCount, extensionProperties.data()
                 ) != VK_SUCCESS) {
@@ -1203,8 +1229,7 @@ namespace mars {
 
         struct PickPhysicalDeviceResult {
             VkPhysicalDevice physicalDevice = nullptr;
-            std::uint32_t queueFamilyIndex;
-            std::uint32_t queueCount;
+            PickQueueFamilyIndexResult queueFamilyInfo;
             SurfaceInfo surfaceInfo;
         };
 
@@ -1217,6 +1242,9 @@ namespace mars {
                     case ErrorTag::FATAL_ERROR: return procResult.moveError<PickPhysicalDeviceResult>();
                     case ErrorTag::ALL_OKAY: break;
                 }
+
+                //Check physical device's support for needed features
+                if(!checkDeviceFeatureSupport(currentPhysicalDevice)) continue;
 
                 //Get physical device's capabilities with the surface
                 if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -1244,9 +1272,7 @@ namespace mars {
                 switch(Error<PickQueueFamilyIndexResult> queueFamilyInfo = pickQueueFamilyIndex(currentPhysicalDevice, surface); queueFamilyInfo.tag()) {
                     case ErrorTag::SEARCH_FAIL: continue;
                     case ErrorTag::FATAL_ERROR: return queueFamilyInfo.moveError<PickPhysicalDeviceResult>();
-                    case ErrorTag::ALL_OKAY: 
-                        result.queueFamilyIndex = queueFamilyInfo.data().index; 
-                        result.queueCount = queueFamilyInfo.data().queueCount;
+                    case ErrorTag::ALL_OKAY: result.queueFamilyInfo = queueFamilyInfo;
                 }
 
                 //At this point if all has succeeded, we are ready to use the current physical device and
@@ -1257,8 +1283,9 @@ namespace mars {
             return {ErrorTag::SEARCH_FAIL, "Failed to find suitable physical device"};
         }
 
-        Error<noreturn> createVkDevice(SurfaceInfo& surfaceInfo, std::uint32_t& queueFamilyIndex) noexcept {
-            std::uint32_t queueCount = 0;
+        Error<noreturn> createVkDevice(SurfaceInfo& surfaceInfo) noexcept {
+            std::uint32_t graphicsQueueCount = 0;
+            std::uint32_t presentQueueCount = 0;
 
             //Get all the physical devices installed on the system
             std::uint32_t physicalDeviceCount = 0;
@@ -1274,45 +1301,84 @@ namespace mars {
             if(Error<PickPhysicalDeviceResult> const pickResult = 
                     pickPhysicalDevice(physicalDevices, surface)
                 ) {
-                physicalDevice = pickResult.data().physicalDevice;
-                queueFamilyIndex = pickResult.data().queueFamilyIndex;
-                queueCount = pickResult.data().queueCount;
-                surfaceInfo = pickResult.data().surfaceInfo;
+                PickPhysicalDeviceResult const& res = pickResult.data();
+                physicalDevice = res.physicalDevice;
+                graphicsQueueFamilyIndex = res.queueFamilyInfo.graphicsIndex;
+                presentQueueFamilyIndex = res.queueFamilyInfo.presentIndex;
+                graphicsQueueCount = res.queueFamilyInfo.graphicsCount;
+                presentQueueCount = res.queueFamilyInfo.presentCount;
+                surfaceInfo = res.surfaceInfo;
             }
             //pickPhysicalDevice just returns SEARCH_FAIL if none of the devices are suitable, but 
             // I want this case to be fatal instead
             else return {ErrorTag::FATAL_ERROR, pickResult.message()};
 
-            HeapArray<float> const queuePriorities(queueCount, 0.0f);
-            VkDeviceQueueCreateInfo const queueInfo = {
-                .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .queueFamilyIndex = queueFamilyIndex,
-                .queueCount = queueCount,
-                .pQueuePriorities = queuePriorities.data()
-            };
+            bool const differentQueueFamilies = graphicsQueueFamilyIndex != presentQueueFamilyIndex;
+            std::array<VkDeviceQueueCreateInfo, 2> queueCreateInfos;
+            std::uint32_t queueCreateInfoCount = 1U;
+            HeapArray<float> queuePriorities;
 
-            VkPhysicalDeviceVulkan14Features vulkan14Features{};
-            vulkan14Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
-            vulkan14Features.pushDescriptor = VK_TRUE;
-            VkPhysicalDeviceFeatures2 features2 = {};
-            features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-            features2.features.samplerAnisotropy = VK_TRUE;
-            features2.pNext = &vulkan14Features;
-            VkPhysicalDeviceVulkan13Features vulkan13Features{};
-            vulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-            vulkan13Features.synchronization2 = VK_TRUE;
-            vulkan13Features.dynamicRendering = VK_TRUE;
-            vulkan13Features.maintenance4 = VK_TRUE;
-            vulkan13Features.pNext = &features2;
+            if(differentQueueFamilies) {
+                queueCreateInfoCount = 2U;
+                graphicsQueueCount = std::min(graphicsQueueCount, maxConcurrentFrames);
+                presentQueueCount = std::min(presentQueueCount, maxConcurrentFrames);
+                queuePriorities.init(graphicsQueueCount + presentQueueCount, 0.0f);
+                queueCreateInfos[0] = {
+                    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0,
+                    .queueFamilyIndex = graphicsQueueFamilyIndex,
+                    .queueCount = graphicsQueueCount,
+                    .pQueuePriorities = &queuePriorities[0]
+                };
+                queueCreateInfos[1] = {
+                    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0,
+                    .queueFamilyIndex = presentQueueFamilyIndex,
+                    .queueCount = presentQueueCount,
+                    .pQueuePriorities = &queuePriorities[graphicsQueueCount]
+                };
+            }
+            else {
+                graphicsQueueCount = std::min(graphicsQueueCount, 2U * maxConcurrentFrames);
+                queuePriorities.init(graphicsQueueCount, 0.0f);
+                queueCreateInfos[0] = {
+                    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0,
+                    .queueFamilyIndex = graphicsQueueFamilyIndex,
+                    .queueCount = graphicsQueueCount,
+                    .pQueuePriorities = queuePriorities.data()
+                };
+            }
+
+            VkPhysicalDeviceVulkan14Features vulkan14Features{
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+                .pNext = nullptr,
+                .pushDescriptor = VK_TRUE
+            };
+            VkPhysicalDeviceVulkan13Features vulkan13Features{
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+                .pNext = &vulkan14Features,
+                .synchronization2 = VK_TRUE,
+                .dynamicRendering = VK_TRUE,
+                .maintenance4 = VK_TRUE
+            };
+            VkPhysicalDeviceFeatures2 features2{
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+                .pNext = &vulkan13Features,
+                .features = {
+                    .samplerAnisotropy = VK_TRUE
+                }
+            };
 
             VkDeviceCreateInfo const deviceInfo = {
                 .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-                .pNext = &vulkan13Features,
+                .pNext = &features2,
                 .flags = 0,
-                .queueCreateInfoCount = 1,
-                .pQueueCreateInfos = &queueInfo,
+                .queueCreateInfoCount = queueCreateInfoCount,
+                .pQueueCreateInfos = queueCreateInfos.data(),
                 .enabledExtensionCount = static_cast<std::uint32_t>(neededDeviceExtensions.size()),
                 .ppEnabledExtensionNames = neededDeviceExtensions.data(),
                 .pEnabledFeatures = nullptr
@@ -1323,10 +1389,31 @@ namespace mars {
             }
 
             //Acquire handles to all the GPU queues we just created
-            queues = HeapArray<VkQueue>(queueCount);
-            for(std::uint32_t i = 0; i < queueCount; i++) {
-                vkGetDeviceQueue(device, queueFamilyIndex, i, &queues[i]);
+            if(differentQueueFamilies) {
+                queues.init(graphicsQueueCount + presentQueueCount);
+                for(std::uint32_t i = 0; i < graphicsQueueCount; i++) {
+                    vkGetDeviceQueue(device, graphicsQueueFamilyIndex, i, &queues[i]);
+                }
+                for(std::uint32_t i = 0; i < presentQueueCount; i++) {
+                    vkGetDeviceQueue(device, presentQueueFamilyIndex, i, &queues[graphicsQueueCount + i]);
+                }
             }
+            else {
+                queues.init(graphicsQueueCount);
+                for(std::uint32_t i = 0; i < graphicsQueueCount; i++) {
+                    vkGetDeviceQueue(device, graphicsQueueFamilyIndex, i, &queues[i]);
+                }
+                //I want the truncating of the division result because it ensures that there are
+                // never more queues allocated to presentation than graphics
+                graphicsQueueCount -= (graphicsQueueCount / 2U);
+            }
+            Error<Slice<VkQueue>> res = Slice<VkQueue>::make(queues, 0, graphicsQueueCount);
+            if(!res) return res.moveError<noreturn>();
+            graphicsQueues = res;
+
+            res = Slice<VkQueue>::make(queues, graphicsQueueCount);
+            if(!res) return res.moveError<noreturn>();
+            presentQueues = res;
 
             return success();
         }
@@ -1373,10 +1460,8 @@ namespace mars {
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, layerProperties.data()) != VK_SUCCESS) {
                     return {ErrorTag::FATAL_ERROR, "Failed to enumerate instance layer properties!"};
                 }
-                std::println("Available Layers:");
                 for(char const* layer : validationLayers) {
                     for(VkLayerProperties const& property : layerProperties) {
-                        std::println("\t{}", property.layerName);
                         if(std::strcmp(layer, property.layerName) == 0) {
                             goto Next_Layer;
                         }
@@ -1392,13 +1477,6 @@ namespace mars {
             extNames.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             for(int i = 0; i < extCount; i++) {
                 extNames.push_back(sdlExtNames[i]);
-            }
-
-            if constexpr(enableValidationLayers) {
-                std::println("Enabled Instance Extensions:");
-                for(char const* extName : extNames) {
-                    std::println("\t{}", extName);
-                }
             }
 
             VkApplicationInfo const appInfo = {
@@ -1447,14 +1525,13 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
             SurfaceInfo surfaceInfo{};
-            std::uint32_t queueFamilyIndex;
-            if(Error<noreturn> res = createVkDevice(surfaceInfo, queueFamilyIndex); !res) {
+            if(Error<noreturn> res = createVkDevice(surfaceInfo); !res) {
                 flags |= flagBits::deviceInvalid;
                 return res;
             }
             TRY(createVkSwapchainKHR(surfaceInfo));
             TRY(getSwapchainImages(surfaceInfo.format.format));
-            TRY(createCommandBuffers(queueFamilyIndex));
+            TRY(createCommandBuffers());
             if(Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(
                     device, physicalDevice, sizeof(glm::mat4) * maxConcurrentFrames); 
                     !res) {
@@ -1540,9 +1617,9 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiitng on fence {}", currentFrame)};
             }
             //These semaphores indicate that we have successfully acquired an image on this frame
-            Slice<VkSemaphore> const imageAcquiredSemaphores(semaphores, 0, maxConcurrentFrames);
+            Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames);
             //These semaphores indicate that the image acquired is ready to present
-            Slice<VkSemaphore> const presentReadySemaphores(semaphores, maxConcurrentFrames);
+            Slice<VkSemaphore> presentReadySemaphores = Slice<VkSemaphore>::make(semaphores, maxConcurrentFrames);
 
             std::uint32_t imageViewIndex;
             VkResult res = vkAcquireNextImageKHR(
@@ -1727,8 +1804,8 @@ namespace mars {
                 .pSignalSemaphoreInfos = &presentationReady
             };
 
-            std::uint32_t const queueIndex = queues.size() > 1 ? 1 : 0;
-            if(vkQueueSubmit2(queues[queueIndex], 1, &submitInfo, fences[currentFrame]) != VK_SUCCESS) {
+            std::uint32_t const graphicsQueueIndex = currentFrame % graphicsQueues.size();
+            if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo, fences[currentFrame]) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to submit draw commands to queue"};
             }
 
@@ -1742,7 +1819,8 @@ namespace mars {
                 .pImageIndices = &imageViewIndex,
                 .pResults = nullptr
             };
-            if(vkQueuePresentKHR(queues[queueIndex], &presentInfo) != VK_SUCCESS) {
+            std::uint32_t const presentQueueIndex = currentFrame % presentQueues.size();
+            if(vkQueuePresentKHR(presentQueues[presentQueueIndex], &presentInfo) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to present graphics queue"};
             }
 
