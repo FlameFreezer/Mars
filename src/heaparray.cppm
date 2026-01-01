@@ -121,7 +121,7 @@ namespace mars {
             return Slice{&array[start], array.size() - start};
         }
         static Error<Slice<T>> make(HeapArray<T> const& array, std::size_t start, std::size_t count) noexcept {
-            if(start + count >= array.size()) {
+            if(start + count > array.size()) {
                 return {ErrorTag::FATAL_ERROR, std::format("Array out of bounds: {} + {} = {}, which is greater than or equal to array size {}", start, count, start + count, array.size())};
             }
             return Slice{&array[start], count};

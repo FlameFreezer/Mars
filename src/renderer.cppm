@@ -1444,8 +1444,17 @@ namespace mars {
                 graphicsQueueCount -= (graphicsQueueCount / 2U);
             }
 
-            graphicsQueues = Slice<VkQueue>::make(queues, 0, graphicsQueueCount);
-            presentQueues = Slice<VkQueue>::make(queues, graphicsQueueCount);
+            Error<Slice<VkQueue>> slice = Slice<VkQueue>::make(queues, 0, graphicsQueueCount);
+            if(!slice) return slice.moveError<noreturn>();
+            graphicsQueues = slice;
+            if(graphicsQueueCount == 1U) {
+                presentQueues = graphicsQueues;
+            }
+            else {
+                slice = Slice<VkQueue>::make(queues, graphicsQueueCount);
+                if(!slice) return slice.moveError<noreturn>();
+                presentQueues = slice;
+            }
 
             return success();
         }
