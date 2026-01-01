@@ -3,6 +3,7 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
+#include <string>
 
 export module vkhelper;
 import error;
@@ -64,5 +65,18 @@ namespace vkhelper {
             return {ErrorTag::FATAL_ERROR, "Failed to bind image memory"};
         }
         return memory;
+    }
+    export constexpr char const* messageSeverityToString(VkDebugUtilsMessageSeverityFlagBitsEXT severity) noexcept {
+        switch(severity) {
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+                return "Verbose"; 
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+                return "Info";
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+                return "Warning";
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+                return "Error";
+            default: return "";
+        }
     }
 }

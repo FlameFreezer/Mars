@@ -32,10 +32,11 @@ import heap_array;
 import flag_bits;
 import vkhelper;
 
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+#define MAX_CONCURRENT_FRAMES 2U
+
 namespace mars {
-    constexpr int width = 800;
-    constexpr int height = 600;
-    constexpr std::uint32_t maxConcurrentFrames = 2;
     constexpr std::array<char const*, 2> neededDeviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
@@ -59,7 +60,9 @@ namespace mars {
 	    VkDebugUtilsMessengerCallbackDataEXT const*	pCallbackData,
 	    void* pUserData
     ) {
-        std::println("Validation Layer: {}", pCallbackData->pMessage);
+        std::print("Validation Layer:\n\tSeverity: ");
+        std::println("{}", vkhelper::messageSeverityToString(messageSeverity));
+        std::println("\tMessage: {}\n", pCallbackData->pMessage);
         return VK_FALSE;
     }
 
@@ -105,21 +108,54 @@ namespace mars {
         }
     };	
 
-    constexpr std::array<Vertex, 8> vertices = {
-        Vertex{glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, -0.5f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(1.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, 0.5f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(1.0f, 1.0f)},
-        Vertex{glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 1.0f)},
-
-        Vertex{glm::vec3(-0.5f, -0.5f, 2.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, -0.5f, 2.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(1.0f, 0.0f)},
-        Vertex{glm::vec3(0.5f, 0.5f, 2.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2(1.0f, 1.0f)},
-        Vertex{glm::vec3(-0.5f, 0.5f, 2.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 1.0f)}
+    constexpr glm::vec3 color(0.0f);
+    constexpr glm::vec3 topleft{-0.5f, -0.5f, 0.0f};
+    constexpr glm::vec3 topright{0.5f, -0.5f, 0.0f};
+    constexpr glm::vec3 bottomright{0.5f, 0.5f, 0.0f};
+    constexpr glm::vec3 bottomleft{-0.5f, 0.5f, 0.0f};
+    constexpr glm::vec3 toprightback{0.5f, -0.5f, 1.0f};
+    constexpr glm::vec3 topleftback{-0.5f, -0.5f, 1.0f};
+    constexpr glm::vec3 bottomleftback{-0.5f, 0.5f, 1.0f};
+    constexpr glm::vec3 bottomrightback{0.5f, 0.5f, 1.0f};
+    constexpr std::array<Vertex, 24> vertices = {
+        //FRONT FACE
+        Vertex{topleft, color, glm::vec2(0.0f, 0.0f)},
+        Vertex{topright, color, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomright, color, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomleft, color, glm::vec2(0.0f, 1.0f)},
+        //RIGHT FACE
+        Vertex{topright, color, glm::vec2(0.0f, 0.0f)},
+        Vertex{toprightback, color, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomrightback, color, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomright, color, glm::vec2(0.0f, 1.0f)},
+        //BACK FACE
+        Vertex{toprightback, color, glm::vec2(0.0f, 0.0f)},
+        Vertex{topleftback, color, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomleftback, color, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomrightback, color, glm::vec2(0.0f, 1.0f)},
+        //LEFT FACE
+        Vertex{topleftback, color, glm::vec2(0.0f, 0.0f)},
+        Vertex{topleft, color, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomleft, color, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomleftback, color, glm::vec2(0.0f, 1.0f)},
+        //TOP FACE
+        Vertex{topleftback, color, glm::vec2(0.0f, 0.0f)},
+        Vertex{toprightback, color, glm::vec2(1.0f, 0.0f)},
+        Vertex{topright, color, glm::vec2(1.0f, 1.0f)},
+        Vertex{topleft, color, glm::vec2(0.0f, 1.0f)},
+        //BOTTOM FACE
+        Vertex{bottomleft, color, glm::vec2(0.0f, 0.0f)},
+        Vertex{bottomright, color, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomrightback, color, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomleftback, color, glm::vec2(0.0f, 1.0f)}
     };
-    constexpr std::array<std::uint32_t, 12> indices = {
-        0, 1, 2, 0, 2, 3,
-
-        4, 5, 6, 4, 6, 7
+    constexpr std::array<std::uint32_t, 36> indices = {
+        0, 1, 2, 0, 2, 3, //FRONT FACE
+        4, 5, 6, 4, 6, 7, //RIGHT FACE
+        8, 9, 10, 8, 10, 11, //BACK FACE
+        12, 13, 14, 12, 14, 15, //LEFT FACE
+        16, 17, 18, 16, 18, 19, //TOP FACE
+        20, 21, 22, 20, 22, 23 //BOTTOM FACE
     };
 
     //Members are in the order of their set number
@@ -139,7 +175,7 @@ namespace mars {
     export class Renderer {
         friend class Game;
         std::vector<VkDescriptorSet> descriptorSets;
-        std::array<glm::mat4, maxConcurrentFrames> models;
+        std::array<glm::mat4, MAX_CONCURRENT_FRAMES> models;
         UniformBuffer<glm::mat4> cameraMatrices;
     	HeapArray<VkImage> swapchainImages;
     	HeapArray<VkImageView> swapchainImageViews;	
@@ -149,8 +185,8 @@ namespace mars {
         HeapArray<VkSemaphore> semaphores;
         GPUImage textureImage;
         GPUImage depthImage;
-    	std::array<VkCommandBuffer, maxConcurrentFrames + 1> commandBuffers;
-        std::array<VkFence, maxConcurrentFrames> fences;
+    	std::array<VkCommandBuffer, MAX_CONCURRENT_FRAMES + 1> commandBuffers;
+        std::array<VkFence, MAX_CONCURRENT_FRAMES> fences;
         DescriptorSetLayouts descriptorSetLayouts;
     	GPUBuffer vertexBuffer;
         VkInstance instance;
@@ -650,7 +686,7 @@ namespace mars {
         }        
 
         Error<noreturn> createSyncObjects() noexcept {
-            semaphores.init(swapchainImages.size() + maxConcurrentFrames);
+            semaphores.init(swapchainImages.size() + MAX_CONCURRENT_FRAMES);
             VkSemaphoreCreateInfo const semaphoreInfo = {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 .pNext = nullptr,
@@ -1320,8 +1356,8 @@ namespace mars {
 
             if(differentQueueFamilies) {
                 queueCreateInfoCount = 2U;
-                graphicsQueueCount = std::min(graphicsQueueCount, maxConcurrentFrames);
-                presentQueueCount = std::min(presentQueueCount, maxConcurrentFrames);
+                graphicsQueueCount = std::min(graphicsQueueCount, MAX_CONCURRENT_FRAMES);
+                presentQueueCount = std::min(presentQueueCount, MAX_CONCURRENT_FRAMES);
                 queuePriorities.init(graphicsQueueCount + presentQueueCount, 0.0f);
                 queueCreateInfos[0] = {
                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -1341,7 +1377,7 @@ namespace mars {
                 };
             }
             else {
-                graphicsQueueCount = std::min(graphicsQueueCount, 2U * maxConcurrentFrames);
+                graphicsQueueCount = std::min(graphicsQueueCount, 2U * MAX_CONCURRENT_FRAMES);
                 queuePriorities.init(graphicsQueueCount, 0.0f);
                 queueCreateInfos[0] = {
                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -1407,13 +1443,9 @@ namespace mars {
                 // never more queues allocated to presentation than graphics
                 graphicsQueueCount -= (graphicsQueueCount / 2U);
             }
-            Error<Slice<VkQueue>> res = Slice<VkQueue>::make(queues, 0, graphicsQueueCount);
-            if(!res) return res.moveError<noreturn>();
-            graphicsQueues = res;
 
-            res = Slice<VkQueue>::make(queues, graphicsQueueCount);
-            if(!res) return res.moveError<noreturn>();
-            presentQueues = res;
+            graphicsQueues = Slice<VkQueue>::make(queues, 0, graphicsQueueCount);
+            presentQueues = Slice<VkQueue>::make(queues, graphicsQueueCount);
 
             return success();
         }
@@ -1515,7 +1547,7 @@ namespace mars {
                 return res;
             }
             if constexpr(enableValidationLayers) TRY(createVkDebugUtilsMessenger());
-            window = SDL_CreateWindow(name.c_str(), width, height, 
+            window = SDL_CreateWindow(name.c_str(), WINDOW_WIDTH, WINDOW_HEIGHT, 
                 SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_HIDDEN);
             if(window == nullptr) return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             if(!SDL_SetWindowRelativeMouseMode(window, true)) {
@@ -1533,7 +1565,7 @@ namespace mars {
             TRY(getSwapchainImages(surfaceInfo.format.format));
             TRY(createCommandBuffers());
             if(Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(
-                    device, physicalDevice, sizeof(glm::mat4) * maxConcurrentFrames); 
+                    device, physicalDevice, sizeof(glm::mat4) * MAX_CONCURRENT_FRAMES); 
                     !res) {
                 return res.moveError<noreturn>();
             }
@@ -1617,9 +1649,9 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiitng on fence {}", currentFrame)};
             }
             //These semaphores indicate that we have successfully acquired an image on this frame
-            Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames);
+            Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, MAX_CONCURRENT_FRAMES);
             //These semaphores indicate that the image acquired is ready to present
-            Slice<VkSemaphore> presentReadySemaphores = Slice<VkSemaphore>::make(semaphores, maxConcurrentFrames);
+            Slice<VkSemaphore> presentReadySemaphores = Slice<VkSemaphore>::make(semaphores, MAX_CONCURRENT_FRAMES);
 
             std::uint32_t imageViewIndex;
             VkResult res = vkAcquireNextImageKHR(
@@ -1657,8 +1689,8 @@ namespace mars {
             //Update model matrix
             constexpr float rotationRate = glm::radians(90.0f / std::chrono::nanoseconds::period::den);
             float const angle = deltaTime.count() * rotationRate;
-            std::uint32_t const prevFrame = (static_cast<std::int32_t>(currentFrame) - 1) % maxConcurrentFrames;
-            models[currentFrame] = glm::rotate(models[prevFrame], angle, glm::vec3(0.0f, 0.0f, 1.0f));
+            std::uint32_t const prevFrame = (static_cast<std::int32_t>(currentFrame) - 1) % MAX_CONCURRENT_FRAMES;
+            //models[currentFrame] = glm::rotate(models[prevFrame], angle, glm::vec3(0.0f, 0.0f, 1.0f));
 
             if(vkResetCommandBuffer(commandBuffers[currentFrame], 0) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer"};
@@ -1824,7 +1856,7 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, "Failed to present graphics queue"};
             }
 
-            currentFrame = (currentFrame + 1) % maxConcurrentFrames;
+            currentFrame = (currentFrame + 1) % MAX_CONCURRENT_FRAMES;
 
             return success();
         }
