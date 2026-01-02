@@ -1,7 +1,5 @@
 module;
 
-#include <utility>
-
 #include <vulkan/vulkan.h>
 
 export module gpubuffer;
@@ -13,16 +11,9 @@ namespace mars {
         VkBuffer handle;
         VkDeviceMemory memory;
 
-        GPUBuffer() noexcept : handle(nullptr), memory(nullptr)  {}
-        GPUBuffer(GPUBuffer&& other) noexcept : handle(other.handle), memory(other.memory) {
-            other.handle = nullptr;
-            other.memory = nullptr;
-        }
         void destroy(VkDevice device) {
             vkDestroyBuffer(device, handle, nullptr);
             vkFreeMemory(device, memory, nullptr);
-            handle = nullptr;
-            memory = nullptr;
         }
         static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
             GPUBuffer buffer;
@@ -44,28 +35,14 @@ namespace mars {
             buffer.memory = mem;
             return buffer;
         }
-        GPUBuffer& operator=(GPUBuffer&& rhs) noexcept {
-            if(this != &rhs) {
-                handle = rhs.handle;
-                memory = rhs.memory;
-                rhs.handle = nullptr;
-                rhs.memory = nullptr;
-            }
-            return *this;
-        }
     };
     export template<class T>
     struct UniformBuffer {
         GPUBuffer buffer;
         T* mappedMemory;
 
-        UniformBuffer() noexcept : mappedMemory(nullptr) {}
-        UniformBuffer(UniformBuffer&& other) noexcept : buffer(std::move(other.buffer)), mappedMemory(other.mappedMemory) {
-            other.mappedMemory = nullptr;
-        }
         void destroy(VkDevice device) noexcept {
             vkUnmapMemory(device, buffer.memory);
-            mappedMemory = nullptr;
             buffer.destroy(device);
         }
         static Error<UniformBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size) noexcept {
@@ -85,15 +62,5 @@ namespace mars {
             }
             return result;
         }
-        UniformBuffer& operator=(UniformBuffer&& rhs) noexcept {
-            if(this != &rhs) {
-                buffer = std::move(rhs.buffer);
-                mappedMemory = rhs.mappedMemory;
-                rhs.mappedMemory = nullptr;
-            }
-            return *this;
-        }
-        private:
-        UniformBuffer(GPUBuffer&& inBuffer) noexcept : buffer(std::move(inBuffer)), mappedMemory(nullptr) {}
     };
 }

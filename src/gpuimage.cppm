@@ -12,18 +12,10 @@ namespace mars {
         VkImageView view;
         VkDeviceMemory memory;
 
-        GPUImage() noexcept : handle(nullptr), view(nullptr), memory(nullptr) {}
-        GPUImage(GPUImage&& other) noexcept : handle(other.handle), view(other.view), memory(other.memory) {
-            other.handle = nullptr;
-            other.memory = nullptr;
-        }
         void destroy(VkDevice device) noexcept {
             vkDestroyImageView(device, view, nullptr);
             vkDestroyImage(device, handle, nullptr);
             vkFreeMemory(device, memory, nullptr);
-            handle = nullptr;
-            view = nullptr;
-            memory = nullptr;
         }
         static Error<GPUImage> make(
                 VkDevice device, 
@@ -88,18 +80,6 @@ namespace mars {
             }
 
             return result;
-        }
-
-        GPUImage& operator=(GPUImage&& rhs) noexcept {
-            if(this != &rhs) {
-                handle = rhs.handle;
-                memory = rhs.memory;
-                view = rhs.view;
-                rhs.handle = nullptr;
-                rhs.memory = nullptr;
-                rhs.view = nullptr;
-            }
-            return *this;
         }
     };
 }

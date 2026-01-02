@@ -34,30 +34,33 @@ namespace mars {
             proj[1][1] *= -1.0f;
             return proj * view;
         }
-        void rotate(float dx, float dy) noexcept {
+        void rotate(float deltaX, float deltaY) noexcept {
             glm::vec3 d(dir);
 
-            if(d.y >= MAX_Y and dy > 0.0f) dy = 0.0f;
-            else if(d.y <= -MAX_Y and dy < 0.0f) dy = 0.0f;
+            if(d.y >= MAX_Y and deltaY > 0.0f) deltaY = 0.0f;
+            else if(d.y <= -MAX_Y and deltaY < 0.0f) deltaY = 0.0f;
 
-            float const deltaYaw = -dx * SENSITIVITY;
-            float const deltaPitch = dy * SENSITIVITY;
+            float const deltaYaw = deltaX * SENSITIVITY;
+            float const deltaPitch = deltaY * SENSITIVITY;
 
             //This gives the angle of dir with the xz-plane
             float pitch = glm::asin(d.y);
             //cos(pitch) gives the length of the projection of dir onto the xz-plane
-            //so, dir.x / cos(pitch) gives the cosine of the angle between dir and the x-axis
-            float yaw = glm::acos(d.x / glm::cos(pitch));
-            //Since -pi <= acos <= pi, we can use dir.z to tell what quadrant dir is in
+            //so, dir.z / cos(pitch) gives the cosine of the angle between dir and the z-axis
+            float yaw = glm::acos(d.z / glm::cos(pitch));
+
+            //Since -pi <= acos <= pi, we have to use d.x to increase the range of yaw
             constexpr float pi = glm::pi<float>();
-            yaw = pi - (pi - yaw) * glm::sign(d.z);
+            //sign(0) = 1
+            float const sign = d.x == 0.0f ? 1.0f : glm::sign(d.x);
+            yaw = pi - (pi - yaw) * sign;
 
             pitch += deltaPitch;
             yaw += deltaYaw;
 
-            d.x = glm::cos(yaw) * glm::cos(pitch);
+            d.x = glm::sin(yaw) * glm::cos(pitch);
             d.y = glm::sin(pitch);
-            d.z = glm::sin(yaw) * glm::cos(pitch);
+            d.z = glm::cos(yaw) * glm::cos(pitch);
             dir = d;
         }
     };

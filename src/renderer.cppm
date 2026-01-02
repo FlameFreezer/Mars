@@ -207,6 +207,7 @@ namespace mars {
         RendererFlags flags;
         std::uint32_t graphicsQueueFamilyIndex;
         std::uint32_t presentQueueFamilyIndex;
+        VkSampleCountFlagBits msaaSampleCount;
 
         Error<noreturn> createRenderTargets(VkFormat format) noexcept {
             renderTargets.resize(swapchainImages.size());
@@ -215,14 +216,14 @@ namespace mars {
                     device, 
                     physicalDevice, 
                     {swapchainImageExtent.width, swapchainImageExtent.height, 1U}, 
-                    VK_SAMPLE_COUNT_4_BIT, 
+                    msaaSampleCount, 
                     VK_IMAGE_TILING_OPTIMAL, 
                     VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                     format, VK_IMAGE_ASPECT_COLOR_BIT
                 );
                 if(!t) return t.moveError<noreturn>();
-                target = t.moveData();
+                target = t;
             }
             return success();
         }
@@ -230,12 +231,12 @@ namespace mars {
         Error<noreturn> createDepthImage() noexcept {
             Error<GPUImage> dp = GPUImage::make(device, physicalDevice,
                 {swapchainImageExtent.width, swapchainImageExtent.height, 1},
-                VK_SAMPLE_COUNT_4_BIT, VK_IMAGE_TILING_OPTIMAL, 
+                msaaSampleCount, VK_IMAGE_TILING_OPTIMAL, 
                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
                 VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
             if(!dp) return dp.moveError<noreturn>();
-            depthImage = dp.moveData();
+            depthImage = dp;
             return success();
         }
 
@@ -388,7 +389,7 @@ namespace mars {
                 ); !image) {
                 return image.moveError<noreturn>();
             }
-            else textureImage = image.moveData();
+            else textureImage = image;
 
             GPUBuffer transferBuffer;
             if(Error<GPUBuffer> tb = GPUBuffer::make(
@@ -400,7 +401,7 @@ namespace mars {
                 ); !tb) {
                 return tb.moveError<noreturn>();
             }
-            else transferBuffer = tb.moveData();
+            else transferBuffer = tb;
 
             void* memory;
             if(vkMapMemory(device, transferBuffer.memory, 0, imageSize, 0, &memory) != VK_SUCCESS) {
@@ -748,7 +749,7 @@ namespace mars {
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
             );
             if(!buff) return buff.moveError<noreturn>();
-            vertexBuffer = buff.moveData();
+            vertexBuffer = buff;
 
             buff = GPUBuffer::make(
                 device,
@@ -758,7 +759,7 @@ namespace mars {
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             );
             if(!buff) return buff.moveError<noreturn>();
-            GPUBuffer transferBuffer(buff.moveData());
+            GPUBuffer transferBuffer(buff);
 
             void* memory = nullptr;
             if(vkMapMemory(device, transferBuffer.memory, 0, vertices.max_size() * sizeof(Vertex), 0, &memory) != VK_SUCCESS) {
@@ -902,7 +903,7 @@ namespace mars {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
-                .rasterizationSamples = VK_SAMPLE_COUNT_4_BIT,
+                .rasterizationSamples = msaaSampleCount,
                 .sampleShadingEnable = VK_FALSE,
                 .minSampleShading = 0.0f,
                 .pSampleMask = nullptr,
@@ -987,7 +988,7 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline layout!"};
             }
            
-            VkGraphicsPipelineCreateInfo pipelineInfo = {
+            VkGraphicsPipelineCreateInfo const pipelineInfo = {
                 .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
                 .pNext = &pipelineRenderingInfo,
                 .flags = 0,
@@ -1294,13 +1295,13 @@ namespace mars {
             for(VkPhysicalDevice const& currentPhysicalDevice : physicalDevices) {
                 //Check device extension support for the current physical device
                 switch(Error<noreturn> procResult = checkDeviceExtensionSupport(currentPhysicalDevice); procResult.tag()) {
-                    case ErrorTag::SEARCH_FAIL: continue;
+                    case ErrorTag::SEARCH_FAIL: goto Continue_Search;
                     case ErrorTag::FATAL_ERROR: return procResult.moveError<PickPhysicalDeviceResult>();
                     case ErrorTag::ALL_OKAY: break;
                 }
 
                 //Check physical device's support for needed features
-                if(!checkDeviceFeatureSupport(currentPhysicalDevice)) continue;
+                if(!checkDeviceFeatureSupport(currentPhysicalDevice)) goto Continue_Search;
 
                 //Get physical device's capabilities with the surface
                 if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -1319,14 +1320,14 @@ namespace mars {
 
                 //Choose a present mode to use
                 switch(Error<VkPresentModeKHR> presentMode = choosePresentMode(currentPhysicalDevice, surface); presentMode.tag()) {
-                    case ErrorTag::SEARCH_FAIL: continue;
+                    case ErrorTag::SEARCH_FAIL: goto Continue_Search;
                     case ErrorTag::FATAL_ERROR: return presentMode.moveError<PickPhysicalDeviceResult>();
                     case ErrorTag::ALL_OKAY: result.surfaceInfo.presentMode = presentMode;
                 }
 
                 //Pick the desired queue family index
                 switch(Error<PickQueueFamilyIndexResult> queueFamilyInfo = pickQueueFamilyIndex(currentPhysicalDevice, surface); queueFamilyInfo.tag()) {
-                    case ErrorTag::SEARCH_FAIL: continue;
+                    case ErrorTag::SEARCH_FAIL: goto Continue_Search;
                     case ErrorTag::FATAL_ERROR: return queueFamilyInfo.moveError<PickPhysicalDeviceResult>();
                     case ErrorTag::ALL_OKAY: result.queueFamilyInfo = queueFamilyInfo;
                 }
@@ -1335,6 +1336,11 @@ namespace mars {
                 // create the logical device
                 result.physicalDevice = currentPhysicalDevice;
                 return result;
+
+                //This label simply causes the loop to continue. I'm doing this because I don't
+                // like using the `continue` keyword in switch statements due to `break` having
+                // different behavior within them.
+                Continue_Search:
             }
             return {ErrorTag::SEARCH_FAIL, "Failed to find suitable physical device"};
         }
@@ -1368,6 +1374,20 @@ namespace mars {
             //pickPhysicalDevice just returns SEARCH_FAIL if none of the devices are suitable, but 
             // I want this case to be fatal instead
             else return {ErrorTag::FATAL_ERROR, pickResult.message()};
+
+            VkPhysicalDeviceProperties2 props = {
+                .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+                .pNext = nullptr
+            };
+            vkGetPhysicalDeviceProperties2(physicalDevice, &props);
+            VkSampleCountFlags const availableSampleCounts = props.properties.limits.framebufferColorSampleCounts;
+            if(availableSampleCounts & VK_SAMPLE_COUNT_64_BIT) msaaSampleCount = VK_SAMPLE_COUNT_64_BIT;
+            else if(availableSampleCounts & VK_SAMPLE_COUNT_32_BIT) msaaSampleCount = VK_SAMPLE_COUNT_32_BIT;
+            else if(availableSampleCounts & VK_SAMPLE_COUNT_16_BIT) msaaSampleCount = VK_SAMPLE_COUNT_16_BIT;
+            else if(availableSampleCounts & VK_SAMPLE_COUNT_8_BIT) msaaSampleCount = VK_SAMPLE_COUNT_8_BIT;
+            else if(availableSampleCounts & VK_SAMPLE_COUNT_4_BIT) msaaSampleCount = VK_SAMPLE_COUNT_4_BIT;
+            else if(availableSampleCounts & VK_SAMPLE_COUNT_2_BIT) msaaSampleCount = VK_SAMPLE_COUNT_2_BIT;
+            else msaaSampleCount = VK_SAMPLE_COUNT_1_BIT;
 
             bool const differentQueueFamilies = graphicsQueueFamilyIndex != presentQueueFamilyIndex;
             std::array<VkDeviceQueueCreateInfo, 2> queueCreateInfos;
@@ -1613,24 +1633,11 @@ namespace mars {
             if(!SDL_ShowWindow(window)) {
                 return {ErrorTag::FATAL_ERROR, "Failed to show window"};
             }
+            currentFrame = 0;
+            flags = 0;
             return success();
         }
-        Renderer() noexcept : 
-            instance(nullptr), 
-            window(nullptr), 
-            debugMessenger(nullptr), 
-            surface(nullptr), 
-            device(nullptr), 
-            physicalDevice(nullptr), 
-            swapchain(nullptr),
-            commandPool(nullptr),
-            graphicsPipeline(nullptr),
-            descriptorSetLayouts({}),
-            descriptorPool(nullptr),
-            currentFrame(0),
-            flags(0)
-        {}
-        void destroy() noexcept {
+        ~Renderer() noexcept {
             if((flags & flagBits::deviceInvalid) == 0) [[likely]] {
                 vkDeviceWaitIdle(device);
                 vkDestroySwapchainKHR(device, swapchain, nullptr);

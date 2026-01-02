@@ -23,26 +23,27 @@ namespace mars {
         SDL_Quit();
     }
 
-    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0) {}
-    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0) {}
+    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0), renderer(nullptr) {}
+    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0), renderer(nullptr) {}
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
-        TRY(renderer.init(appName));
+        renderer = new Renderer();
+        TRY(renderer->init(appName));
         time = std::chrono::steady_clock::now();
         return success();
     }
     Game::~Game() noexcept {
-        renderer.destroy();
+        delete renderer;
         deinitLibrary();
     }
     void Game::setRendererFlags(RendererFlags flag) noexcept {
-        renderer.flags |= flag;
+        renderer->flags |= flag;
     }
     void Game::setFlags(GameFlags flag) noexcept {
         flags |= flag;
     }
     bool Game::rendererHasFlags(RendererFlags flag) noexcept {
-        return renderer.flags & flag;
+        return renderer->flags & flag;
     }
     bool Game::hasFlags(GameFlags flag) noexcept {
         return flags & flag;
@@ -66,14 +67,14 @@ namespace mars {
     }
     Error<noreturn> Game::draw() noexcept {
         if(camera.aspect == Camera::autoAspect) {
-            camera.aspect = static_cast<float>(renderer.swapchainImageExtent.width) / static_cast<float>(renderer.swapchainImageExtent.height);
-            renderer.cameraMatrices.mappedMemory[renderer.currentFrame] = camera.loadMatrices();
+            camera.aspect = static_cast<float>(renderer->swapchainImageExtent.width) / static_cast<float>(renderer->swapchainImageExtent.height);
+            renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
             camera.aspect = Camera::autoAspect;
         }
         else {
-            renderer.cameraMatrices.mappedMemory[renderer.currentFrame] = camera.loadMatrices();
+            renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
         }
-        TRY(renderer.drawFrame(deltaTime));
+        TRY(renderer->drawFrame(deltaTime));
         return success();
     }
 }

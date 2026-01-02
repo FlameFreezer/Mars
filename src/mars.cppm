@@ -16,7 +16,7 @@ export import heap_array;
 
 namespace mars {
     export class Game {
-        Renderer renderer;
+        Renderer* renderer;
         std::string windowName;
         std::string appName;
         std::chrono::steady_clock::time_point time;
