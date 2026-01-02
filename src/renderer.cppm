@@ -179,6 +179,7 @@ namespace mars {
         UniformBuffer<glm::mat4> cameraMatrices;
     	HeapArray<VkImage> swapchainImages;
     	HeapArray<VkImageView> swapchainImageViews;	
+        HeapArray<GPUImage> renderTargets;
         HeapArray<VkQueue> queues;
         Slice<VkQueue> graphicsQueues;
         Slice<VkQueue> presentQueues;
@@ -207,10 +208,29 @@ namespace mars {
         std::uint32_t graphicsQueueFamilyIndex;
         std::uint32_t presentQueueFamilyIndex;
 
+        Error<noreturn> createRenderTargets(VkFormat format) noexcept {
+            renderTargets.resize(swapchainImages.size());
+            for(GPUImage& target : renderTargets) {
+                Error<GPUImage> t = GPUImage::make(
+                    device, 
+                    physicalDevice, 
+                    {swapchainImageExtent.width, swapchainImageExtent.height, 1U}, 
+                    VK_SAMPLE_COUNT_4_BIT, 
+                    VK_IMAGE_TILING_OPTIMAL, 
+                    VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    format, VK_IMAGE_ASPECT_COLOR_BIT
+                );
+                if(!t) return t.moveError<noreturn>();
+                target = t.moveData();
+            }
+            return success();
+        }
+
         Error<noreturn> createDepthImage() noexcept {
             Error<GPUImage> dp = GPUImage::make(device, physicalDevice,
                 {swapchainImageExtent.width, swapchainImageExtent.height, 1},
-                VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, 
+                VK_SAMPLE_COUNT_4_BIT, VK_IMAGE_TILING_OPTIMAL, 
                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
                 VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -582,15 +602,15 @@ namespace mars {
             return success();
         }
 
-        void doRenderPass(VkImageView renderTargetView, VkCommandBuffer commandBuffer) noexcept {
-            VkRenderingAttachmentInfo const colorAttachment = {
+        void doRenderPass(std::uint32_t imageIndex, VkCommandBuffer commandBuffer) noexcept {
+            VkRenderingAttachmentInfo const renderAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .pNext = nullptr,
-                .imageView = renderTargetView,
+                .imageView = renderTargets[imageIndex].view,
                 .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .resolveMode = VK_RESOLVE_MODE_NONE,
-                .resolveImageView = nullptr,
-                .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT,
+                .resolveImageView = swapchainImageViews[imageIndex],
+                .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
                 .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
                 .clearValue = {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}
@@ -618,7 +638,7 @@ namespace mars {
                 .layerCount = 1,
                 .viewMask = 0,
                 .colorAttachmentCount = 1,
-                .pColorAttachments = &colorAttachment,
+                .pColorAttachments = &renderAttachment,
                 .pDepthAttachment = &depthAttachment,
                 .pStencilAttachment = nullptr
             };
@@ -686,7 +706,7 @@ namespace mars {
         }        
 
         Error<noreturn> createSyncObjects() noexcept {
-            semaphores.init(swapchainImages.size() + MAX_CONCURRENT_FRAMES);
+            semaphores.resize(swapchainImages.size() + MAX_CONCURRENT_FRAMES);
             VkSemaphoreCreateInfo const semaphoreInfo = {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 .pNext = nullptr,
@@ -882,7 +902,7 @@ namespace mars {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
-                .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+                .rasterizationSamples = VK_SAMPLE_COUNT_4_BIT,
                 .sampleShadingEnable = VK_FALSE,
                 .minSampleShading = 0.0f,
                 .pSampleMask = nullptr,
@@ -1001,11 +1021,11 @@ namespace mars {
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
             }
-            swapchainImages.init(imageCount);
+            swapchainImages.resize(imageCount);
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
             }
-            swapchainImageViews.init(imageCount);
+            swapchainImageViews.resize(imageCount);
 
             VkImageViewCreateInfo imageViewInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -1426,7 +1446,7 @@ namespace mars {
 
             //Acquire handles to all the GPU queues we just created
             if(differentQueueFamilies) {
-                queues.init(graphicsQueueCount + presentQueueCount);
+                queues.resize(graphicsQueueCount + presentQueueCount);
                 for(std::uint32_t i = 0; i < graphicsQueueCount; i++) {
                     vkGetDeviceQueue(device, graphicsQueueFamilyIndex, i, &queues[i]);
                 }
@@ -1435,7 +1455,7 @@ namespace mars {
                 }
             }
             else {
-                queues.init(graphicsQueueCount);
+                queues.resize(graphicsQueueCount);
                 for(std::uint32_t i = 0; i < graphicsQueueCount; i++) {
                     vkGetDeviceQueue(device, graphicsQueueFamilyIndex, i, &queues[i]);
                 }
@@ -1581,6 +1601,7 @@ namespace mars {
             else cameraMatrices = res.moveData(); 
             TRY(createTexture());
             TRY(createSampler());
+            TRY(createRenderTargets(surfaceInfo.format.format));
             TRY(createDepthImage());
             TRY(createVertexBuffer());
             TRY(createSyncObjects());
@@ -1628,6 +1649,7 @@ namespace mars {
                 }
                 textureImage.destroy(device);
                 depthImage.destroy(device);
+                for(GPUImage& target: renderTargets) target.destroy(device);
                 vkDestroySampler(device, sampler, nullptr);
                 vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
                 vkDestroyCommandPool(device, commandPool, nullptr);
@@ -1662,14 +1684,14 @@ namespace mars {
             //These semaphores indicate that the image acquired is ready to present
             Slice<VkSemaphore> presentReadySemaphores = Slice<VkSemaphore>::make(semaphores, MAX_CONCURRENT_FRAMES);
 
-            std::uint32_t imageViewIndex;
+            std::uint32_t imageIndex;
             VkResult res = vkAcquireNextImageKHR(
                 device, 
                 swapchain, 
                 std::numeric_limits<std::uint64_t>::max(), 
                 imageAcquiredSemaphores[currentFrame], 
                 nullptr, 
-                &imageViewIndex
+                &imageIndex
             );
             if(res == VK_ERROR_OUT_OF_DATE_KHR or res == VK_SUBOPTIMAL_KHR or (flags & flagBits::recreateSwapchain)) {
                 TRY(recreateSwapchain());
@@ -1694,12 +1716,6 @@ namespace mars {
             if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, std::format("Failed to reset fence {}", currentFrame)};
             }
-
-            //Update model matrix
-            constexpr float rotationRate = glm::radians(90.0f / std::chrono::nanoseconds::period::den);
-            float const angle = deltaTime.count() * rotationRate;
-            std::uint32_t const prevFrame = (static_cast<std::int32_t>(currentFrame) - 1) % MAX_CONCURRENT_FRAMES;
-            //models[currentFrame] = glm::rotate(models[prevFrame], angle, glm::vec3(0.0f, 0.0f, 1.0f));
 
             if(vkResetCommandBuffer(commandBuffers[currentFrame], 0) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer"};
@@ -1727,7 +1743,7 @@ namespace mars {
                 .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = swapchainImages[imageViewIndex],
+                .image = renderTargets[imageIndex].handle,
                 .subresourceRange = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel = 0,
@@ -1771,7 +1787,7 @@ namespace mars {
 
             vkCmdPipelineBarrier2(commandBuffers[currentFrame], &colorWriteDependency);
 
-            doRenderPass(swapchainImageViews[imageViewIndex], commandBuffers[currentFrame]);
+            doRenderPass(imageIndex, commandBuffers[currentFrame]);
 
             //Transition image layout for presentation
             VkImageMemoryBarrier2 const presentSrcBarrier = {
@@ -1781,11 +1797,11 @@ namespace mars {
                 .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                 .dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
                 .dstAccessMask = VK_ACCESS_2_NONE,
-                .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                 .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = swapchainImages[imageViewIndex],
+                .image = swapchainImages[imageIndex],
                 .subresourceRange = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel = 0,
@@ -1828,7 +1844,7 @@ namespace mars {
             VkSemaphoreSubmitInfo const presentationReady = {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                 .pNext = nullptr,
-                .semaphore = presentReadySemaphores[imageViewIndex],
+                .semaphore = presentReadySemaphores[imageIndex],
                 .value = 0,
                 .stageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                 .deviceIndex = 0
@@ -1854,10 +1870,10 @@ namespace mars {
                 .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &presentReadySemaphores[imageViewIndex],
+                .pWaitSemaphores = &presentReadySemaphores[imageIndex],
                 .swapchainCount = 1,
                 .pSwapchains = &swapchain,
-                .pImageIndices = &imageViewIndex,
+                .pImageIndices = &imageIndex,
                 .pResults = nullptr
             };
             std::uint32_t const presentQueueIndex = currentFrame % presentQueues.size();

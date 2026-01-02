@@ -8,6 +8,8 @@ module;
 
 #define SENSITIVITY 0.001f
 #define MAX_Y 0.90f
+#define NEAR_PLANE 0.1f
+#define FAR_PLANE 1000.0f
 
 export module mars:camera;
 import error;
@@ -26,13 +28,13 @@ namespace mars {
                 dir.y = std::clamp(dir.y, -MAX_Y, MAX_Y);
             }
         glm::mat4 loadMatrices() const noexcept {
+            //dir + pos = target (position the camera is looking at)
             glm::mat4 const view = glm::lookAt(pos, dir + pos, up);
-            glm::mat4 proj = glm::perspective(fov, aspect, 0.1f, 1000.0f);
+            glm::mat4 proj = glm::perspective(fov, aspect, NEAR_PLANE, FAR_PLANE);
             proj[1][1] *= -1.0f;
             return proj * view;
         }
         void rotate(float dx, float dy) noexcept {
-
             glm::vec3 d(dir);
 
             if(d.y >= MAX_Y and dy > 0.0f) dy = 0.0f;

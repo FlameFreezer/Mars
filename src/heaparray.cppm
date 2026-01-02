@@ -60,13 +60,13 @@ namespace mars {
             delete[] mPtr;
             mSize = 0;
         }
-        void init(std::size_t size) noexcept {
+        void resize(std::size_t size) noexcept {
             delete[] mPtr;
             mPtr = new T[size];
             mSize = size;
         }
         void init(std::size_t size, T const& value) noexcept {
-            init(size);
+            resize(size);
             for(std::size_t i = 0; i < size; i++) mPtr[i] = value;
         }
 

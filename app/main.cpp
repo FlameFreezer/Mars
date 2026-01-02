@@ -28,34 +28,41 @@ void handleEvent(mars::Game& game, SDL_Event const& e) noexcept {
 
 void handleKeyboardInput(mars::Game& game) noexcept {
     game.updateKeyState();
+    glm::vec3 velocity(0.0f);
     if(game.keyState[SDL_SCANCODE_D]) {
-        glm::vec3 const right = glm::normalize(glm::cross(game.camera.dir, game.camera.up));
-        game.camera.pos += right * SPEED * game.getDeltaTimeSeconds();
+        glm::vec3 const right(glm::normalize(glm::cross(game.camera.dir, game.camera.up)));
+        velocity += right;
     }
     if(game.keyState[SDL_SCANCODE_A]) {
-        glm::vec3 const left = glm::normalize(glm::cross(game.camera.up, game.camera.dir));
-        game.camera.pos += left * SPEED * game.getDeltaTimeSeconds();
+        glm::vec3 const left(glm::normalize(glm::cross(game.camera.up, game.camera.dir)));
+        velocity += left;
     }
     if(game.keyState[SDL_SCANCODE_S]) {
         glm::vec3 dir(game.camera.dir);
         dir.y = 0.0f;
         dir = glm::normalize(dir);
-        game.camera.pos -= dir * SPEED * game.getDeltaTimeSeconds();
+        velocity -= dir;
     }
     if(game.keyState[SDL_SCANCODE_W]) {
         glm::vec3 dir(game.camera.dir);
         dir.y = 0.0f;
         dir = glm::normalize(dir);
-        game.camera.pos += dir * SPEED * game.getDeltaTimeSeconds();
+        velocity += dir;
     }
     if(game.keyState[SDL_SCANCODE_SPACE]) {
-        game.camera.pos += game.camera.up * SPEED * game.getDeltaTimeSeconds();
+        velocity += game.camera.up;
     }
     if(game.keyState[SDL_SCANCODE_LSHIFT]) {
-        game.camera.pos -= game.camera.up * SPEED * game.getDeltaTimeSeconds();
+        velocity -= game.camera.up;
     }
-    if(game.keyState[SDL_SCANCODE_ESCAPE])
+    if(game.keyState[SDL_SCANCODE_ESCAPE]) {
         game.setFlags(mars::flagBits::stopExecution);
+    }
+
+    if(velocity != glm::vec3(0.0f)) {
+        velocity = glm::normalize(velocity) * SPEED * game.getDeltaTimeSeconds();
+        game.camera.pos += velocity;
+    }
 }
 
 void handleMouseInput(mars::Game& game) noexcept {
