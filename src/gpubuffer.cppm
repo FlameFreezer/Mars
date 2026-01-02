@@ -1,8 +1,8 @@
 module;
 
-#include <vulkan/vulkan.h>
-
 #include <utility>
+
+#include <vulkan/vulkan.h>
 
 export module gpubuffer;
 import error;

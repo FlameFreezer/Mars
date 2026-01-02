@@ -1,9 +1,8 @@
 module;
 
-#include <vulkan/vulkan.h>
-
 #include <cstdint>
-#include <string>
+
+#include <vulkan/vulkan.h>
 
 export module vkhelper;
 import error;

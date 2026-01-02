@@ -10,7 +10,7 @@ import mars;
 
 using ErrorNoreturn = mars::Error<mars::noreturn>;
 
-constexpr float speed = 2.0f;
+#define SPEED 2.0f
 
 void handleEvent(mars::Game& game, SDL_Event const& e) noexcept {
     switch(e.type) {
@@ -30,55 +30,39 @@ void handleKeyboardInput(mars::Game& game) noexcept {
     game.updateKeyState();
     if(game.keyState[SDL_SCANCODE_D]) {
         glm::vec3 const right = glm::normalize(glm::cross(game.camera.dir, game.camera.up));
-        game.camera.pos += right * speed * game.getDeltaTimeSeconds();
+        game.camera.pos += right * SPEED * game.getDeltaTimeSeconds();
     }
     if(game.keyState[SDL_SCANCODE_A]) {
         glm::vec3 const left = glm::normalize(glm::cross(game.camera.up, game.camera.dir));
-        game.camera.pos += left * speed * game.getDeltaTimeSeconds();
+        game.camera.pos += left * SPEED * game.getDeltaTimeSeconds();
     }
     if(game.keyState[SDL_SCANCODE_S]) {
         glm::vec3 dir(game.camera.dir);
         dir.y = 0.0f;
         dir = glm::normalize(dir);
-        game.camera.pos -= dir * speed * game.getDeltaTimeSeconds();
+        game.camera.pos -= dir * SPEED * game.getDeltaTimeSeconds();
     }
     if(game.keyState[SDL_SCANCODE_W]) {
         glm::vec3 dir(game.camera.dir);
         dir.y = 0.0f;
         dir = glm::normalize(dir);
-        game.camera.pos += dir * speed * game.getDeltaTimeSeconds();
+        game.camera.pos += dir * SPEED * game.getDeltaTimeSeconds();
     }
     if(game.keyState[SDL_SCANCODE_SPACE]) {
-        game.camera.pos += game.camera.up * speed * game.getDeltaTimeSeconds();
+        game.camera.pos += game.camera.up * SPEED * game.getDeltaTimeSeconds();
     }
     if(game.keyState[SDL_SCANCODE_LSHIFT]) {
-        game.camera.pos -= game.camera.up * speed * game.getDeltaTimeSeconds();
+        game.camera.pos -= game.camera.up * SPEED * game.getDeltaTimeSeconds();
     }
     if(game.keyState[SDL_SCANCODE_ESCAPE])
         game.setFlags(mars::flagBits::stopExecution);
 }
 
 void handleMouseInput(mars::Game& game) noexcept {
-    #define SENSITIVITY 0.001f
-    #define MAX_Y 0.95f
     float dx, dy;
     SDL_GetRelativeMouseState(&dx, &dy);
-    if(dx == 0.0f and dy == 0.0f) return;
 
-    if(game.camera.dir.y >= MAX_Y and dy > 0.0f) dy = 0.0f;
-    else if(game.camera.dir.y <= -MAX_Y and dy < 0.0f) dy = 0.0f;
-
-    float const angleX = -dx * SENSITIVITY;
-    float const angleY = -dy * SENSITIVITY;
-    constexpr glm::mat4 i(1.0f);
-    glm::vec4 dir;
-
-    dir = glm::rotate(i, angleX, game.camera.up) * glm::vec4(game.camera.dir, 0.0f);
-    game.camera.dir = {dir.x, dir.y, dir.z};
-
-    glm::vec3 const axis = glm::cross(game.camera.dir, game.camera.up);
-    dir = glm::rotate(i, angleY, axis) * glm::vec4(game.camera.dir, 0.0f);
-    game.camera.dir = {dir.x, dir.y, dir.z};
+    if(dx != 0.0f or dy != 0.0f) game.camera.rotate(dx, dy);
 }
 
 ErrorNoreturn mainLoop(mars::Game& game) noexcept {
