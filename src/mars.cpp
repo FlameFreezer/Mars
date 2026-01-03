@@ -36,13 +36,13 @@ namespace mars {
         delete renderer;
         deinitLibrary();
     }
-    void Game::setRendererFlags(RendererFlags flag) noexcept {
+    void Game::setFlags(RendererFlags flag) noexcept {
         renderer->flags |= flag;
     }
     void Game::setFlags(GameFlags flag) noexcept {
         flags |= flag;
     }
-    bool Game::rendererHasFlags(RendererFlags flag) noexcept {
+    bool Game::hasFlags(RendererFlags flag) noexcept {
         return renderer->flags & flag;
     }
     bool Game::hasFlags(GameFlags flag) noexcept {

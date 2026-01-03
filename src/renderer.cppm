@@ -204,10 +204,10 @@ namespace mars {
         VkSampler sampler;
         VkDescriptorPool descriptorPool;
         std::uint32_t currentFrame;
-        RendererFlags flags;
         std::uint32_t graphicsQueueFamilyIndex;
         std::uint32_t presentQueueFamilyIndex;
         VkSampleCountFlagBits msaaSampleCount;
+        RendererFlags flags;
 
         Error<noreturn> createRenderTargets(VkFormat format) noexcept {
             renderTargets.resize(swapchainImages.size());
@@ -1634,7 +1634,7 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, "Failed to show window"};
             }
             currentFrame = 0;
-            flags = 0;
+            flags = {};
             return success();
         }
         ~Renderer() noexcept {
@@ -1684,7 +1684,7 @@ namespace mars {
                     VK_TRUE, 
                     std::numeric_limits<std::uint64_t>::max()
                 ) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiitng on fence {}", currentFrame)};
+                return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiting on fence {}", currentFrame)};
             }
             //These semaphores indicate that we have successfully acquired an image on this frame
             Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, MAX_CONCURRENT_FRAMES);

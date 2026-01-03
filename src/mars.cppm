@@ -30,9 +30,9 @@ namespace mars {
         ~Game() noexcept;
         Error<noreturn> init() noexcept;
         Error<noreturn> draw() noexcept;
-        void setRendererFlags(RendererFlags flag) noexcept;
+        void setFlags(RendererFlags flag) noexcept;
         void setFlags(GameFlags flag) noexcept;
-        bool rendererHasFlags(RendererFlags flag) noexcept;
+        bool hasFlags(RendererFlags flag) noexcept;
         bool hasFlags(GameFlags flag) noexcept;
         std::chrono::steady_clock::time_point getFrameTime() const noexcept;
         std::chrono::nanoseconds::rep getDeltaTime() const noexcept;

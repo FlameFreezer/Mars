@@ -1,7 +1,5 @@
 module;
 
-#include <algorithm>
-
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -25,7 +23,8 @@ namespace mars {
         Camera() noexcept : aspect(autoAspect), fov(0.0f) {}
         Camera(glm::vec3 const& inPos, glm::vec3 const& inDir, glm::vec3 inUp, float inFov, float inAspect) noexcept 
             : pos(inPos), dir(glm::normalize(inDir)), up(glm::normalize(inUp)), fov(inFov), aspect(inAspect) {
-                dir.y = std::clamp(dir.y, -MAX_Y, MAX_Y);
+                if(dir.y < -MAX_Y) dir.y = -MAX_Y;
+                else if(dir.y > MAX_Y) dir.y = MAX_Y;
             }
         glm::mat4 loadMatrices() const noexcept {
             //dir + pos = target (position the camera is looking at)

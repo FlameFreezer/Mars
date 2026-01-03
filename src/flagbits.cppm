@@ -1,22 +1,58 @@
 module;
 
 #include <cstdint>
+#include <concepts>
 
-#define RENDERER_NEXT_BIT(name) export constexpr RendererFlags name = 1U << (__LINE__ - rendererStart)
-#define GAME_NEXT_BIT(name) export constexpr GameFlags name = 1U << (__LINE__ - gameStart)
+#define RENDERER_NEXT_BIT(name) export constexpr RendererFlags name{1U << (__LINE__ - rendererStart)}
+#define GAME_NEXT_BIT(name) export constexpr GameFlags name{1U << (__LINE__ - gameStart)}
 
 export module flag_bits;
 
 namespace mars {
-    export using RendererFlags = std::uint16_t;
-    export using GameFlags = std::uint16_t;
+    template<class T> requires std::integral<T>
+    class MarsFlags {
+        T bits;
+        public:
+        using Width = T;
+        constexpr MarsFlags(Width inBits) noexcept : bits(inBits) {}
+        constexpr MarsFlags() noexcept : bits(0) {}
+        MarsFlags operator|(MarsFlags rhs) const noexcept {
+            return bits | rhs.bits;
+        }
+        MarsFlags operator&(MarsFlags rhs) const noexcept {
+            return bits & rhs.bits;
+        }
+        MarsFlags operator^(MarsFlags rhs) const noexcept {
+            return bits ^rhs.bits;
+        }
+        MarsFlags& operator&=(MarsFlags rhs) noexcept {
+            bits &= rhs.bits;
+            return *this;
+        }
+        MarsFlags& operator|=(MarsFlags rhs) noexcept {
+            bits |= rhs.bits;
+            return *this;
+        }
+        MarsFlags& operator^=(MarsFlags rhs) noexcept {
+            bits ^= rhs.bits;
+            return *this;
+        }
+        MarsFlags operator~() const noexcept {
+            return ~bits;
+        }
+        operator bool() const noexcept {
+            return bits != 0;
+        }
+    };
+    export class RendererFlags : public MarsFlags<std::uint8_t> {};
+    export class GameFlags : public MarsFlags<std::uint8_t> {};
     namespace flagBits {
-        constexpr RendererFlags rendererStart = __LINE__ + 1U;
+        constexpr std::uint32_t rendererStart = __LINE__ + 1U;
         RENDERER_NEXT_BIT(recreateSwapchain);
         RENDERER_NEXT_BIT(deviceInvalid);
         RENDERER_NEXT_BIT(instanceInvalid);
 
-        constexpr GameFlags gameStart = __LINE__ + 1U;
+        constexpr std::uint32_t gameStart = __LINE__ + 1U;
         GAME_NEXT_BIT(stopExecution);
     }
 }
