@@ -105,10 +105,10 @@ namespace mars {
     };
 
     //A non-owning reference to a range within a heap-allocated array
-    export template <class T>
+    export template <class T, std::size_t align = alignof(T)>
     class Slice {
         private:
-        T* mPtr;
+        alignas(align) T* mPtr;
         std::size_t mSize;
         public:
         Slice() noexcept : mPtr(nullptr), mSize(0) {}

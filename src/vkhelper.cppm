@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <string>
 
 #include <vulkan/vulkan.h>
 
@@ -65,7 +66,7 @@ namespace vkhelper {
         }
         return memory;
     }
-    export constexpr char const* messageSeverityToString(VkDebugUtilsMessageSeverityFlagBitsEXT severity) noexcept {
+    export constexpr std::string messageSeverityToString(VkDebugUtilsMessageSeverityFlagBitsEXT severity) noexcept {
         switch(severity) {
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
                 return "Verbose"; 

@@ -1,8 +1,5 @@
 import mars;
 
-#include <print>
-#include <chrono>
-
 #include <SDL3/SDL.h>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -71,13 +68,11 @@ void handleKeyboardInput(mars::Game& game) noexcept {
 void handleMouseInput(mars::Game& game) noexcept {
     float dx, dy;
     SDL_GetRelativeMouseState(&dx, &dy);
-
-    if(dx != 0.0f or dy != 0.0f) game.camera.rotate(dx, dy);
+    if(dx == 0.0f and dy == 0.0f) return;
+    game.camera.rotate(dx, dy);
 }
 
 ErrorNoreturn mainLoop(mars::Game& game) noexcept {
-    std::uint64_t frameCount = 0;
-    auto const start = std::chrono::steady_clock::now();
     while(!game.hasFlags(mars::flagBits::stopExecution)) {
     	SDL_Event e;
         game.updateTime();
@@ -88,12 +83,6 @@ ErrorNoreturn mainLoop(mars::Game& game) noexcept {
         handleKeyboardInput(game);
         handleMouseInput(game);
         TRY(game.draw());
-        if(++frameCount == 10000) {
-            auto const now = std::chrono::steady_clock::now();
-            float const seconds = std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(now - start).count();
-            std::println("Time to render 10000 frames: {} seconds", seconds);
-            game.setFlags(mars::flagBits::stopExecution);
-        }
     }
     return mars::success();
 }

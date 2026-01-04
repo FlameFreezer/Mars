@@ -60,22 +60,17 @@ namespace mars {
 	    VkDebugUtilsMessengerCallbackDataEXT const*	pCallbackData,
 	    void* pUserData
     ) {
-        std::print("Validation Layer:\n\tSeverity: ");
-        std::println("{}", vkhelper::messageSeverityToString(messageSeverity));
+        std::println("Validation Layer:\n\tSeverity: {}", vkhelper::messageSeverityToString(messageSeverity));
         std::println("\tMessage: {}\n", pCallbackData->pMessage);
         return VK_FALSE;
     }
 
-    struct SurfaceInfo {
-        VkSurfaceCapabilitiesKHR capabilities;
-        VkPresentModeKHR presentMode;
-    	VkSurfaceFormatKHR format;
-    };
-
     struct Vertex {
-        glm::vec3 pos;
-        glm::vec3 color;
-        glm::vec2 texCoord;
+        alignas(4) glm::vec3 pos;
+        alignas(4) glm::vec3 color;
+        alignas(4) glm::vec2 texCoord;
+
+        constexpr Vertex(glm::vec3 inPos, glm::vec2 inTexCoord) noexcept : pos(inPos), color(glm::vec3{0.0f}), texCoord(inTexCoord) {}
 
         static constexpr VkVertexInputBindingDescription getInputBindingDescription() noexcept {
             return { 0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
@@ -108,7 +103,6 @@ namespace mars {
         }
     };	
 
-    constexpr glm::vec3 color(0.0f);
     constexpr glm::vec3 topleft{-0.5f, -0.5f, 0.0f};
     constexpr glm::vec3 topright{0.5f, -0.5f, 0.0f};
     constexpr glm::vec3 bottomright{0.5f, 0.5f, 0.0f};
@@ -119,35 +113,35 @@ namespace mars {
     constexpr glm::vec3 bottomrightback{0.5f, 0.5f, 1.0f};
     constexpr std::array<Vertex, 24> vertices = {
         //FRONT FACE
-        Vertex{topleft, color, glm::vec2(0.0f, 0.0f)},
-        Vertex{topright, color, glm::vec2(1.0f, 0.0f)},
-        Vertex{bottomright, color, glm::vec2(1.0f, 1.0f)},
-        Vertex{bottomleft, color, glm::vec2(0.0f, 1.0f)},
+        Vertex{topleft, glm::vec2(0.0f, 0.0f)},
+        Vertex{topright, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomright, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomleft, glm::vec2(0.0f, 1.0f)},
         //RIGHT FACE
-        Vertex{topright, color, glm::vec2(0.0f, 0.0f)},
-        Vertex{toprightback, color, glm::vec2(1.0f, 0.0f)},
-        Vertex{bottomrightback, color, glm::vec2(1.0f, 1.0f)},
-        Vertex{bottomright, color, glm::vec2(0.0f, 1.0f)},
+        Vertex{topright, glm::vec2(0.0f, 0.0f)},
+        Vertex{toprightback, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomrightback, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomright, glm::vec2(0.0f, 1.0f)},
         //BACK FACE
-        Vertex{toprightback, color, glm::vec2(0.0f, 0.0f)},
-        Vertex{topleftback, color, glm::vec2(1.0f, 0.0f)},
-        Vertex{bottomleftback, color, glm::vec2(1.0f, 1.0f)},
-        Vertex{bottomrightback, color, glm::vec2(0.0f, 1.0f)},
+        Vertex{toprightback, glm::vec2(0.0f, 0.0f)},
+        Vertex{topleftback, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomleftback, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomrightback, glm::vec2(0.0f, 1.0f)},
         //LEFT FACE
-        Vertex{topleftback, color, glm::vec2(0.0f, 0.0f)},
-        Vertex{topleft, color, glm::vec2(1.0f, 0.0f)},
-        Vertex{bottomleft, color, glm::vec2(1.0f, 1.0f)},
-        Vertex{bottomleftback, color, glm::vec2(0.0f, 1.0f)},
+        Vertex{topleftback, glm::vec2(0.0f, 0.0f)},
+        Vertex{topleft, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomleft, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomleftback, glm::vec2(0.0f, 1.0f)},
         //TOP FACE
-        Vertex{topleftback, color, glm::vec2(0.0f, 0.0f)},
-        Vertex{toprightback, color, glm::vec2(1.0f, 0.0f)},
-        Vertex{topright, color, glm::vec2(1.0f, 1.0f)},
-        Vertex{topleft, color, glm::vec2(0.0f, 1.0f)},
+        Vertex{topleftback, glm::vec2(0.0f, 0.0f)},
+        Vertex{toprightback, glm::vec2(1.0f, 0.0f)},
+        Vertex{topright, glm::vec2(1.0f, 1.0f)},
+        Vertex{topleft, glm::vec2(0.0f, 1.0f)},
         //BOTTOM FACE
-        Vertex{bottomleft, color, glm::vec2(0.0f, 0.0f)},
-        Vertex{bottomright, color, glm::vec2(1.0f, 0.0f)},
-        Vertex{bottomrightback, color, glm::vec2(1.0f, 1.0f)},
-        Vertex{bottomleftback, color, glm::vec2(0.0f, 1.0f)}
+        Vertex{bottomleft, glm::vec2(0.0f, 0.0f)},
+        Vertex{bottomright, glm::vec2(1.0f, 0.0f)},
+        Vertex{bottomrightback, glm::vec2(1.0f, 1.0f)},
+        Vertex{bottomleftback, glm::vec2(0.0f, 1.0f)}
     };
     constexpr std::array<std::uint32_t, 36> indices = {
         0, 1, 2, 0, 2, 3, //FRONT FACE
@@ -208,6 +202,25 @@ namespace mars {
         std::uint32_t presentQueueFamilyIndex;
         VkSampleCountFlagBits msaaSampleCount;
         RendererFlags flags;
+
+        struct SurfaceInfo {
+            VkSurfaceCapabilitiesKHR capabilities;
+            VkPresentModeKHR presentMode;
+        	VkSurfaceFormatKHR format;
+        };
+
+        struct PickQueueFamilyIndexResult {
+            std::uint32_t presentIndex = std::numeric_limits<std::uint32_t>::max();
+            std::uint32_t presentCount = 0U;
+            std::uint32_t graphicsIndex = std::numeric_limits<std::uint32_t>::max();
+            std::uint32_t graphicsCount = 0U;
+        };
+
+        struct PickPhysicalDeviceResult {
+            VkPhysicalDevice physicalDevice = nullptr;
+            PickQueueFamilyIndexResult queueFamilyInfo;
+            SurfaceInfo surfaceInfo;
+        };
 
         Error<noreturn> createRenderTargets(VkFormat format) noexcept {
             renderTargets.resize(swapchainImages.size());
@@ -1096,6 +1109,7 @@ namespace mars {
             };
         }
 
+
         Error<noreturn> createVkSwapchainKHR(SurfaceInfo const& surfaceInfo) noexcept {
             Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceInfo.capabilities);
             if(!imageExtent) return imageExtent.moveError<noreturn>();
@@ -1129,12 +1143,6 @@ namespace mars {
             return success();
         }
 
-        struct PickQueueFamilyIndexResult {
-            std::uint32_t presentIndex = std::numeric_limits<std::uint32_t>::max();
-            std::uint32_t presentCount = 0U;
-            std::uint32_t graphicsIndex = std::numeric_limits<std::uint32_t>::max();
-            std::uint32_t graphicsCount = 0U;
-        };
 
         static Error<PickQueueFamilyIndexResult> pickQueueFamilyIndex(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) noexcept {
             PickQueueFamilyIndexResult result{};
@@ -1284,11 +1292,6 @@ namespace mars {
         }
 
 
-        struct PickPhysicalDeviceResult {
-            VkPhysicalDevice physicalDevice = nullptr;
-            PickQueueFamilyIndexResult queueFamilyInfo;
-            SurfaceInfo surfaceInfo;
-        };
 
         static Error<PickPhysicalDeviceResult> pickPhysicalDevice(std::vector<VkPhysicalDevice>const& physicalDevices, VkSurfaceKHR surface) noexcept {
             PickPhysicalDeviceResult result{};

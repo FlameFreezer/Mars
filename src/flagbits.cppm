@@ -14,8 +14,9 @@ namespace mars {
         T bits;
         public:
         using Width = T;
-        constexpr MarsFlags(Width inBits) noexcept : bits(inBits) {}
         constexpr MarsFlags() noexcept : bits(0) {}
+        constexpr MarsFlags(Width inBits) noexcept : bits(inBits) {}
+        constexpr MarsFlags(MarsFlags const& other) noexcept : bits(other.bits) {}
         MarsFlags operator|(MarsFlags rhs) const noexcept {
             return bits | rhs.bits;
         }
