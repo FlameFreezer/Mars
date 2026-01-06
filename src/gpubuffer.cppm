@@ -10,6 +10,7 @@ namespace mars {
     export struct GPUBuffer {
         VkBuffer handle;
         VkDeviceMemory memory;
+        VkDeviceSize size;
 
         void destroy(VkDevice device) {
             vkDestroyBuffer(device, handle, nullptr);
@@ -17,6 +18,7 @@ namespace mars {
         }
         static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
             GPUBuffer buffer;
+            buffer.size = size;
             VkBufferCreateInfo const bufferInfo = {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                 .pNext = nullptr,
