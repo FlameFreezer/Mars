@@ -144,8 +144,8 @@ namespace mars {
         }
         //Creates an Error union of the templated type, moving the tag and message from the calling 
         // Error union to it. The callng Error union is left `okay`, with data set to zeroes. Calling this function on an 
-        // Error union that is `okay` raises a compile error.
-        template<class U>
+        // Error union that is `okay` throws an exception.
+        template<class U = noreturn>
         Error<U> moveError() {
             if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveError\"  on an error union which does not have a message");
             Error<U> result(mTag, std::move(mMessage));

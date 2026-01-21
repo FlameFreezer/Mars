@@ -52,7 +52,7 @@ target_sources(Mars PUBLIC
     FILES "${MARS_MODULE_FILES}"    
     PRIVATE "${MARS_SOURCE_FILES}"
 )
-target_compile_definitions(Mars PUBLIC MARS_TEXTURE_PATH="${CMAKE_SOURCE_DIR}/textures")
+target_compile_definitions(Mars PUBLIC MARS_TEXTURE_PATH="${CMAKE_SOURCE_DIR}/textures/")
 
 # Link libraries to mars
 target_link_libraries(Mars PRIVATE SDL3::SDL3 glm::glm)

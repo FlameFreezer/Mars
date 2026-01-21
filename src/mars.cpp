@@ -2,6 +2,7 @@ module;
 
 #include <string>
 #include <chrono>
+#include <vector>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -49,8 +50,8 @@ namespace mars {
     bool Game::hasFlags(GameFlags flag) noexcept {
         return flags & flag;
     }
-    std::chrono::steady_clock::time_point Game::getFrameTime() const noexcept {
-        return time;
+    std::chrono::steady_clock::time_point::rep Game::getFrameTime() const noexcept {
+        return time.time_since_epoch().count();
     }
     std::chrono::nanoseconds::rep Game::getDeltaTime() const noexcept {
         return deltaTime.count();
@@ -75,7 +76,22 @@ namespace mars {
         else {
             renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
         }
-        TRY(renderer->drawFrame(deltaTime));
+        //Note to self: this is VERY BAD PERFORMANCE
+        //Later, I need to store lateral arrays of indices and vertex buffers, instead of this object-oriented approach
+        //Then, I can easily pass them to the drawFrame function without needing expensive copies of upwards of thousands of objects
+        std::vector<Renderer::Object> rendererObjects;
+        for(Object& obj : objects) rendererObjects.emplace_back(obj.getModelMatrix(), obj.meshIndex, obj.textureIndex);
+        TRY(renderer->drawFrame(deltaTime, rendererObjects));
         return success();
+    }
+
+    Error<std::size_t> Game::loadMesh(std::string const& path) noexcept {
+        if(path.compare("CUBE") == 0) {
+            return renderer->makeMesh({Cube::vertices.data(), Cube::vertices.max_size()}, {Cube::indices.data(), Cube::indices.max_size()});
+        }
+        return 0;
+    }
+    Error<std::size_t> Game::loadTexture(std::string const& path) noexcept {
+        return renderer->createTexture(path);
     }
 }

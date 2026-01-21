@@ -52,6 +52,7 @@ namespace mars {
         RENDERER_NEXT_BIT(recreateSwapchain);
         RENDERER_NEXT_BIT(deviceInvalid);
         RENDERER_NEXT_BIT(instanceInvalid);
+        RENDERER_NEXT_BIT(beganTransferOps);
 
         constexpr std::uint32_t gameStart = __LINE__ + 1U;
         GAME_NEXT_BIT(stopExecution);

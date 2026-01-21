@@ -1,5 +1,7 @@
 import mars;
 
+#include <string>
+
 #include <SDL3/SDL.h>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -73,6 +75,21 @@ void handleMouseInput(mars::Game& game) noexcept {
 }
 
 ErrorNoreturn mainLoop(mars::Game& game) noexcept {
+    game.camera.pos = glm::vec3(0.0f, 0.0f, -2.0f);
+    game.camera.dir = glm::vec3(0.0f, 0.0f, 1.0f);
+    game.camera.up = glm::vec3(0.0f, -1.0f, 0.0f);
+    game.camera.fov = glm::radians(45.0f);
+    game.camera.aspect = mars::Camera::autoAspect;
+
+    auto cubemesh = game.loadMesh("CUBE");
+    if(!cubemesh) return cubemesh.moveError();
+
+    auto texture = game.loadTexture(std::string(MARS_TEXTURE_PATH) + "texture.jpg");
+    if(!texture) return texture.moveError();
+
+    game.objects.emplace_back(cubemesh, texture, glm::vec3(2.0f, -0.5f, -0.5f));
+    game.objects.emplace_back(cubemesh, texture, glm::vec3(-2.0f, -0.5f, -0.5f));
+
     while(!game.hasFlags(mars::flagBits::stopExecution)) {
     	SDL_Event e;
         game.updateTime();
@@ -90,11 +107,6 @@ ErrorNoreturn mainLoop(mars::Game& game) noexcept {
 int main(int argc, char** argv) {
     mars::Game g;
     if(!g.init().report()) return 1;
-    g.camera.pos = glm::vec3(0.0f, 0.0f, -2.0f);
-    g.camera.dir = glm::vec3(0.0f, 0.0f, 1.0f);
-    g.camera.up = glm::vec3(0.0f, -1.0f, 0.0f);
-    g.camera.fov = glm::radians(45.0f);
-    g.camera.aspect = mars::Camera::autoAspect;
     if(!mainLoop(g).report()) return 1;
     return 0;
 }
