@@ -2,7 +2,6 @@ module;
 
 #include <string>
 #include <chrono>
-#include <vector>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -16,6 +15,7 @@ export import flag_bits;
 export import error;
 export import heap_array;
 export import object;
+export import multimap;
 
 namespace mars {
     export class Game {

@@ -2,7 +2,6 @@ module;
 
 #include <string>
 #include <chrono>
-#include <vector>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -32,6 +31,10 @@ namespace mars {
         renderer = new Renderer();
         TRY(renderer->init(appName));
         time = std::chrono::steady_clock::now();
+        objects.meshIndices = new std::size_t[Objects::capacity];
+        objects.textureIndices = new std::size_t[Objects::capacity];
+        objects.positions = new glm::vec3[Objects::capacity];
+        objects.size = 0;
         return success();
     }
     Game::~Game() noexcept {
@@ -76,9 +79,12 @@ namespace mars {
         else {
             renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
         }
-        Renderer::Objects rendererObjects(objects.meshIndices, objects.textureIndices);
-        objects.getModelMatrices(rendererObjects.modelMatrices);
+        Renderer::Objects rendererObjects{nullptr, objects.meshIndices, objects.textureIndices, objects.size};
+        glm::mat4* modelMatrices = new glm::mat4[objects.size];
+        objects.getModelMatrices(modelMatrices);
+        rendererObjects.modelMatrices = modelMatrices;
         TRY(renderer->drawFrame(deltaTime, rendererObjects));
+        delete[] modelMatrices;
         return success();
     }
 
@@ -92,10 +98,10 @@ namespace mars {
         return renderer->createTexture(path);
     }
     Error<std::size_t> Game::createObject(std::size_t mesh, std::size_t texture, glm::vec3 const& pos) noexcept {
-        objects.meshIndices.push_back(mesh);
-        objects.textureIndices.push_back(texture);
-        objects.positions.push_back(pos);
-        return objects.meshIndices.size() - 1;
+        objects.meshIndices[objects.size] = mesh;
+        objects.textureIndices[objects.size] = texture;
+        objects.positions[objects.size] = pos;
+        return objects.size++;
     }
 
 }

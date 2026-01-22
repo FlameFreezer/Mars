@@ -162,15 +162,19 @@ namespace mars {
     };
 
     struct VertexBuffers {
-        std::vector<VkBuffer> handles;
-        std::vector<VkDeviceMemory> memories;
-        std::vector<BufferSizes> sizes;
+        VkBuffer* handles;
+        VkDeviceMemory* memories;
+        BufferSizes* sizes;
+        std::size_t size;
+        static std::size_t const capacity = 50;
     };
 
     struct Textures {
-        std::vector<VkImage> handles;
-        std::vector<VkDeviceMemory> memories;
-        std::vector<VkImageView> views;
+        VkImage* handles;
+        VkDeviceMemory* memories;
+        VkImageView* views;
+        std::size_t size;
+        static std::size_t const capacity = 50;
     };
 
     export class Renderer {
@@ -275,20 +279,18 @@ namespace mars {
             flags &= ~flagBits::beganTransferOps;
             transferBuffer.destroy(device);
 
-            buffers.handles.push_back(vertexBuffer.handle);
-            buffers.memories.push_back(vertexBuffer.memory);
-            buffers.sizes.emplace_back(verticesSize, indicesSize);
+            buffers.handles[buffers.size] = vertexBuffer.handle;
+            buffers.memories[buffers.size] = vertexBuffer.memory;
+            buffers.sizes[buffers.size] = {verticesSize, indicesSize};
 
-            return buffers.handles.size() - 1;
+            return buffers.size++;
         }
 
         struct Objects {
-            std::vector<glm::mat4> modelMatrices;
-            std::vector<std::size_t> const& meshIndices;
-            std::vector<std::size_t> const& textureIndices;
-
-            Objects(std::vector<std::size_t> const& meshes, std::vector<std::size_t> const& textures) noexcept
-                : meshIndices(meshes), textureIndices(textures) {}
+            glm::mat4 const* modelMatrices;
+            std::size_t const* meshIndices;
+            std::size_t const* textureIndices;
+            std::size_t size;
         };
 
         struct SurfaceInfo {
@@ -592,10 +594,10 @@ namespace mars {
             }
 
             transferBuffer.destroy(device);
-            textures.handles.push_back(textureImage.handle);
-            textures.memories.push_back(textureImage.memory);
-            textures.views.push_back(textureImage.view);
-            return textures.handles.size() - 1;
+            textures.handles[textures.size] = textureImage.handle;
+            textures.memories[textures.size] = textureImage.memory;
+            textures.views[textures.size] = textureImage.view;
+            return textures.size++;
         }
 
         Error<noreturn> recreateSwapchain() noexcept {
@@ -734,10 +736,12 @@ namespace mars {
                 &writeCamera
             );
 
-            HeapArray<VkDeviceSize> offsets(buffers.handles.size(), 0);
-            vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<std::uint32_t>(buffers.handles.size()), buffers.handles.data(), offsets.data());
+            if(buffers.size != 0) {
+                HeapArray<VkDeviceSize> offsets(buffers.size, 0);
+                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<std::uint32_t>(buffers.size), buffers.handles, offsets.data());
+            }
 
-            for(std::size_t i = 0; i < objects.modelMatrices.size(); i++) {
+            for(std::size_t i = 0; i < objects.size; i++) {
                 VkDescriptorImageInfo const materialInfo = {
                     .sampler = sampler,
                     .imageView = textures.views[objects.textureIndices[i]],
@@ -1606,6 +1610,14 @@ namespace mars {
             }
             currentFrame = 0;
             flags = {};
+            buffers.handles = new VkBuffer[VertexBuffers::capacity];
+            buffers.memories = new VkDeviceMemory[VertexBuffers::capacity];
+            buffers.sizes = new BufferSizes[VertexBuffers::capacity];
+            buffers.size = 0;
+            textures.handles = new VkImage[Textures::capacity];
+            textures.memories = new VkDeviceMemory[Textures::capacity];
+            textures.views = new VkImageView[Textures::capacity];
+            textures.size = 0;
             return success();
         }
         //Destructor
@@ -1613,15 +1625,21 @@ namespace mars {
             if((flags & flagBits::deviceInvalid) == 0) [[likely]] {
                 vkDeviceWaitIdle(device);
                 vkDestroySwapchainKHR(device, swapchain, nullptr);
-                for(std::size_t i = 0; i < buffers.handles.size(); i++) {
+                for(std::size_t i = 0; i < buffers.size; i++) {
                     vkDestroyBuffer(device, buffers.handles[i], nullptr);
                     vkFreeMemory(device, buffers.memories[i], nullptr);
                 }
-                for(std::size_t i = 0; i < textures.handles.size(); i++) {
+                delete[] buffers.handles;
+                delete[] buffers.memories;
+                delete[] buffers.sizes;
+                for(std::size_t i = 0; i < textures.size; i++) {
                     vkDestroyImage(device, textures.handles[i], nullptr);
                     vkFreeMemory(device, textures.memories[i], nullptr);
                     vkDestroyImageView(device, textures.views[i], nullptr);
                 }
+                delete[] textures.handles;
+                delete[] textures.memories;
+                delete[] textures.views;
                 for(VkImageView view : swapchainImageViews) {
                     vkDestroyImageView(device, view, nullptr);
                 }
