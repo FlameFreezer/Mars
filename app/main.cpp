@@ -87,8 +87,8 @@ ErrorNoreturn mainLoop(mars::Game& game) noexcept {
     auto texture = game.loadTexture(std::string(MARS_TEXTURE_PATH) + "texture.jpg");
     if(!texture) return texture.moveError();
 
-    game.objects.emplace_back(cubemesh, texture, glm::vec3(2.0f, -0.5f, -0.5f));
-    game.objects.emplace_back(cubemesh, texture, glm::vec3(-2.0f, -0.5f, -0.5f));
+    auto o1 = game.createObject(cubemesh, texture, glm::vec3(2.0f, -0.5f, -0.5f));
+    auto o2 = game.createObject(cubemesh, texture, glm::vec3(-2.0f, -0.5f, -0.5f));
 
     while(!game.hasFlags(mars::flagBits::stopExecution)) {
     	SDL_Event e;

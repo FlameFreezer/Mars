@@ -1,5 +1,7 @@
 module;
 
+#include <vector>
+
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -7,13 +9,15 @@ module;
 export module object;
 
 namespace mars {
-    export struct Object {
-        std::size_t meshIndex;
-        std::size_t textureIndex;
-        glm::vec3 pos;
+    export struct Objects {
+        std::vector<std::size_t> meshIndices;
+        std::vector<std::size_t> textureIndices;
+        std::vector<glm::vec3> positions;
 
-        glm::mat4 getModelMatrix() const noexcept {
-            return glm::translate(glm::mat4(1.0f), pos);
+        void getModelMatrices(std::vector<glm::mat4>& outMatrices) const noexcept {
+            for(std::size_t i = 0; i < positions.size(); i++) {
+                outMatrices.push_back(glm::translate(glm::mat4(1.0f), positions[i]));
+            }
         }
     };
 };

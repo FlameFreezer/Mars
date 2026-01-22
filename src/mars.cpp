@@ -76,11 +76,8 @@ namespace mars {
         else {
             renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
         }
-        //Note to self: this is VERY BAD PERFORMANCE
-        //Later, I need to store lateral arrays of indices and vertex buffers, instead of this object-oriented approach
-        //Then, I can easily pass them to the drawFrame function without needing expensive copies of upwards of thousands of objects
-        std::vector<Renderer::Object> rendererObjects;
-        for(Object& obj : objects) rendererObjects.emplace_back(obj.getModelMatrix(), obj.meshIndex, obj.textureIndex);
+        Renderer::Objects rendererObjects(objects.meshIndices, objects.textureIndices);
+        objects.getModelMatrices(rendererObjects.modelMatrices);
         TRY(renderer->drawFrame(deltaTime, rendererObjects));
         return success();
     }
@@ -94,4 +91,11 @@ namespace mars {
     Error<std::size_t> Game::loadTexture(std::string const& path) noexcept {
         return renderer->createTexture(path);
     }
+    Error<std::size_t> Game::createObject(std::size_t mesh, std::size_t texture, glm::vec3 const& pos) noexcept {
+        objects.meshIndices.push_back(mesh);
+        objects.textureIndices.push_back(texture);
+        objects.positions.push_back(pos);
+        return objects.meshIndices.size() - 1;
+    }
+
 }

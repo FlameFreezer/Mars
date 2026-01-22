@@ -6,6 +6,8 @@ module;
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
 
 export module mars;
 export import :camera;
@@ -24,7 +26,7 @@ namespace mars {
         std::chrono::nanoseconds deltaTime;
         GameFlags flags;
         public:
-        std::vector<Object> objects;
+        Objects objects;
         Camera camera;
         bool const* keyState;
         Game() noexcept;
@@ -43,6 +45,7 @@ namespace mars {
         void updateKeyState() noexcept;
         Error<std::size_t> loadMesh(std::string const& path) noexcept;
         Error<std::size_t> loadTexture(std::string const& path) noexcept;
+        Error<std::size_t> createObject(std::size_t mesh, std::size_t texture, glm::vec3 const& pos) noexcept;
     };
 
 };
