@@ -15,7 +15,6 @@ export import flag_bits;
 export import error;
 export import heap_array;
 export import object;
-export import multimap;
 
 namespace mars {
     export class Game {

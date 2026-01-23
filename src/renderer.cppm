@@ -37,6 +37,7 @@ import error;
 import heap_array;
 import flag_bits;
 import vkhelper;
+import multimap;
 
 namespace mars {
     constexpr std::array<char const*, 2> neededDeviceExtensions = {
@@ -166,7 +167,9 @@ namespace mars {
         VkDeviceMemory* memories;
         BufferSizes* sizes;
         std::size_t size;
-        static std::size_t const capacity = 50;
+        std::size_t* indices;
+        std::uint8_t* activeMask;
+        static constexpr std::size_t capacity = 50;
     };
 
     struct Textures {
@@ -174,12 +177,13 @@ namespace mars {
         VkDeviceMemory* memories;
         VkImageView* views;
         std::size_t size;
-        static std::size_t const capacity = 50;
+        static constexpr std::size_t capacity = 50;
     };
 
     export class Renderer {
         friend class Game;
-        VertexBuffers buffers;
+        VertexBuffers vertexBuffers;
+        std::vector<std::size_t> vertexBufferIds;
         Textures textures;
         UniformBuffer<glm::mat4> cameraMatrices;
     	HeapArray<VkImage> swapchainImages;
@@ -279,11 +283,13 @@ namespace mars {
             flags &= ~flagBits::beganTransferOps;
             transferBuffer.destroy(device);
 
-            buffers.handles[buffers.size] = vertexBuffer.handle;
-            buffers.memories[buffers.size] = vertexBuffer.memory;
-            buffers.sizes[buffers.size] = {verticesSize, indicesSize};
-
-            return buffers.size++;
+            vertexBuffers.handles[vertexBuffers.size] = vertexBuffer.handle;
+            vertexBuffers.memories[vertexBuffers.size] = vertexBuffer.memory;
+            vertexBuffers.sizes[vertexBuffers.size] = {verticesSize, indicesSize};
+            std::size_t const id = multimapGetIndex(vertexBuffers.activeMask, VertexBuffers::capacity, std::bit_cast<std::size_t>(vertexBuffer.handle));
+            multimapSetActiveAtUnsafe(vertexBuffers.activeMask, VertexBuffers::capacity, id);
+            vertexBuffers.indices[id] = vertexBuffers.size++;
+            return id;
         }
 
         struct Objects {
@@ -736,9 +742,9 @@ namespace mars {
                 &writeCamera
             );
 
-            if(buffers.size != 0) {
-                HeapArray<VkDeviceSize> offsets(buffers.size, 0);
-                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<std::uint32_t>(buffers.size), buffers.handles, offsets.data());
+            if(vertexBuffers.size != 0) {
+                HeapArray<VkDeviceSize> offsets(vertexBuffers.size, 0);
+                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<std::uint32_t>(vertexBuffers.size), vertexBuffers.handles, offsets.data());
             }
 
             for(std::size_t i = 0; i < objects.size; i++) {
@@ -770,9 +776,10 @@ namespace mars {
 
                 vkCmdPushConstants(commandBuffer, graphicsPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &objects.modelMatrices[i]);
 
-                vkCmdBindIndexBuffer(commandBuffer, buffers.handles[objects.meshIndices[i]], buffers.sizes[objects.meshIndices[i]].vertices, VK_INDEX_TYPE_UINT32);
-                std::uint32_t const numIndices = buffers.sizes[objects.meshIndices[i]].indices / sizeof(std::uint32_t);
-                vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, objects.meshIndices[i], 0);
+                std::size_t const meshIndex = vertexBuffers.indices[objects.meshIndices[i]];
+                vkCmdBindIndexBuffer(commandBuffer, vertexBuffers.handles[meshIndex], vertexBuffers.sizes[meshIndex].vertices, VK_INDEX_TYPE_UINT32);
+                std::uint32_t const numIndices = vertexBuffers.sizes[meshIndex].indices / sizeof(std::uint32_t);
+                vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, meshIndex, 0);
             }
 
             vkCmdEndRendering(commandBuffer);
@@ -1063,7 +1070,7 @@ namespace mars {
                 .commandBufferCount = static_cast<std::uint32_t>(commandBuffers.max_size())
             };
             if(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to allocate command buffers!"};
+                return {ErrorTag::FATAL_ERROR, "Failed to allocate command vertexBuffers!"};
             }
             return success();
         }
@@ -1610,10 +1617,13 @@ namespace mars {
             }
             currentFrame = 0;
             flags = {};
-            buffers.handles = new VkBuffer[VertexBuffers::capacity];
-            buffers.memories = new VkDeviceMemory[VertexBuffers::capacity];
-            buffers.sizes = new BufferSizes[VertexBuffers::capacity];
-            buffers.size = 0;
+            vertexBuffers.handles = new VkBuffer[VertexBuffers::capacity];
+            vertexBuffers.memories = new VkDeviceMemory[VertexBuffers::capacity];
+            vertexBuffers.sizes = new BufferSizes[VertexBuffers::capacity];
+            vertexBuffers.size = 0;
+            vertexBuffers.indices = new std::size_t[VertexBuffers::capacity];
+            multimapInitActiveMask(&vertexBuffers.activeMask, VertexBuffers::capacity);
+
             textures.handles = new VkImage[Textures::capacity];
             textures.memories = new VkDeviceMemory[Textures::capacity];
             textures.views = new VkImageView[Textures::capacity];
@@ -1625,13 +1635,15 @@ namespace mars {
             if((flags & flagBits::deviceInvalid) == 0) [[likely]] {
                 vkDeviceWaitIdle(device);
                 vkDestroySwapchainKHR(device, swapchain, nullptr);
-                for(std::size_t i = 0; i < buffers.size; i++) {
-                    vkDestroyBuffer(device, buffers.handles[i], nullptr);
-                    vkFreeMemory(device, buffers.memories[i], nullptr);
+                for(std::size_t i = 0; i < vertexBuffers.size; i++) {
+                    vkDestroyBuffer(device, vertexBuffers.handles[i], nullptr);
+                    vkFreeMemory(device, vertexBuffers.memories[i], nullptr);
                 }
-                delete[] buffers.handles;
-                delete[] buffers.memories;
-                delete[] buffers.sizes;
+                delete[] vertexBuffers.handles;
+                delete[] vertexBuffers.memories;
+                delete[] vertexBuffers.sizes;
+                delete[] vertexBuffers.indices;
+                delete[] vertexBuffers.activeMask;
                 for(std::size_t i = 0; i < textures.size; i++) {
                     vkDestroyImage(device, textures.handles[i], nullptr);
                     vkFreeMemory(device, textures.memories[i], nullptr);
