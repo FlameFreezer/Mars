@@ -1092,7 +1092,7 @@ namespace mars {
         }
 
 
-        Error<noreturn> createVkSwapchainKHR(SurfaceInfo const& surfaceInfo) noexcept {
+        Error<noreturn> createSwapchain(SurfaceInfo const& surfaceInfo) noexcept {
             Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceInfo.capabilities);
             if(!imageExtent) return imageExtent.moveError();
             swapchainImageExtent = imageExtent;
@@ -1330,7 +1330,7 @@ namespace mars {
             return {ErrorTag::SEARCH_FAIL, "Failed to find suitable physical device"};
         }
 
-        Error<noreturn> createVkDevice(SurfaceInfo& surfaceInfo) noexcept {
+        Error<noreturn> createDevice(SurfaceInfo& surfaceInfo) noexcept {
             std::uint32_t graphicsQueueCount = 0;
             std::uint32_t presentQueueCount = 0;
 
@@ -1484,7 +1484,7 @@ namespace mars {
             return success();
         }
 
-        Error<noreturn> createVkDebugUtilsMessenger() noexcept {
+        Error<noreturn> createDebugUtilsMessenger() noexcept {
             vkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
                 vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
             if(vkCreateDebugUtilsMessengerEXT == nullptr) {
@@ -1516,7 +1516,7 @@ namespace mars {
             return success();
         }
 
-        Error<noreturn> createVkInstance(const std::string& appName) noexcept {
+        Error<noreturn> createInstance(const std::string& appName) noexcept {
             if constexpr(enableValidationLayers) {
                 std::uint32_t layerPropertyCount = 0;
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
@@ -1574,38 +1574,48 @@ namespace mars {
             }
             return success();
         }
-        public:
 
-
-        Error<noreturn> init(std::string const& name) noexcept {
-            if(Error<noreturn> res = createVkInstance(name); !res) {
-                flags |= flagBits::instanceInvalid;
-                return res;
+        Error<noreturn> createSurface(std::string const& name) noexcept {
+            int numDisplays;
+            SDL_DisplayID* displays = SDL_GetDisplays(&numDisplays);
+            if(displays == nullptr) {
+                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
-            if constexpr(enableValidationLayers) TRY(createVkDebugUtilsMessenger());
-            window = SDL_CreateWindow(name.c_str(), WINDOW_WIDTH, WINDOW_HEIGHT, 
-                SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_HIDDEN);
-            if(window == nullptr) return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+            //Be lazy and just use the first display
+            SDL_Rect displayBounds{};
+            if(!SDL_GetDisplayBounds(displays[0], &displayBounds)) {
+                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+            }
+            //Hide window before we're ready to render
+            window = SDL_CreateWindow(name.c_str(), displayBounds.w, displayBounds.h, 
+                SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_HIDDEN);
+            //Instead of tracking live mouse inputs and having on-screen cursor, just track
+            // changes in mouse position
             if(!SDL_SetWindowRelativeMouseMode(window, true)) {
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
             if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
+            return success();
+        }
+        public:
+
+        Error<noreturn> init(std::string const& name) noexcept {
+            if(Error<noreturn> res = createInstance(name); !res) {
+                flags |= flagBits::instanceInvalid;
+                return res;
+            }
+            if constexpr(enableValidationLayers) TRY(createDebugUtilsMessenger());
+            TRY(createSurface(name));
             SurfaceInfo surfaceInfo{};
-            if(Error<noreturn> res = createVkDevice(surfaceInfo); !res) {
+            if(Error<noreturn> res = createDevice(surfaceInfo); !res) {
                 flags |= flagBits::deviceInvalid;
                 return res;
             }
-            TRY(createVkSwapchainKHR(surfaceInfo));
+            TRY(createSwapchain(surfaceInfo));
             TRY(getSwapchainImages(surfaceInfo.format.format));
             TRY(createCommandBuffers());
-            if(Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(
-                    device, physicalDevice, sizeof(glm::mat4) * MAX_CONCURRENT_FRAMES); 
-                    !res) {
-                return res.moveError();
-            }
-            else cameraMatrices = res.moveData(); 
             TRY(createSampler());
             TRY(createRenderTargets(surfaceInfo.format.format));
             TRY(createDepthImage());
@@ -1617,6 +1627,12 @@ namespace mars {
             }
             currentFrame = 0;
             flags = {};
+            if(Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(
+                    device, physicalDevice, sizeof(glm::mat4) * MAX_CONCURRENT_FRAMES); 
+                    !res) {
+                return res.moveError();
+            }
+            else cameraMatrices = res.moveData(); 
             vertexBuffers.handles = new VkBuffer[VertexBuffers::capacity];
             vertexBuffers.memories = new VkDeviceMemory[VertexBuffers::capacity];
             vertexBuffers.sizes = new BufferSizes[VertexBuffers::capacity];

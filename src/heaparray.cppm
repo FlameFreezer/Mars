@@ -43,7 +43,7 @@ namespace mars {
         }
         HeapArray<T>& operator=(HeapArray<T> const& rhs) noexcept {
             if(this != &rhs) {
-                delete[] mPtr;
+                if(mPtr == nullptr) delete[] mPtr;
                 mPtr = new T[rhs.mSize];
                 for(std::size_t i = 0; i < rhs.mSize; i++) mPtr[i] = rhs.mPtr[i];
                 mSize = rhs.mSize;
@@ -57,11 +57,11 @@ namespace mars {
             return mPtr;
         }
         void clear() noexcept {
-            delete[] mPtr;
+            if(mPtr == nullptr) delete[] mPtr;
             mSize = 0;
         }
         void resize(std::size_t size) noexcept {
-            delete[] mPtr;
+            if(mPtr == nullptr) delete[] mPtr;
             mPtr = new T[size];
             mSize = size;
         }
