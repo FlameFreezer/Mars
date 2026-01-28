@@ -5,15 +5,21 @@ module;
 #include <glm/gtc/matrix_transform.hpp>
 
 export module object;
+import multimap;
 
 namespace mars {
-    export struct Objects {
-        std::size_t* meshIndices;
-        std::size_t* textureIndices;
+    export using ID = std::uint64_t;
+    export class Objects : public ArrayMultimap {
+        public:
+        ID* meshIDs;
+        ID* textureIDs;
         glm::vec3* positions;
-        std::size_t size;
-        static constexpr std::size_t capacity = 50;
         static constexpr glm::mat4 identity{1.0f};
+        Objects(std::size_t capacity) noexcept :
+            ArrayMultimap(capacity),
+            meshIDs(new ID[capacity]),
+            textureIDs(new ID[capacity]),
+            positions(new glm::vec3[capacity]) {}
 
         void getModelMatrices(glm::mat4* outMatrices) const noexcept {
             for(std::size_t i = 0; i < size; i++) {
@@ -21,8 +27,8 @@ namespace mars {
             }
         }
         ~Objects() noexcept {
-            delete[] meshIndices;
-            delete[] textureIndices;
+            delete[] meshIDs;
+            delete[] textureIDs;
             delete[] positions;
         }
     };

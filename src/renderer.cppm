@@ -27,8 +27,8 @@ module;
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define MAX_CONCURRENT_FRAMES 2U
-#define INITIAL_VERTEX_BUFFER_STORAGE 50
-#define INITIAL_TEXTURE_MAP_SIZE 50
+#define MESH_CAPACITY 50
+#define TEXTURE_CAPACITY 50
 
 export module mars:renderer;
 import gpubuffer;
@@ -162,28 +162,49 @@ namespace mars {
         VkDeviceSize indices;
     };
 
-    struct VertexBuffers {
+    constexpr std::size_t ceil(double val) noexcept {
+        std::size_t wholePart = val;
+        if(val > wholePart) wholePart++;
+        return wholePart;
+    }
+
+    class VertexBuffers : public ArrayMultimap {
+        public:
         VkBuffer* handles;
         VkDeviceMemory* memories;
         BufferSizes* sizes;
-        std::size_t size;
-        std::size_t* indices;
-        std::uint8_t* activeMask;
-        static constexpr std::size_t capacity = 50;
+        VertexBuffers(std::size_t capacity) noexcept : 
+            ArrayMultimap(capacity), 
+            handles(new VkBuffer[capacity]), 
+            memories(new VkDeviceMemory[capacity]), 
+            sizes(new BufferSizes[capacity]) {} 
+        ~VertexBuffers() noexcept {
+            delete[] handles;
+            delete[] memories;
+            delete[] sizes;
+        }
     };
 
-    struct Textures {
+    class Textures : public ArrayMultimap {
+        public:
         VkImage* handles;
         VkDeviceMemory* memories;
         VkImageView* views;
-        std::size_t size;
-        static constexpr std::size_t capacity = 50;
+        Textures(std::size_t capacity) noexcept :
+            ArrayMultimap(capacity),
+            handles(new VkImage[capacity]),
+            memories(new VkDeviceMemory[capacity]),
+            views(new VkImageView[capacity]) {}
+        ~Textures() noexcept {
+            delete[] handles;
+            delete[] memories;
+            delete[] views;
+        }
     };
 
     export class Renderer {
         friend class Game;
         VertexBuffers vertexBuffers;
-        std::vector<std::size_t> vertexBufferIds;
         Textures textures;
         UniformBuffer<glm::mat4> cameraMatrices;
     	HeapArray<VkImage> swapchainImages;
@@ -216,7 +237,7 @@ namespace mars {
         RendererFlags flags;
 
         //Due to the circular dependency of the Mesh and Renderer classes, this has to be a renderer method
-        Error<std::size_t> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<std::uint32_t> indices) noexcept {
+        Error<std::size_t> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<std::uint32_t> indices, std::uint64_t timeNanos) noexcept {
             VkDeviceSize const verticesSize = vertices.size() * sizeof(Vertex);
             VkDeviceSize const indicesSize = indices.size() * sizeof(std::uint32_t);
             VkDeviceSize const size = verticesSize + indicesSize;
@@ -286,16 +307,18 @@ namespace mars {
             vertexBuffers.handles[vertexBuffers.size] = vertexBuffer.handle;
             vertexBuffers.memories[vertexBuffers.size] = vertexBuffer.memory;
             vertexBuffers.sizes[vertexBuffers.size] = {verticesSize, indicesSize};
-            std::size_t const id = multimapGetIndex(vertexBuffers.activeMask, VertexBuffers::capacity, std::bit_cast<std::size_t>(vertexBuffer.handle));
-            multimapSetActiveAtUnsafe(vertexBuffers.activeMask, VertexBuffers::capacity, id);
-            vertexBuffers.indices[id] = vertexBuffers.size++;
+
+            Error<std::uint64_t> id = vertexBuffers.makeID(vertexBuffer.handle, timeNanos);
+            if(!id) return id;
+            vertexBuffers.setActiveAt(id);
+            vertexBuffers.setIndex(id, vertexBuffers.size++);
             return id;
         }
 
         struct Objects {
             glm::mat4 const* modelMatrices;
-            std::size_t const* meshIndices;
-            std::size_t const* textureIndices;
+            std::size_t const* meshIDs;
+            std::size_t const* textureIDs;
             std::size_t size;
         };
 
@@ -423,7 +446,7 @@ namespace mars {
             return success();
         }
 
-        Error<std::size_t> createTexture(std::string const& texturePath) noexcept {
+        Error<std::size_t> createTexture(std::string const& texturePath, std::uint64_t timeNanos) noexcept {
             int texWidth, texHeight, texChannels;
             stbi_uc* pixels = nullptr;
             pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
@@ -603,7 +626,12 @@ namespace mars {
             textures.handles[textures.size] = textureImage.handle;
             textures.memories[textures.size] = textureImage.memory;
             textures.views[textures.size] = textureImage.view;
-            return textures.size++;
+            
+            Error<std::uint64_t> id = textures.makeID(textureImage.handle, timeNanos);
+            if(!id) return id;
+            textures.setActiveAt(id);
+            textures.setIndex(id, textures.size++);
+            return id;
         }
 
         Error<noreturn> recreateSwapchain() noexcept {
@@ -742,15 +770,15 @@ namespace mars {
                 &writeCamera
             );
 
+            HeapArray<VkDeviceSize> offsets(vertexBuffers.size, 0);
             if(vertexBuffers.size != 0) {
-                HeapArray<VkDeviceSize> offsets(vertexBuffers.size, 0);
                 vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<std::uint32_t>(vertexBuffers.size), vertexBuffers.handles, offsets.data());
             }
 
             for(std::size_t i = 0; i < objects.size; i++) {
                 VkDescriptorImageInfo const materialInfo = {
                     .sampler = sampler,
-                    .imageView = textures.views[objects.textureIndices[i]],
+                    .imageView = textures.at(textures.views, objects.textureIDs[i]),
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                 };
                 VkWriteDescriptorSet const writeMaterial = {
@@ -776,7 +804,7 @@ namespace mars {
 
                 vkCmdPushConstants(commandBuffer, graphicsPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &objects.modelMatrices[i]);
 
-                std::size_t const meshIndex = vertexBuffers.indices[objects.meshIndices[i]];
+                std::size_t const meshIndex = vertexBuffers.getIndex(objects.meshIDs[i]);
                 vkCmdBindIndexBuffer(commandBuffer, vertexBuffers.handles[meshIndex], vertexBuffers.sizes[meshIndex].vertices, VK_INDEX_TYPE_UINT32);
                 std::uint32_t const numIndices = vertexBuffers.sizes[meshIndex].indices / sizeof(std::uint32_t);
                 vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, meshIndex, 0);
@@ -1600,8 +1628,10 @@ namespace mars {
             return success();
         }
         public:
+        Renderer() noexcept : vertexBuffers(MESH_CAPACITY), textures(TEXTURE_CAPACITY) {}
 
         Error<noreturn> init(std::string const& name) noexcept {
+            ArrayMultimap m(5);
             if(Error<noreturn> res = createInstance(name); !res) {
                 flags |= flagBits::instanceInvalid;
                 return res;
@@ -1633,17 +1663,6 @@ namespace mars {
                 return res.moveError();
             }
             else cameraMatrices = res.moveData(); 
-            vertexBuffers.handles = new VkBuffer[VertexBuffers::capacity];
-            vertexBuffers.memories = new VkDeviceMemory[VertexBuffers::capacity];
-            vertexBuffers.sizes = new BufferSizes[VertexBuffers::capacity];
-            vertexBuffers.size = 0;
-            vertexBuffers.indices = new std::size_t[VertexBuffers::capacity];
-            multimapInitActiveMask(&vertexBuffers.activeMask, VertexBuffers::capacity);
-
-            textures.handles = new VkImage[Textures::capacity];
-            textures.memories = new VkDeviceMemory[Textures::capacity];
-            textures.views = new VkImageView[Textures::capacity];
-            textures.size = 0;
             return success();
         }
         //Destructor
@@ -1655,19 +1674,11 @@ namespace mars {
                     vkDestroyBuffer(device, vertexBuffers.handles[i], nullptr);
                     vkFreeMemory(device, vertexBuffers.memories[i], nullptr);
                 }
-                delete[] vertexBuffers.handles;
-                delete[] vertexBuffers.memories;
-                delete[] vertexBuffers.sizes;
-                delete[] vertexBuffers.indices;
-                delete[] vertexBuffers.activeMask;
                 for(std::size_t i = 0; i < textures.size; i++) {
                     vkDestroyImage(device, textures.handles[i], nullptr);
                     vkFreeMemory(device, textures.memories[i], nullptr);
                     vkDestroyImageView(device, textures.views[i], nullptr);
                 }
-                delete[] textures.handles;
-                delete[] textures.memories;
-                delete[] textures.views;
                 for(VkImageView view : swapchainImageViews) {
                     vkDestroyImageView(device, view, nullptr);
                 }

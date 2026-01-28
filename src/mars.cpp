@@ -13,6 +13,8 @@ module;
 
 module mars;
 
+#define OBJECT_CAPACITY 50
+
 namespace mars {
     Error<noreturn> initLibrary() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -24,16 +26,13 @@ namespace mars {
         SDL_Quit();
     }
 
-    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0), renderer(nullptr) {}
-    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0), renderer(nullptr) {}
+    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0), renderer(nullptr), objects(OBJECT_CAPACITY) {}
+    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0), renderer(nullptr), objects(OBJECT_CAPACITY) {}
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
         renderer = new Renderer();
         TRY(renderer->init(appName));
         time = std::chrono::steady_clock::now();
-        objects.meshIndices = new std::size_t[Objects::capacity];
-        objects.textureIndices = new std::size_t[Objects::capacity];
-        objects.positions = new glm::vec3[Objects::capacity];
         objects.size = 0;
         return success();
     }
@@ -79,7 +78,7 @@ namespace mars {
         else {
             renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
         }
-        Renderer::Objects rendererObjects{nullptr, objects.meshIndices, objects.textureIndices, objects.size};
+        Renderer::Objects rendererObjects{nullptr, objects.meshIDs, objects.textureIDs, objects.size};
         glm::mat4* modelMatrices = new glm::mat4[objects.size];
         objects.getModelMatrices(modelMatrices);
         rendererObjects.modelMatrices = modelMatrices;
@@ -88,20 +87,27 @@ namespace mars {
         return success();
     }
 
-    Error<std::size_t> Game::loadMesh(std::string const& path) noexcept {
+    Error<ID> Game::loadMesh(std::string const& path) noexcept {
         if(path.compare("CUBE") == 0) {
-            return renderer->makeMesh({Cube::vertices.data(), Cube::vertices.max_size()}, {Cube::indices.data(), Cube::indices.max_size()});
+            return renderer->makeMesh({Cube::vertices.data(), Cube::vertices.max_size()}, {Cube::indices.data(), Cube::indices.max_size()}, getFrameTime());
         }
         return 0;
     }
-    Error<std::size_t> Game::loadTexture(std::string const& path) noexcept {
-        return renderer->createTexture(path);
+    Error<ID> Game::loadTexture(std::string const& path) noexcept {
+        return renderer->createTexture(path, getFrameTime());
     }
-    Error<std::size_t> Game::createObject(std::size_t mesh, std::size_t texture, glm::vec3 const& pos) noexcept {
-        objects.meshIndices[objects.size] = mesh;
-        objects.textureIndices[objects.size] = texture;
+    Error<ID> Game::createObject(ID meshID, ID textureID, glm::vec3 const& pos) noexcept {
+        objects.meshIDs[objects.size] = meshID;
+        objects.textureIDs[objects.size] = textureID;
         objects.positions[objects.size] = pos;
-        return objects.size++;
+
+        // Hash Function
+        Error<ID> id = objects.makeID(static_cast<double>(pos.x + pos.y + pos.z), getFrameTime());
+        if(!id) return id;
+
+        objects.setActiveAt(id);
+        objects.setIndex(id, objects.size++);
+        return id;
     }
 
 }
