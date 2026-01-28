@@ -74,6 +74,15 @@ void handleMouseInput(mars::Game& game) noexcept {
     game.camera.rotate(dx, dy);
 }
 
+void handleGamepad(mars::Game& game) noexcept {
+    static float timer = 1.0f;
+    timer += game.getDeltaTimeSeconds();
+    if(timer < 1.0f) return;
+    timer = 0.0f;
+    if(game.gamepad == nullptr) return;
+    SDL_RumbleGamepad(game.gamepad, 0xffff, 0xffff, 1000);
+}
+
 ErrorNoreturn mainLoop(mars::Game& game) noexcept {
     game.camera.pos = glm::vec3(0.0f, 0.0f, -2.0f);
     game.camera.dir = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -99,6 +108,7 @@ ErrorNoreturn mainLoop(mars::Game& game) noexcept {
     	}
         handleKeyboardInput(game);
         handleMouseInput(game);
+        handleGamepad(game);
         TRY(game.draw());
     }
     return mars::success();

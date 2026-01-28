@@ -28,6 +28,7 @@ namespace mars {
         Objects objects;
         Camera camera;
         bool const* keyState;
+        SDL_Gamepad* gamepad;
         Game() noexcept;
         Game(const std::string& name) noexcept;
         ~Game() noexcept;

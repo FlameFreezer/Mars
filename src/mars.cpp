@@ -26,18 +26,25 @@ namespace mars {
         SDL_Quit();
     }
 
-    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0), renderer(nullptr), objects(OBJECT_CAPACITY) {}
-    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0), renderer(nullptr), objects(OBJECT_CAPACITY) {}
+    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0), renderer(nullptr), objects(OBJECT_CAPACITY), gamepad(nullptr) {}
+    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0), renderer(nullptr), objects(OBJECT_CAPACITY), gamepad(nullptr) {}
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
         renderer = new Renderer();
         TRY(renderer->init(appName));
+
+        int numGamepads;
+        SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
+        if(gamepads != nullptr) {
+            gamepad = SDL_OpenGamepad(gamepads[0]);
+        }
         time = std::chrono::steady_clock::now();
         objects.size = 0;
         return success();
     }
     Game::~Game() noexcept {
         delete renderer;
+        SDL_CloseGamepad(gamepad);
         deinitLibrary();
     }
     void Game::setFlags(RendererFlags flag) noexcept {
