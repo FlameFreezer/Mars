@@ -103,12 +103,12 @@ namespace mars {
     Error<ID> Game::loadTexture(std::string const& path) noexcept {
         return renderer->createTexture(path, getFrameTime());
     }
-    Error<ID> Game::createObject(ID meshID, ID textureID, glm::vec3 const& pos) noexcept {
+    Error<ID> Game::createObject(ID meshID, ID textureID, glm::vec3 const& pos, glm::vec3 const& scale) noexcept {
         objects.meshIDs[objects.size] = meshID;
         objects.textureIDs[objects.size] = textureID;
         objects.positions[objects.size] = pos;
+        objects.scales[objects.size] = scale;
 
-        // Hash Function
         Error<ID> id = objects.makeID(static_cast<double>(pos.x + pos.y + pos.z), getFrameTime());
         if(!id) return id;
 
