@@ -116,5 +116,9 @@ namespace mars {
         objects.setIndex(id, objects.size++);
         return id;
     }
-
+    Rect2D Game::getWindowDimensions() const noexcept {
+        int w, h;
+        SDL_GetWindowSize(renderer->window, &w, &h);
+        return {static_cast<std::uint64_t>(w), static_cast<std::uint64_t>(h)};
+    }
 }

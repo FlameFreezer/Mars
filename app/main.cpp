@@ -12,7 +12,7 @@ import mars;
 
 using ErrorNoreturn = mars::Error<mars::noreturn>;
 
-#define SPEED 5.0f
+#define SPEED 2.0f
 
 void handleEvent(mars::Game& game, SDL_Event const& e) noexcept {
     switch(e.type) {
@@ -84,7 +84,7 @@ void handleGamepad(mars::Game& game) noexcept {
 }
 
 ErrorNoreturn mainLoop(mars::Game& game) noexcept {
-    game.camera.pos = glm::vec3(0.0f, 0.0f, -10.0f);
+    game.camera.pos = glm::vec3(0.0f, 0.0f, -2.0f);
     game.camera.dir = glm::vec3(0.0f, 0.0f, 1.0f);
     game.camera.up = glm::vec3(0.0f, -1.0f, 0.0f);
     game.camera.fov = glm::radians(45.0f);
@@ -93,10 +93,10 @@ ErrorNoreturn mainLoop(mars::Game& game) noexcept {
     auto cubemesh = game.loadMesh("CUBE");
     if(!cubemesh) return cubemesh.moveError();
 
-    auto texture = game.loadTexture(std::string(MARS_ASSETS_PATH) + "texture.jpg");
+    auto texture = game.loadTexture(std::string(MARS_ASSETS_PATH) + "S_Placeholder.png");
     if(!texture) return texture.moveError();
 
-    auto o1 = game.createObject(cubemesh, texture, glm::vec3(-1.0f, -0.5f, -0.5f), glm::vec3(8.0f, 6.0f, 8.0f));
+    auto o1 = game.createObject(cubemesh, texture, glm::vec3(-0.5, -0.5, -0.5), glm::vec3(1.0f));
 
     while(!game.hasFlags(mars::flagBits::stopExecution)) {
     	SDL_Event e;

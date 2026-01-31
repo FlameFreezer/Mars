@@ -7,7 +7,7 @@ module;
 #define SENSITIVITY 0.001f
 #define MAX_Y 0.90f
 #define NEAR_PLANE 0.1f
-#define FAR_PLANE 1000.0f
+#define FAR_PLANE 100.0f
 
 export module mars:camera;
 import error;

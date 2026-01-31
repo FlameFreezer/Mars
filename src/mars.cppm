@@ -17,6 +17,11 @@ export import heap_array;
 export import object;
 
 namespace mars {
+    export struct Rect2D {
+        std::uint64_t w;
+        std::uint64_t h;
+    };
+
     export class Game {
         Renderer* renderer;
         std::string windowName;
@@ -46,6 +51,7 @@ namespace mars {
         Error<std::size_t> loadMesh(std::string const& path) noexcept;
         Error<std::size_t> loadTexture(std::string const& path) noexcept;
         Error<std::size_t> createObject(std::size_t mesh, std::size_t texture, glm::vec3 const& pos, glm::vec3 const& scale) noexcept;
+        Rect2D getWindowDimensions() const noexcept;
     };
 
 };
