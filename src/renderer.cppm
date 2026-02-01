@@ -24,8 +24,6 @@ module;
 
 #include "mars_macros.h"
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
 #define MAX_CONCURRENT_FRAMES 2U
 #define MESH_CAPACITY 50
 #define TEXTURE_CAPACITY 50
@@ -1614,7 +1612,9 @@ namespace mars {
             if(!SDL_GetDisplayBounds(displays[0], &displayBounds)) {
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
-            //Hide window before we're ready to render
+            //SDL_WINDOW_MOUSE_GRABBED : mouse cannot escape window bounds - allows using relative
+            // mouse mode
+            //SDL_WINDOW_HIDDEN : hide the window before we're ready to display images to it
             window = SDL_CreateWindow(name.c_str(), displayBounds.w, displayBounds.h, 
                 SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_HIDDEN);
             //Instead of tracking live mouse inputs and having on-screen cursor, just track

@@ -85,10 +85,9 @@ namespace mars {
         else {
             renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
         }
-        Renderer::Objects rendererObjects{nullptr, objects.meshIDs, objects.textureIDs, objects.size};
         glm::mat4* modelMatrices = new glm::mat4[objects.size];
         objects.getModelMatrices(modelMatrices);
-        rendererObjects.modelMatrices = modelMatrices;
+        Renderer::Objects rendererObjects{modelMatrices, objects.meshIDs, objects.textureIDs, objects.size};
         TRY(renderer->drawFrame(deltaTime, rendererObjects));
         delete[] modelMatrices;
         return success();
@@ -120,5 +119,10 @@ namespace mars {
         int w, h;
         SDL_GetWindowSize(renderer->window, &w, &h);
         return {static_cast<std::uint64_t>(w), static_cast<std::uint64_t>(h)};
+    }
+    void Game::resizeWindow(std::uint32_t width, std::uint32_t height) noexcept {
+        int w = static_cast<int>(width), h = static_cast<int>(height);
+        SDL_SetWindowSize(renderer->window, w, h);
+        renderer->flags |= flagBits::recreateSwapchain;
     }
 }

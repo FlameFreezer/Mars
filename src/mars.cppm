@@ -48,6 +48,7 @@ namespace mars {
         std::chrono::duration<float, std::chrono::seconds::period>::rep getDeltaTimeSeconds() const noexcept;
         void updateTime() noexcept;
         void updateKeyState() noexcept;
+        void resizeWindow(std::uint32_t width, std::uint32_t height) noexcept;
         Error<std::size_t> loadMesh(std::string const& path) noexcept;
         Error<std::size_t> loadTexture(std::string const& path) noexcept;
         Error<std::size_t> createObject(std::size_t mesh, std::size_t texture, glm::vec3 const& pos, glm::vec3 const& scale) noexcept;

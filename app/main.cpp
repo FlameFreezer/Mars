@@ -12,7 +12,9 @@ import mars;
 
 using ErrorNoreturn = mars::Error<mars::noreturn>;
 
-#define SPEED 2.0f
+#define SPEED 1.0f
+
+mars::ID cube;
 
 void handleEvent(mars::Game& game, SDL_Event const& e) noexcept {
     switch(e.type) {
@@ -75,28 +77,35 @@ void handleMouseInput(mars::Game& game) noexcept {
 }
 
 void handleGamepad(mars::Game& game) noexcept {
-    static float timer = 1.0f;
-    timer += game.getDeltaTimeSeconds();
-    if(timer < 1.0f) return;
-    timer = 0.0f;
-    if(game.gamepad == nullptr) return;
-    SDL_RumbleGamepad(game.gamepad, 0xffff, 0xffff, 1000);
 }
 
-ErrorNoreturn mainLoop(mars::Game& game) noexcept {
-    game.camera.pos = glm::vec3(0.0f, 0.0f, -2.0f);
+void initCamera(mars::Game& game) noexcept {
+    game.camera.pos = glm::vec3(0.0f, 0.0f, -1.0f);
     game.camera.dir = glm::vec3(0.0f, 0.0f, 1.0f);
     game.camera.up = glm::vec3(0.0f, -1.0f, 0.0f);
     game.camera.fov = glm::radians(45.0f);
     game.camera.aspect = mars::Camera::autoAspect;
+}
 
+void fixCube(mars::Game& game) {
+    float halfd = glm::tan(game.camera.fov / 2.0f);
+    mars::Rect2D const windowDimensions = game.getWindowDimensions();
+    if(windowDimensions.h < windowDimensions.w) halfd *= (static_cast<float>(windowDimensions.w) / windowDimensions.h);
+    game.objects.at(game.objects.positions, cube) = glm::vec3(-halfd, -halfd, 0.0f);
+}
+
+ErrorNoreturn mainLoop(mars::Game& game) noexcept {
+    initCamera(game);
     auto cubemesh = game.loadMesh("CUBE");
     if(!cubemesh) return cubemesh.moveError();
 
     auto texture = game.loadTexture(std::string(MARS_ASSETS_PATH) + "S_Placeholder.png");
     if(!texture) return texture.moveError();
 
-    auto o1 = game.createObject(cubemesh, texture, glm::vec3(-0.5, -0.5, -0.5), glm::vec3(1.0f));
+    float halfd = glm::tan(game.camera.fov / 2.0f);
+    mars::Rect2D windowDimensions = game.getWindowDimensions();
+    if(windowDimensions.h < windowDimensions.w) halfd *= (static_cast<float>(windowDimensions.w) / windowDimensions.h);
+    cube = game.createObject(cubemesh, texture, glm::vec3(-halfd, -halfd, 0.0f), glm::vec3(2.0f * halfd));
 
     while(!game.hasFlags(mars::flagBits::stopExecution)) {
     	SDL_Event e;
@@ -108,6 +117,7 @@ ErrorNoreturn mainLoop(mars::Game& game) noexcept {
         handleKeyboardInput(game);
         handleMouseInput(game);
         handleGamepad(game);
+        fixCube(game);
         TRY(game.draw());
     }
     return mars::success();
