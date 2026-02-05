@@ -25,8 +25,6 @@ module;
 #include "mars_macros.h"
 
 #define MAX_CONCURRENT_FRAMES 2U
-#define MESH_CAPACITY 50
-#define TEXTURE_CAPACITY 50
 
 export module mars:renderer;
 import gpubuffer;
@@ -167,36 +165,96 @@ namespace mars {
     }
 
     class VertexBuffers : public ArrayMultimap {
+        void realloc() noexcept {
+            this->ArrayMultimap::realloc();
+            std::size_t const cap = this->capacity();
+            std::size_t const s = this->size();
+
+            VkBuffer* newHandles = new VkBuffer[cap];
+            VkDeviceMemory* newMemories = new VkDeviceMemory[cap];
+            BufferSizes* newSizes = new BufferSizes[cap];
+
+            std::memcpy(newHandles, handles, s);
+            std::memcpy(newMemories, memories, s);
+            std::memcpy(newSizes, sizes, s);
+
+            delete[] handles;
+            delete[] memories;
+            delete[] sizes;
+
+            handles = newHandles;
+            memories = newMemories;
+            sizes = newSizes;
+        }
         public:
         VkBuffer* handles;
         VkDeviceMemory* memories;
         BufferSizes* sizes;
-        VertexBuffers(std::size_t capacity) noexcept : 
-            ArrayMultimap(capacity), 
-            handles(new VkBuffer[capacity]), 
-            memories(new VkDeviceMemory[capacity]), 
-            sizes(new BufferSizes[capacity]) {} 
+        VertexBuffers() noexcept : ArrayMultimap() {
+            handles = new VkBuffer[this->capacity()];
+            memories = new VkDeviceMemory[this->capacity()];
+            sizes = new BufferSizes[this->capacity()];
+        }
         ~VertexBuffers() noexcept {
             delete[] handles;
             delete[] memories;
             delete[] sizes;
         }
+        ID append(VkBuffer h, VkDeviceMemory m, BufferSizes s) noexcept {
+            if(this->size() == this->capacity()) {
+                realloc();
+            }
+            handles[this->size()] = h;
+            memories[this->size()] = m;
+            sizes[this->size()] = s;
+            return this->ArrayMultimap::append();
+        }
     };
 
     class Textures : public ArrayMultimap {
+        void realloc() noexcept {
+            this->ArrayMultimap::realloc();
+            std::size_t const cap = this->capacity();
+            std::size_t const s = this->size();
+
+            VkImage* newHandles = new VkImage[cap];
+            VkDeviceMemory* newMemories = new VkDeviceMemory[cap];
+            VkImageView* newViews = new VkImageView[cap];
+
+            std::memcpy(newHandles, handles, s);
+            std::memcpy(newMemories, memories, s);
+            std::memcpy(newViews, views, s);
+
+            delete[] handles;
+            delete[] memories;
+            delete[] views;
+
+            handles = newHandles;
+            memories = newMemories;
+            views = newViews;
+        }
         public:
         VkImage* handles;
         VkDeviceMemory* memories;
         VkImageView* views;
-        Textures(std::size_t capacity) noexcept :
-            ArrayMultimap(capacity),
-            handles(new VkImage[capacity]),
-            memories(new VkDeviceMemory[capacity]),
-            views(new VkImageView[capacity]) {}
+        Textures() noexcept : ArrayMultimap() {
+            handles = new VkImage[this->capacity()];
+            memories = new VkDeviceMemory[this->capacity()];
+            views = new VkImageView[this->capacity()];
+        }
         ~Textures() noexcept {
             delete[] handles;
             delete[] memories;
             delete[] views;
+        }
+        ID append(VkImage h, VkDeviceMemory m, VkImageView v) noexcept {
+            if(this->size() == this->capacity()) {
+                realloc();
+            }
+            handles[this->size()] = h;
+            memories[this->size()] = m;
+            views[this->size()] = v;
+            return this->ArrayMultimap::append();
         }
     };
 
@@ -302,15 +360,7 @@ namespace mars {
             flags &= ~flagBits::beganTransferOps;
             transferBuffer.destroy(device);
 
-            vertexBuffers.handles[vertexBuffers.size] = vertexBuffer.handle;
-            vertexBuffers.memories[vertexBuffers.size] = vertexBuffer.memory;
-            vertexBuffers.sizes[vertexBuffers.size] = {verticesSize, indicesSize};
-
-            Error<std::uint64_t> id = vertexBuffers.makeID(vertexBuffer.handle, timeNanos);
-            if(!id) return id;
-            vertexBuffers.setActiveAt(id);
-            vertexBuffers.setIndex(id, vertexBuffers.size++);
-            return id;
+            return vertexBuffers.append(vertexBuffer.handle, vertexBuffer.memory, {verticesSize, indicesSize});
         }
 
         struct Objects {
@@ -621,15 +671,7 @@ namespace mars {
             }
 
             transferBuffer.destroy(device);
-            textures.handles[textures.size] = textureImage.handle;
-            textures.memories[textures.size] = textureImage.memory;
-            textures.views[textures.size] = textureImage.view;
-            
-            Error<std::uint64_t> id = textures.makeID(textureImage.handle, timeNanos);
-            if(!id) return id;
-            textures.setActiveAt(id);
-            textures.setIndex(id, textures.size++);
-            return id;
+            return textures.append(textureImage.handle, textureImage.memory, textureImage.view);
         }
 
         Error<noreturn> recreateSwapchain() noexcept {
@@ -687,7 +729,7 @@ namespace mars {
         }
 
         void doRenderPass(std::uint32_t imageIndex, VkCommandBuffer commandBuffer, Objects const& objects) noexcept {
-            VkRenderingAttachmentInfo const renderAttachment = {
+            VkRenderingAttachmentInfo renderAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .pNext = nullptr,
                 .imageView = renderTargets[imageIndex].view,
@@ -697,8 +739,11 @@ namespace mars {
                 .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
                 .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .clearValue = {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}
+                .clearValue = {.color = {.float32 = {1.0f, 1.0f, 1.0f, 1.0f}}}
             };
+            if(msaaSampleCount == VK_SAMPLE_COUNT_1_BIT) {
+                renderAttachment.resolveMode = VK_RESOLVE_MODE_NONE;
+            }
             VkRenderingAttachmentInfo const depthAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .pNext = nullptr,
@@ -768,9 +813,9 @@ namespace mars {
                 &writeCamera
             );
 
-            HeapArray<VkDeviceSize> offsets(vertexBuffers.size, 0);
-            if(vertexBuffers.size != 0) {
-                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<std::uint32_t>(vertexBuffers.size), vertexBuffers.handles, offsets.data());
+            HeapArray<VkDeviceSize> offsets(vertexBuffers.size(), 0);
+            if(vertexBuffers.size() != 0) {
+                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<std::uint32_t>(vertexBuffers.size()), vertexBuffers.handles, offsets.data());
             }
 
             for(std::size_t i = 0; i < objects.size; i++) {
@@ -1625,11 +1670,10 @@ namespace mars {
             if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
                 return {ErrorTag::FATAL_ERROR, SDL_GetError()};
             }
+            SDL_free(displays);
             return success();
         }
         public:
-        Renderer() noexcept : vertexBuffers(MESH_CAPACITY), textures(TEXTURE_CAPACITY) {}
-
         Error<noreturn> init(std::string const& name) noexcept {
             ArrayMultimap m(5);
             if(Error<noreturn> res = createInstance(name); !res) {
@@ -1670,11 +1714,11 @@ namespace mars {
             if((flags & flagBits::deviceInvalid) == 0) [[likely]] {
                 vkDeviceWaitIdle(device);
                 vkDestroySwapchainKHR(device, swapchain, nullptr);
-                for(std::size_t i = 0; i < vertexBuffers.size; i++) {
+                for(std::size_t i = 0; i < vertexBuffers.size(); i++) {
                     vkDestroyBuffer(device, vertexBuffers.handles[i], nullptr);
                     vkFreeMemory(device, vertexBuffers.memories[i], nullptr);
                 }
-                for(std::size_t i = 0; i < textures.size; i++) {
+                for(std::size_t i = 0; i < textures.size(); i++) {
                     vkDestroyImage(device, textures.handles[i], nullptr);
                     vkFreeMemory(device, textures.memories[i], nullptr);
                     vkDestroyImageView(device, textures.views[i], nullptr);

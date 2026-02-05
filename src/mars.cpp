@@ -13,8 +13,6 @@ module;
 
 module mars;
 
-#define OBJECT_CAPACITY 50
-
 namespace mars {
     Error<noreturn> initLibrary() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -26,8 +24,8 @@ namespace mars {
         SDL_Quit();
     }
 
-    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0), renderer(nullptr), objects(OBJECT_CAPACITY), gamepad(nullptr) {}
-    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0), renderer(nullptr), objects(OBJECT_CAPACITY), gamepad(nullptr) {}
+    Game::Game() noexcept : windowName("My Mars Game"), appName("My Mars Game"), flags(0), renderer(nullptr), gamepad(nullptr) {}
+    Game::Game(const std::string& name) noexcept : windowName(name), appName(name), flags(0), renderer(nullptr), gamepad(nullptr) {}
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
         renderer = new Renderer();
@@ -39,7 +37,6 @@ namespace mars {
             gamepad = SDL_OpenGamepad(gamepads[0]);
         }
         time = std::chrono::steady_clock::now();
-        objects.size = 0;
         return success();
     }
     Game::~Game() noexcept {
@@ -85,9 +82,9 @@ namespace mars {
         else {
             renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
         }
-        glm::mat4* modelMatrices = new glm::mat4[objects.size];
+        glm::mat4* modelMatrices = new glm::mat4[objects.size()];
         objects.getModelMatrices(modelMatrices);
-        Renderer::Objects rendererObjects{modelMatrices, objects.meshIDs, objects.textureIDs, objects.size};
+        Renderer::Objects rendererObjects{modelMatrices, objects.meshIDs, objects.textureIDs, objects.size()};
         TRY(renderer->drawFrame(deltaTime, rendererObjects));
         delete[] modelMatrices;
         return success();
@@ -103,17 +100,7 @@ namespace mars {
         return renderer->createTexture(path, getFrameTime());
     }
     Error<ID> Game::createObject(ID meshID, ID textureID, glm::vec3 const& pos, glm::vec3 const& scale) noexcept {
-        objects.meshIDs[objects.size] = meshID;
-        objects.textureIDs[objects.size] = textureID;
-        objects.positions[objects.size] = pos;
-        objects.scales[objects.size] = scale;
-
-        Error<ID> id = objects.makeID(static_cast<double>(pos.x + pos.y + pos.z), getFrameTime());
-        if(!id) return id;
-
-        objects.setActiveAt(id);
-        objects.setIndex(id, objects.size++);
-        return id;
+        return objects.append(meshID, textureID, pos, scale);
     }
     Rect2D Game::getWindowDimensions() const noexcept {
         int w, h;
