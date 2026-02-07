@@ -27,13 +27,13 @@ module;
 #define MAX_CONCURRENT_FRAMES 2U
 
 export module mars:renderer;
+import maps;
 import gpubuffer;
 import gpuimage;
 import error;
 import heap_array;
 import flag_bits;
 import vkhelper;
-import multimap;
 
 namespace mars {
     constexpr std::array<char const*, 2> neededDeviceExtensions = {
@@ -152,111 +152,6 @@ namespace mars {
             20, 21, 22, 20, 22, 23 //BOTTOM FACE
         };
     }
-
-    struct BufferSizes {
-        VkDeviceSize vertices;
-        VkDeviceSize indices;
-    };
-
-    constexpr std::size_t ceil(double val) noexcept {
-        std::size_t wholePart = val;
-        if(val > wholePart) wholePart++;
-        return wholePart;
-    }
-
-    class VertexBuffers : public ArrayMultimap {
-        void realloc() noexcept {
-            this->ArrayMultimap::realloc();
-            std::size_t const cap = this->capacity();
-            std::size_t const s = this->size();
-
-            VkBuffer* newHandles = new VkBuffer[cap];
-            VkDeviceMemory* newMemories = new VkDeviceMemory[cap];
-            BufferSizes* newSizes = new BufferSizes[cap];
-
-            std::memcpy(newHandles, handles, s);
-            std::memcpy(newMemories, memories, s);
-            std::memcpy(newSizes, sizes, s);
-
-            delete[] handles;
-            delete[] memories;
-            delete[] sizes;
-
-            handles = newHandles;
-            memories = newMemories;
-            sizes = newSizes;
-        }
-        public:
-        VkBuffer* handles;
-        VkDeviceMemory* memories;
-        BufferSizes* sizes;
-        VertexBuffers() noexcept : ArrayMultimap() {
-            handles = new VkBuffer[this->capacity()];
-            memories = new VkDeviceMemory[this->capacity()];
-            sizes = new BufferSizes[this->capacity()];
-        }
-        ~VertexBuffers() noexcept {
-            delete[] handles;
-            delete[] memories;
-            delete[] sizes;
-        }
-        ID append(VkBuffer h, VkDeviceMemory m, BufferSizes s) noexcept {
-            if(this->size() == this->capacity()) {
-                realloc();
-            }
-            handles[this->size()] = h;
-            memories[this->size()] = m;
-            sizes[this->size()] = s;
-            return this->ArrayMultimap::append();
-        }
-    };
-
-    class Textures : public ArrayMultimap {
-        void realloc() noexcept {
-            this->ArrayMultimap::realloc();
-            std::size_t const cap = this->capacity();
-            std::size_t const s = this->size();
-
-            VkImage* newHandles = new VkImage[cap];
-            VkDeviceMemory* newMemories = new VkDeviceMemory[cap];
-            VkImageView* newViews = new VkImageView[cap];
-
-            std::memcpy(newHandles, handles, s);
-            std::memcpy(newMemories, memories, s);
-            std::memcpy(newViews, views, s);
-
-            delete[] handles;
-            delete[] memories;
-            delete[] views;
-
-            handles = newHandles;
-            memories = newMemories;
-            views = newViews;
-        }
-        public:
-        VkImage* handles;
-        VkDeviceMemory* memories;
-        VkImageView* views;
-        Textures() noexcept : ArrayMultimap() {
-            handles = new VkImage[this->capacity()];
-            memories = new VkDeviceMemory[this->capacity()];
-            views = new VkImageView[this->capacity()];
-        }
-        ~Textures() noexcept {
-            delete[] handles;
-            delete[] memories;
-            delete[] views;
-        }
-        ID append(VkImage h, VkDeviceMemory m, VkImageView v) noexcept {
-            if(this->size() == this->capacity()) {
-                realloc();
-            }
-            handles[this->size()] = h;
-            memories[this->size()] = m;
-            views[this->size()] = v;
-            return this->ArrayMultimap::append();
-        }
-    };
 
     export class Renderer {
         friend class Game;
@@ -1675,7 +1570,6 @@ namespace mars {
         }
         public:
         Error<noreturn> init(std::string const& name) noexcept {
-            ArrayMultimap m(5);
             if(Error<noreturn> res = createInstance(name); !res) {
                 flags |= flagBits::instanceInvalid;
                 return res;

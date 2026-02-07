@@ -3,31 +3,30 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <limits>
 
 export module multimap;
+
+#define INITIAL_MAP_CAPACITY 50
+#define GROWTH_FACTOR 2
 
 namespace mars {
     export using ID = std::uint64_t; 
     export class ArrayMultimap {
-        static const std::size_t initialMapCapacity = 50;
-        static const std::size_t growthFactor = 2;
         ID* mIndices;
         std::size_t mSize;
         std::size_t mCapacity;
 
         protected:
         void realloc() noexcept {
-            ID* data = new ID[mCapacity * growthFactor];
+            ID* data = new ID[mCapacity * GROWTH_FACTOR];
             std::memcpy(data, mIndices, mCapacity);
-            mCapacity *= growthFactor;
+            mCapacity *= GROWTH_FACTOR;
             delete[] mIndices;
             mIndices = data;
         }
 
         public:
-        static const std::size_t npos = std::numeric_limits<std::size_t>::max();
-        ArrayMultimap() noexcept : mIndices(new ID[initialMapCapacity]), mSize(0), mCapacity(initialMapCapacity) {}
+        ArrayMultimap() noexcept : mIndices(new ID[INITIAL_MAP_CAPACITY]), mSize(0), mCapacity(INITIAL_MAP_CAPACITY) {}
         ArrayMultimap(std::size_t inCapacity) noexcept : mIndices(new ID[inCapacity]), mSize(0), mCapacity(inCapacity) {}
         ~ArrayMultimap() noexcept {
             delete[] mIndices;
@@ -47,6 +46,10 @@ namespace mars {
         ID append() noexcept {
             mIndices[mSize] = mSize;
             return mSize++;
+        }
+        void fixID(ID id, ID index) noexcept {
+           mIndices[id] = index;
+            --mSize;
         }
         template<typename T>
         T& at(T* map, ID id) noexcept {

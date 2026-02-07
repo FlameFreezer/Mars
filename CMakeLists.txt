@@ -49,7 +49,7 @@ target_sources(Mars PUBLIC
     FILE_SET mars_module 
     TYPE CXX_MODULES 
     BASE_DIRS src
-    FILES "${MARS_MODULE_FILES}"    
+    FILES "${MARS_MODULE_FILES}"   
     PRIVATE "${MARS_SOURCE_FILES}"
 )
 target_compile_definitions(Mars PUBLIC MARS_ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/")
@@ -72,6 +72,7 @@ target_include_directories(Mars PUBLIC
     "${CMAKE_SOURCE_DIR}/libraries/GLM"
     "$ENV{VULKAN_SDK}/include" 
     "${CMAKE_SOURCE_DIR}/libraries"
+    "${CMAKE_SOURCE_DIR}/include"
 )
 target_link_directories(Mars INTERFACE
     "$ENV{VULKAN_SDK}/lib"

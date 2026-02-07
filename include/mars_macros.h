@@ -1,5 +1,4 @@
-#ifndef MARS_MACROS_H
-#define MARS_MACROS_H 1
+#pragma once
 
 #define TRY(proc) \
 if(auto procResult = proc; !procResult) return procResult
@@ -12,5 +11,3 @@ else name = procResult
 type name;\
 if(auto procResult = proc; !procResult) return procResult.moveError<errType>();\
 else name = procResult
-
-#endif
