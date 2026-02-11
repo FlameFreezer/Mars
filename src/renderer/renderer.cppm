@@ -102,6 +102,19 @@ namespace mars {
         }
     };	
 
+    struct Square {
+        static constexpr std::array<Vertex, 4> vertices = {
+            Vertex{glm::vec3(0.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
+            Vertex{glm::vec3(1.0f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 1.0f)}
+        };
+        static constexpr std::array<std::uint32_t, 6> indices = {
+            0, 1, 2,
+            0, 2, 3
+        };
+    };
+
     constexpr glm::vec3 topleft{0.0f, 0.0f, 0.0f};
     constexpr glm::vec3 topright{1.0f, 0.0f, 0.0f};
     constexpr glm::vec3 bottomright{1.0f, 1.0f, 0.0f};
@@ -114,6 +127,8 @@ namespace mars {
         GPUBuffer buffer;
         glm::mat4 matrix;
         std::uint32_t dim;
+        float fov;
+        float aspect;
         static constexpr std::array<Vertex, 24> vertices = {
             //FRONT FACE
             Vertex{topleft, glm::vec2(0.0f, 0.0f)},
@@ -194,6 +209,21 @@ namespace mars {
         std::uint32_t presentQueueFamilyIndex;
         VkSampleCountFlagBits msaaSampleCount;
         RendererFlags flags;
+
+        Error<noreturn> createCamera() noexcept {
+            auto res = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
+                //Each frame gets its own 3D camera, while one 2D camera exists
+                sizeof(glm::mat4) * (MAX_CONCURRENT_FRAMES + 1)); 
+            if(!res) {
+                return res.moveError();
+            }
+            else cameraMatrices = res.moveData(); 
+
+            float const scale = 1.0f / (0.5f * static_cast<float>(cube.dim));
+            cameraMatrices.mappedMemory[0] = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, -1.0f, 0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1.0f));
+
+            return success();
+        }
 
         //Due to the circular dependency of the Mesh and Renderer classes, this has to be a renderer method
         Error<std::size_t> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<std::uint32_t> indices) noexcept {
@@ -386,6 +416,8 @@ namespace mars {
 
             cube.matrix = glm::mat4(1.0f);
             cube.dim = std::max(swapchainImageExtent.width, swapchainImageExtent.height);
+            cube.fov = 0.0f;
+            cube.aspect = 0.0f;
 
             return success();
         }
@@ -732,6 +764,12 @@ namespace mars {
             swapchainImageExtent = imageExtent;
             cube.dim = std::max(swapchainImageExtent.width, swapchainImageExtent.height);
 
+            float dim = static_cast<float>(cube.dim);
+            float scale = 1.0f / dim;
+            dim *= -0.5f;
+            cameraMatrices.mappedMemory[0] = glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1.0f)) * glm::translate(glm::mat4(1.0f), glm::vec3(dim, dim, 1.0f));
+
+
             VkSwapchainKHR newSwapchain;
             VkSwapchainCreateInfoKHR const swapchainInfo = {
                 .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -894,7 +932,7 @@ namespace mars {
                 .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
                 .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .clearValue = {.color = {.float32 = {1.0f, 0.0f, 1.0f, 1.0f}}}
+                .clearValue = {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}
             };
             VkRenderingAttachmentInfo const depthAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -1850,20 +1888,17 @@ namespace mars {
             TRY(createSyncObjects());
             TRY(createDescriptorSetLayouts());
             TRY(createGraphicsPipeline());
+            TRY(createCamera());
             if(!SDL_ShowWindow(window)) {
                 return {ErrorTag::FATAL_ERROR, "Failed to show window"};
             }
 
+            //create square mesh - this must be the first mesh made so that it always has ID 0
+            auto sq = makeMesh(Square::vertices, Square::indices);
+            if(!sq) return sq.moveError();
+
             currentFrame = 0;
             flags = {};
-            auto res = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
-                //Each frame gets its own 3D camera, while one 2D camera exists
-                sizeof(glm::mat4) * (MAX_CONCURRENT_FRAMES + 1)); 
-            if(!res) {
-                return res.moveError();
-            }
-            else cameraMatrices = res.moveData(); 
-            cameraMatrices.mappedMemory[0] = glm::mat4(1.0f);
             return success();
         }
         //Destructor
@@ -1915,12 +1950,16 @@ namespace mars {
         }
 
         Error<noreturn> drawFrame(std::chrono::nanoseconds deltaTime, float fov, float aspect, Objects& objects) noexcept {
-            //Fix the cube
-            float halfd = glm::tan(fov / 2.0f);
-            if(aspect > 1.0f) halfd *= aspect;
-            glm::vec3 const pos(-halfd, -halfd, 0.0f);
-            glm::vec3 const scale(2.0f * halfd);
-            cube.matrix = glm::translate(glm::mat4(1.0f), pos) * glm::scale(glm::mat4(1.0f), scale);
+            //Fix the cube - only if any of the viewport details changed
+            if(fov != cube.fov or aspect != cube.aspect) {
+                float halfd = glm::tan(fov / 2.0f);
+                if(aspect > 1.0f) halfd *= aspect;
+                glm::vec3 const pos(-halfd, -halfd, 0.0f);
+                glm::vec3 const scale(2.0f * halfd);
+                cube.matrix = glm::translate(glm::mat4(1.0f), pos) * glm::scale(glm::mat4(1.0f), scale) ;
+                cube.fov = fov;
+                cube.aspect = aspect;
+            };
 
             if(vkWaitForFences(
                     device, 

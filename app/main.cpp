@@ -1,5 +1,7 @@
 import mars;
 
+#include <string>
+
 #include <SDL3/SDL.h>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -85,6 +87,8 @@ void initCamera(mars::Game& game) noexcept {
 
 ErrorNoreturn mainLoop(mars::Game& game) noexcept {
     initCamera(game);
+    mars::ID texture = game.loadTexture(std::string(MARS_ASSETS_PATH) + "S_Placeholder.png");
+    mars::ID object = game.createObject(game.shapes.square, texture, glm::vec3(0.0f), glm::vec3(100.0f));
     while(!game.hasFlags(mars::flagBits::stopExecution)) {
     	SDL_Event e;
         game.updateTime();

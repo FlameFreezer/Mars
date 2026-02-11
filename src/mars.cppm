@@ -31,6 +31,9 @@ namespace mars {
         std::chrono::nanoseconds deltaTime;
         GameFlags flags;
         public:
+        struct {
+            ID const square = 0;
+        } shapes;
         Objects objects;
         Camera camera;
         bool const* keyState;
