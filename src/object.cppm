@@ -49,6 +49,7 @@ namespace mars {
         }
 
         void getModelMatrices(glm::mat4* outMatrices) const noexcept {
+            if(outMatrices == nullptr) return;
             std::size_t const s = this->size();
             for(std::size_t i = 0; i < s; i++) {
                 outMatrices[i] = glm::translate(identity, positions[i]) * glm::scale(identity, scales[i]);

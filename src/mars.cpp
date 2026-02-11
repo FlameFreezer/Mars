@@ -74,30 +74,36 @@ namespace mars {
         keyState = SDL_GetKeyboardState(nullptr);
     }
     Error<noreturn> Game::draw() noexcept {
+        float aspect = 0.0f;
         if(camera.aspect == Camera::autoAspect) {
             camera.aspect = static_cast<float>(renderer->swapchainImageExtent.width) / static_cast<float>(renderer->swapchainImageExtent.height);
-            renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
+            aspect = camera.aspect;
+            renderer->cameraMatrices.mappedMemory[1 + renderer->currentFrame] = camera.loadMatrices();
             camera.aspect = Camera::autoAspect;
         }
         else {
-            renderer->cameraMatrices.mappedMemory[renderer->currentFrame] = camera.loadMatrices();
+            renderer->cameraMatrices.mappedMemory[1 + renderer->currentFrame] = camera.loadMatrices();
+            aspect = camera.aspect;
         }
-        glm::mat4* modelMatrices = new glm::mat4[objects.size()];
-        objects.getModelMatrices(modelMatrices);
-        Renderer::Objects rendererObjects{modelMatrices, objects.meshIDs, objects.textureIDs, objects.size()};
-        TRY(renderer->drawFrame(deltaTime, rendererObjects));
-        delete[] modelMatrices;
+        if(objects.size() != 0) {
+            glm::mat4* modelMatrices = new glm::mat4[objects.size()];
+            objects.getModelMatrices(modelMatrices);
+            Renderer::Objects rendererObjects{modelMatrices, objects.meshIDs, objects.textureIDs, objects.size()};
+            TRY(renderer->drawFrame(deltaTime, camera.fov, aspect, rendererObjects));
+            delete[] modelMatrices;
+        }
+        else {
+            Renderer::Objects rendererObjects{nullptr, nullptr, nullptr, 0};
+            TRY(renderer->drawFrame(deltaTime, camera.fov, aspect, rendererObjects));
+        }
         return success();
     }
 
     Error<ID> Game::loadMesh(std::string const& path) noexcept {
-        if(path.compare("CUBE") == 0) {
-            return renderer->makeMesh({Cube::vertices.data(), Cube::vertices.max_size()}, {Cube::indices.data(), Cube::indices.max_size()}, getFrameTime());
-        }
         return 0;
     }
     Error<ID> Game::loadTexture(std::string const& path) noexcept {
-        return renderer->createTexture(path, getFrameTime());
+        return renderer->createTexture(path);
     }
     Error<ID> Game::createObject(ID meshID, ID textureID, glm::vec3 const& pos, glm::vec3 const& scale) noexcept {
         return objects.append(meshID, textureID, pos, scale);

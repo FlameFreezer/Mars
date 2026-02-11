@@ -1,7 +1,5 @@
 import mars;
 
-#include <string>
-
 #include <SDL3/SDL.h>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -13,8 +11,6 @@ import mars;
 using ErrorNoreturn = mars::Error<mars::noreturn>;
 
 #define SPEED 1.0f
-
-mars::ID cube;
 
 void handleEvent(mars::Game& game, SDL_Event const& e) noexcept {
     switch(e.type) {
@@ -87,26 +83,8 @@ void initCamera(mars::Game& game) noexcept {
     game.camera.aspect = mars::Camera::autoAspect;
 }
 
-void fixCube(mars::Game& game) {
-    float halfd = glm::tan(game.camera.fov / 2.0f);
-    mars::Rect2D const windowDimensions = game.getWindowDimensions();
-    if(windowDimensions.h < windowDimensions.w) halfd *= (static_cast<float>(windowDimensions.w) / windowDimensions.h);
-    game.objects.at(game.objects.positions, cube) = glm::vec3(-halfd, -halfd, 0.0f);
-}
-
 ErrorNoreturn mainLoop(mars::Game& game) noexcept {
     initCamera(game);
-    auto cubemesh = game.loadMesh("CUBE");
-    if(!cubemesh) return cubemesh.moveError();
-
-    auto texture = game.loadTexture(std::string(MARS_ASSETS_PATH) + "S_Placeholder.png");
-    if(!texture) return texture.moveError();
-
-    float halfd = glm::tan(game.camera.fov / 2.0f);
-    mars::Rect2D windowDimensions = game.getWindowDimensions();
-    if(windowDimensions.h < windowDimensions.w) halfd *= (static_cast<float>(windowDimensions.w) / windowDimensions.h);
-    cube = game.createObject(cubemesh, texture, glm::vec3(-halfd, -halfd, 0.0f), glm::vec3(2.0f * halfd));
-
     while(!game.hasFlags(mars::flagBits::stopExecution)) {
     	SDL_Event e;
         game.updateTime();
@@ -117,7 +95,6 @@ ErrorNoreturn mainLoop(mars::Game& game) noexcept {
         handleKeyboardInput(game);
         handleMouseInput(game);
         handleGamepad(game);
-        fixCube(game);
         TRY(game.draw());
     }
     return mars::success();
