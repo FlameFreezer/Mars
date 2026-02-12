@@ -260,17 +260,24 @@ namespace mars {
             
             buffer = GPUBuffer::make(device, physicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            if(!buffer) return buffer.moveError<std::size_t>();
+            if(!buffer) {
+                vertexBuffer.destroy(device);
+                return buffer.moveError<std::size_t>();
+            }
             GPUBuffer transferBuffer = buffer.moveData();
 
             void* memory;
             if(vkMapMemory(device, transferBuffer.memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to map device memory"};
+                vertexBuffer.destroy(device);
+                transferBuffer.destroy(device);
+                return fatal<std::size_t>("Failed to map device memory");
             }
             std::memcpy(memory, reinterpret_cast<void const*>(vertices.data()), verticesSize);
             vkUnmapMemory(device, transferBuffer.memory);
 
             if(vkMapMemory(device, transferBuffer.memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
+                vertexBuffer.destroy(device);
+                transferBuffer.destroy(device);
                 return {ErrorTag::FATAL_ERROR, "Failed to map device memory"};
             }
             std::memcpy(memory, reinterpret_cast<void const*>(indices.data()), indicesSize);
@@ -278,7 +285,11 @@ namespace mars {
 
             if(!(flags & flagBits::beganTransferOps)) {
                 Error<noreturn> res = beginTransferOps();
-                if(!res) return res.moveError<std::size_t>();
+                if(!res) {
+                    vertexBuffer.destroy(device);
+                    transferBuffer.destroy(device);
+                    return res.moveError<std::size_t>();
+                }
             }
 
             VkBufferCopy const region = {
@@ -288,6 +299,8 @@ namespace mars {
             };
             vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
+                vertexBuffer.destroy(device);
+                transferBuffer.destroy(device);
                 return {ErrorTag::FATAL_ERROR, "Failed to end transfer command buffer"};
             }
             VkCommandBufferSubmitInfo const commandBufferInfo = {
@@ -308,6 +321,8 @@ namespace mars {
                 .pSignalSemaphoreInfos = nullptr
             };
             if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+                vertexBuffer.destroy(device);
+                transferBuffer.destroy(device);
                 return {ErrorTag::FATAL_ERROR, "Failed to submit to transfer queue while creating vertex buffer"};
             }
             vkQueueWaitIdle(graphicsQueues[0]);
@@ -316,6 +331,202 @@ namespace mars {
             transferBuffer.destroy(device);
 
             return vertexBuffers.append(vertexBuffer.handle, vertexBuffer.memory, {verticesSize, indicesSize});
+        }
+
+        Error<std::size_t> createTexture(std::string const& texturePath) noexcept {
+            int texWidth, texHeight, texChannels;
+            stbi_uc* pixels = nullptr;
+            pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+            if(pixels == nullptr) {
+                return {ErrorTag::FATAL_ERROR, "Failed to find/load texture file"};
+            }
+            VkDeviceSize const imageSize = texWidth * texHeight * STBI_rgb_alpha; 
+            GPUImage textureImage;
+
+            if(Error<GPUImage> image = GPUImage::make(
+                    device, physicalDevice, 
+                    {static_cast<std::uint32_t>(texWidth), static_cast<std::uint32_t>(texHeight), 1},
+                    VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, 
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT
+                ); !image) {
+                stbi_image_free(pixels);
+                return image.moveError<std::size_t>();
+            }
+            else textureImage = image;
+
+            GPUBuffer transferBuffer;
+            if(Error<GPUBuffer> tb = GPUBuffer::make(
+                    device, 
+                    physicalDevice, 
+                    imageSize, 
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                ); !tb) {
+                stbi_image_free(pixels);
+                textureImage.destroy(device);
+                return tb.moveError<std::size_t>();
+            }
+            else transferBuffer = tb;
+
+            void* memory;
+            if(vkMapMemory(device, transferBuffer.memory, 0, imageSize, 0, &memory) != VK_SUCCESS) {
+                stbi_image_free(pixels);
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::FATAL_ERROR, "Failed to map buffer memory to the host"};
+            }
+            std::memcpy(memory, pixels, imageSize);
+            vkUnmapMemory(device, transferBuffer.memory);
+
+            stbi_image_free(pixels);
+
+            VkCommandBufferBeginInfo const beginInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .pNext = nullptr,
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                .pInheritanceInfo = nullptr
+            };
+            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::FATAL_ERROR, "Failed to begin single time command buffer"};
+            }
+
+            VkImageMemoryBarrier2 const firstTransition = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = textureImage.handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            VkDependencyInfo const dep1 = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = nullptr,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &firstTransition
+            };
+            vkCmdPipelineBarrier2(commandBuffers.back(), &dep1);
+
+            VkBufferImageCopy2 const copyRegion = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+                .pNext = nullptr,
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                },
+                .imageOffset = {0,0,0},
+                .imageExtent = {static_cast<std::uint32_t>(texWidth), static_cast<std::uint32_t>(texHeight), 1}
+            };
+            VkCopyBufferToImageInfo2 const bufferToImageInfo = {
+                .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+                .pNext = nullptr,
+                .srcBuffer = transferBuffer.handle,
+                .dstImage = textureImage.handle,
+                .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .regionCount = 1,
+                .pRegions = &copyRegion
+            };
+            vkCmdCopyBufferToImage2(commandBuffers.back(), &bufferToImageInfo);
+
+            VkImageMemoryBarrier2 const preShaderRead = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = textureImage.handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            VkDependencyInfo const dep2 = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = nullptr,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &preShaderRead
+            };
+            vkCmdPipelineBarrier2(commandBuffers.back(), &dep2);
+
+            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::FATAL_ERROR, "Failed to end command buffer while creating texture image"};
+            }
+
+            VkCommandBufferSubmitInfo const commandInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .pNext = nullptr,
+                .commandBuffer = commandBuffers.back(),
+                .deviceMask = 0
+            };
+            VkSubmitInfo2 const submitInfo = {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .pNext = nullptr,
+                .flags = 0,
+                .waitSemaphoreInfoCount = 0,
+                .pWaitSemaphoreInfos = nullptr,
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &commandInfo,
+                .signalSemaphoreInfoCount = 0,
+                .pSignalSemaphoreInfos = nullptr
+            };
+            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::FATAL_ERROR, "Failed to submit to queue while creating texture image"};
+            }
+            if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::FATAL_ERROR, "Failed to wait for queue while creating texture image"};
+            }
+            if(vkResetCommandBuffer(commandBuffers.back(), 0) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer while creating texture image"};
+            }
+
+            transferBuffer.destroy(device);
+            return textures.append(textureImage.handle, textureImage.memory, textureImage.view);
         }
 
         struct Objects {
@@ -377,7 +588,9 @@ namespace mars {
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             );
-            if(!transferBuffer) return transferBuffer.moveError();
+            if(!transferBuffer) {
+                return transferBuffer.moveError();
+            }
             void* memory;
             if(vkMapMemory(device, transferBuffer.data().memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
                 transferBuffer.data().destroy(device);
@@ -400,6 +613,7 @@ namespace mars {
                 .pInheritanceInfo = nullptr
             };
             if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
+                transferBuffer.data().destroy(device);
                 return {ErrorTag::FATAL_ERROR, "Failed to begin single time command buffer"};
             }
 
@@ -410,6 +624,7 @@ namespace mars {
             };
             vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.data().handle, cube.buffer.handle, 1, &region);
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
+                transferBuffer.data().destroy(device);
                 return {ErrorTag::FATAL_ERROR, "Failed to end transfer command buffer"};
             }
             VkCommandBufferSubmitInfo const commandBufferInfo = {
@@ -430,6 +645,7 @@ namespace mars {
                 .pSignalSemaphoreInfos = nullptr
             };
             if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+                transferBuffer.data().destroy(device);
                 return {ErrorTag::FATAL_ERROR, "Failed to submit to transfer queue while creating vertex buffer"};
             }
             vkQueueWaitIdle(graphicsQueues[0]);
@@ -585,186 +801,6 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, "Failed to create texture sampler"};
             }
             return success();
-        }
-
-        Error<std::size_t> createTexture(std::string const& texturePath) noexcept {
-            int texWidth, texHeight, texChannels;
-            stbi_uc* pixels = nullptr;
-            pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-            if(pixels == nullptr) {
-                return {ErrorTag::FATAL_ERROR, "Failed to find/load texture file"};
-            }
-            VkDeviceSize const imageSize = texWidth * texHeight * STBI_rgb_alpha; 
-            GPUImage textureImage;
-
-            if(Error<GPUImage> image = GPUImage::make(
-                    device, physicalDevice, 
-                    {static_cast<std::uint32_t>(texWidth), static_cast<std::uint32_t>(texHeight), 1},
-                    VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, 
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT
-                ); !image) {
-                return image.moveError<std::size_t>();
-            }
-            else textureImage = image;
-
-            GPUBuffer transferBuffer;
-            if(Error<GPUBuffer> tb = GPUBuffer::make(
-                    device, 
-                    physicalDevice, 
-                    imageSize, 
-                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                ); !tb) {
-                return tb.moveError<std::size_t>();
-            }
-            else transferBuffer = tb;
-
-            void* memory;
-            if(vkMapMemory(device, transferBuffer.memory, 0, imageSize, 0, &memory) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to map buffer memory to the host"};
-            }
-            std::memcpy(memory, pixels, imageSize);
-            vkUnmapMemory(device, transferBuffer.memory);
-
-            stbi_image_free(pixels);
-
-            VkCommandBufferBeginInfo const beginInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-                .pNext = nullptr,
-                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-                .pInheritanceInfo = nullptr
-            };
-            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to begin single time command buffer"};
-            }
-
-            VkImageMemoryBarrier2 const firstTransition = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                .srcAccessMask = VK_ACCESS_2_NONE,
-                .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = textureImage.handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            VkDependencyInfo const dep1 = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = nullptr,
-                .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &firstTransition
-            };
-            vkCmdPipelineBarrier2(commandBuffers.back(), &dep1);
-
-            VkBufferImageCopy2 const copyRegion = {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
-                .pNext = nullptr,
-                .bufferOffset = 0,
-                .bufferRowLength = 0,
-                .bufferImageHeight = 0,
-                .imageSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .mipLevel = 0,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                },
-                .imageOffset = {0,0,0},
-                .imageExtent = {static_cast<std::uint32_t>(texWidth), static_cast<std::uint32_t>(texHeight), 1}
-            };
-            VkCopyBufferToImageInfo2 const bufferToImageInfo = {
-                .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
-                .pNext = nullptr,
-                .srcBuffer = transferBuffer.handle,
-                .dstImage = textureImage.handle,
-                .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .regionCount = 1,
-                .pRegions = &copyRegion
-            };
-            vkCmdCopyBufferToImage2(commandBuffers.back(), &bufferToImageInfo);
-
-            VkImageMemoryBarrier2 const preShaderRead = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = textureImage.handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            VkDependencyInfo const dep2 = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = nullptr,
-                .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &preShaderRead
-            };
-            vkCmdPipelineBarrier2(commandBuffers.back(), &dep2);
-
-            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to end command buffer while creating texture image"};
-            }
-
-            VkCommandBufferSubmitInfo const commandInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-                .pNext = nullptr,
-                .commandBuffer = commandBuffers.back(),
-                .deviceMask = 0
-            };
-            VkSubmitInfo2 const submitInfo = {
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-                .pNext = nullptr,
-                .flags = 0,
-                .waitSemaphoreInfoCount = 0,
-                .pWaitSemaphoreInfos = nullptr,
-                .commandBufferInfoCount = 1,
-                .pCommandBufferInfos = &commandInfo,
-                .signalSemaphoreInfoCount = 0,
-                .pSignalSemaphoreInfos = nullptr
-            };
-            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to submit to queue while creating texture image"};
-            }
-            if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to wait for queue while creating texture image"};
-            }
-            if(vkResetCommandBuffer(commandBuffers.back(), 0) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer while creating texture image"};
-            }
-
-            transferBuffer.destroy(device);
-            return textures.append(textureImage.handle, textureImage.memory, textureImage.view);
         }
 
         Error<noreturn> recreateSwapchain() noexcept {
@@ -1264,6 +1300,7 @@ namespace mars {
                 .pPushConstantRanges = pushConstantRanges.data()
             };
             if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout) != VK_SUCCESS) {
+                vkDestroyShaderModule(device, shaderModule, nullptr);
                 return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline layout!"};
             }
            
@@ -1290,6 +1327,7 @@ namespace mars {
             };
 
             if(vkCreateGraphicsPipelines(device, nullptr, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+                vkDestroyShaderModule(device, shaderModule, nullptr);
                 return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline!"};
             }
 

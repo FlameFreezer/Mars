@@ -173,4 +173,13 @@ namespace mars {
     export Error<noreturn> success() noexcept {
         return Error<noreturn>();
     }
+    //Returns an `Error<T>` with `key == FATAL_ERROR`.
+    export template<typename T = noreturn>
+    Error<T> fatal(std::string&& message) noexcept {
+        return Error<T>(ErrorTag::FATAL_ERROR, std::move(message));
+    }
+    export template<typename T = noreturn>
+    Error<T> fatal(std::string const& message) noexcept {
+        return Error<T>(ErrorTag::FATAL_ERROR, message);
+    }
 }
