@@ -25,6 +25,11 @@ namespace mars {
             mIndices = data;
         }
 
+        void setIndexForID(ID id, ID index) noexcept {
+           mIndices[id] = index;
+            --mSize;
+        }
+
         public:
         ArrayMultimap() noexcept : mIndices(new ID[INITIAL_MAP_CAPACITY]), mSize(0), mCapacity(INITIAL_MAP_CAPACITY) {}
         ArrayMultimap(std::size_t inCapacity) noexcept : mIndices(new ID[inCapacity]), mSize(0), mCapacity(inCapacity) {}
@@ -47,10 +52,6 @@ namespace mars {
             mIndices[mSize] = mSize;
             return mSize++;
         }
-        void fixID(ID id, ID index) noexcept {
-           mIndices[id] = index;
-            --mSize;
-        }
         template<typename T>
         T& at(T* map, ID id) noexcept {
             return map[mIndices[id]];
@@ -59,6 +60,5 @@ namespace mars {
         T& at(T* map, ID id) const noexcept {
             return map[mIndices[id]];
         }
-
     };
 }

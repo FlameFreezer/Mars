@@ -77,7 +77,7 @@ namespace mars {
             memories[index] = memories[back];
             sizes[index] = sizes[back];
             //Fix the ID in the backing array of indices and reduce size
-            this->fixID(id, index);
+            this->setIndexForID(id, index);
         }
     };
 

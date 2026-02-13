@@ -1129,7 +1129,7 @@ namespace mars {
         }
 
         Error<VkShaderModule> createShaderModule() noexcept {
-            std::ifstream shaderFile("slang.spv", std::ios::binary | std::ios::ate);
+            std::ifstream shaderFile("shader.spv", std::ios::binary | std::ios::ate);
             if(!shaderFile.is_open()) {
                 return {ErrorTag::FATAL_ERROR, "Failed to find shader code!"};
             }

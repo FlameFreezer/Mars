@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 4.1.2)
 project(MarsEngine)
 
 set(CMAKE_CXX_STANDARD 23)
-#set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Ensure all build objects are placed in the same directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
@@ -26,7 +26,7 @@ add_custom_command(OUTPUT slang.spv
         -fvk-use-entrypoint-name 
         -entry vertMain 
         -entry fragMain 
-        -o slang.spv
+        -o shader.spv
     DEPENDS "${MARS_SHADER_PATH}/shader.slang"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
     COMMENT "Compiling shaders"
