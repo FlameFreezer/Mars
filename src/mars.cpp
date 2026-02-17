@@ -85,17 +85,10 @@ namespace mars {
             renderer->cameraMatrices.mappedMemory[1 + renderer->currentFrame] = camera.loadMatrices();
             aspect = camera.aspect;
         }
-        if(objects.size() != 0) {
-            glm::mat4* modelMatrices = new glm::mat4[objects.size()];
-            objects.getModelMatrices(modelMatrices);
-            Renderer::Objects rendererObjects{modelMatrices, objects.meshIDs, objects.textureIDs, objects.size()};
-            TRY(renderer->drawFrame(deltaTime, camera.fov, aspect, rendererObjects));
-            delete[] modelMatrices;
-        }
-        else {
-            Renderer::Objects rendererObjects{nullptr, nullptr, nullptr, 0};
-            TRY(renderer->drawFrame(deltaTime, camera.fov, aspect, rendererObjects));
-        }
+        TRY(objects.updateModelMatrices(objectsToUpdate));
+        objectsToUpdate.clear();
+        Renderer::Objects rendererObjects{objects.models, objects.meshIDs, objects.textureIDs, objects.size()};
+        TRY(renderer->drawFrame(deltaTime, camera.fov, aspect, rendererObjects));
         return success();
     }
 
@@ -106,7 +99,9 @@ namespace mars {
         return renderer->createTexture(path);
     }
     Error<ID> Game::createObject(ID meshID, ID textureID, glm::vec3 const& pos, glm::vec3 const& scale) noexcept {
-        return objects.append(meshID, textureID, pos, scale);
+        ID id = objects.append(meshID, textureID, pos, scale);
+        objectsToUpdate.push_back(id);
+        return id;
     }
     Rect2D Game::getWindowDimensions() const noexcept {
         int w, h;
@@ -117,5 +112,30 @@ namespace mars {
         int w = static_cast<int>(width), h = static_cast<int>(height);
         SDL_SetWindowSize(renderer->window, w, h);
         renderer->flags |= flagBits::recreateSwapchain;
+    }
+
+    Error<noreturn> Game::setPosition(ID object, glm::vec3 const& pos) noexcept {
+        objects.at(objects.positions, object) = pos;
+        objectsToUpdate.push_back(object);
+        return success();
+    }
+
+    Error<noreturn> Game::addPosition(ID object, glm::vec3 const& pos) noexcept {
+        objects.at(objects.positions, object) += pos;
+        objectsToUpdate.push_back(object);
+        return success();
+    }
+
+    Error<glm::vec3> Game::getPosition(ID object) const noexcept {
+        return objects.at(objects.positions, object);
+    }
+
+    Error<noreturn> Game::setScale(ID object, glm::vec3 const& pos) noexcept {
+        objects.at(objects.scales, object) = pos;
+        objectsToUpdate.push_back(object);
+        return success();
+    }
+    Error<glm::vec3> Game::getScale(ID object) const noexcept {
+        return objects.at(objects.scales, object);
     }
 }

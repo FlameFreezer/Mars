@@ -2,6 +2,7 @@ module;
 
 #include <string>
 #include <chrono>
+#include <vector>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -30,6 +31,7 @@ namespace mars {
         std::chrono::steady_clock::time_point time;
         std::chrono::nanoseconds deltaTime;
         GameFlags flags;
+        std::vector<ID> objectsToUpdate; 
         public:
         struct {
             ID const square = 0;
@@ -94,5 +96,10 @@ namespace mars {
         // Returns the dimensions of the window.
         // Returns: Rect2D  The dimensions of the window.
         Rect2D getWindowDimensions() const noexcept;
+        Error<noreturn> setPosition(ID object, glm::vec3 const& pos) noexcept;
+        Error<noreturn> addPosition(ID object, glm::vec3 const& pos) noexcept;
+        Error<glm::vec3> getPosition(ID object) const noexcept;
+        Error<noreturn> setScale(ID object, glm::vec3 const& pos) noexcept;
+        Error<glm::vec3> getScale(ID object) const noexcept;
     };
 };

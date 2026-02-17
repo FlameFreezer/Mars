@@ -1,65 +1,80 @@
 module;
 
+#include <format>
+
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 export module object;
 import multimap;
+import error;
 
 namespace mars {
     export class Objects : public ArrayMultimap {
+        ID* meshIDs;
+        ID* textureIDs;
+        glm::vec3* positions;
+        glm::vec3* scales;
+        glm::mat4* models;
+        static constexpr glm::mat4 identity{1.0f};
+
+        void clear() noexcept {
+            delete[] meshIDs;
+            delete[] textureIDs;
+            delete[] positions;
+            delete[] scales;
+            delete[] models;
+        }
+
         void realloc() noexcept {
             this->ArrayMultimap::realloc();
             std::size_t const cap = this->capacity();
             std::size_t const s = this->size();
 
-            ID* newIDs = new ID[cap];
-            glm::vec3* newVectors = new glm::vec3[cap];
+            ID* newMeshes = new ID[cap];
+            ID* newTextures = new ID[cap];
+            glm::vec3* newPos = new glm::vec3[cap];
+            glm::vec3* newScale = new glm::vec3[cap];
+            glm::mat4* newModels = new glm::mat4[cap];
             for(std::size_t i = 0; i < s; i++) {
-                newIDs[i] = meshIDs[i];
-                newVectors[i] = positions[i];
+                newMeshes[i] = meshIDs[i];
+                newTextures[i] = textureIDs[i];
+                newPos[i] = positions[i];
+                newScale[i] = scales[i];
+                newModels[i] = models[i];
             }
-            delete[] meshIDs;
-            delete[] positions;
-            meshIDs = newIDs;
-            positions = newVectors;
-
-            for(std::size_t i = 0; i < s; i++) {
-                newIDs[i] = textureIDs[i];
-                newVectors[i] = scales[i];
-            }
-            delete[] textureIDs;
-            delete[] scales;
-            textureIDs = newIDs;
-            scales = newVectors;
+            clear();
+            meshIDs = newMeshes;
+            textureIDs = newTextures;
+            positions = newPos;
+            scales = newScale;
+            models = newModels;
         }
         public:
-        ID* meshIDs;
-        ID* textureIDs;
-        glm::vec3* positions;
-        glm::vec3* scales;
-        static constexpr glm::mat4 identity{1.0f};
-
+        //Give Game direct access to internal arrays
+        friend class Game;
         Objects() noexcept : ArrayMultimap() {
             meshIDs = new ID[this->capacity()];
             textureIDs = new ID[this->capacity()];
             positions = new glm::vec3[this->capacity()];
             scales = new glm::vec3[this->capacity()];
+            models = new glm::mat4[this->capacity()];
         }
 
-        void getModelMatrices(glm::mat4* outMatrices) const noexcept {
-            if(outMatrices == nullptr) return;
+        Error<noreturn> updateModelMatrices(std::vector<ID> const& toUpdate) const noexcept {
             std::size_t const s = this->size();
-            for(std::size_t i = 0; i < s; i++) {
-                outMatrices[i] = glm::translate(identity, positions[i]) * glm::scale(identity, scales[i]);
+            for(ID id : toUpdate) {
+                ID const index = this->getIndex(id);
+                if(index >= s) {
+                    return fatal(std::format("Out of bounds: Object ID {} (index {}) is invalid for object array of size {}", id, index, s));
+                }
+                models[index] = glm::translate(identity, positions[index]) * glm::scale(identity, scales[index]);
             }
+            return success();
         }
         ~Objects() noexcept {
-            delete[] meshIDs;
-            delete[] textureIDs;
-            delete[] positions;
-            delete[] scales;
+            clear();
         }
 
         ID append(ID meshID, ID textureID, glm::vec3 const& position, glm::vec3 const& scale) noexcept {
