@@ -101,5 +101,7 @@ namespace mars {
         Error<glm::vec3> getPosition(ID object) const noexcept;
         Error<noreturn> setScale(ID object, glm::vec3 const& pos) noexcept;
         Error<glm::vec3> getScale(ID object) const noexcept;
+        bool checkCollision(ID o1, ID o2) const noexcept;
+        Error<noreturn> setTexture(ID object, ID texture) noexcept;
     };
 };

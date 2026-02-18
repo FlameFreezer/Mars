@@ -138,4 +138,26 @@ namespace mars {
     Error<glm::vec3> Game::getScale(ID object) const noexcept {
         return objects.at(objects.scales, object);
     }
+
+    bool checkCollisionPart(glm::vec3 const& s1, glm::vec3 const& p1, glm::vec3 const& s2, glm::vec3 const& p2) {
+        bool leftInside = p1.x <= p2.x and p2.x <= p1.x + s1.x;
+        bool topInside = p1.y <= p2.y and p2.y <= p1.y + s1.y;
+        bool rightInside = p1.x <= p2.x + s2.x and p2.x + s2.x <= p1.x + s1.x;
+        bool bottomInside = p1.y <= p2.y + s2.y and p2.y + s2.y <= p1.y + s1.y;
+        return (leftInside or rightInside) and (topInside or bottomInside);
+    }
+
+    bool Game::checkCollision(ID o1, ID o2) const noexcept {
+        glm::vec3 const& s1 = objects.at(objects.scales, o1);
+        glm::vec3 const& p1 = objects.at(objects.positions, o1);
+        glm::vec3 const& p2 = objects.at(objects.positions, o2);
+        glm::vec3 const& s2 = objects.at(objects.scales, o2);
+        //Check with either object as the first one
+        return checkCollisionPart(s1, p1, s2, p2) or checkCollisionPart(s2, p2, s1, p1);
+    }
+
+    Error<noreturn> Game::setTexture(ID object, ID texture) noexcept {
+        objects.at(objects.textureIDs, object) = texture;
+        return success();
+    }
 }
