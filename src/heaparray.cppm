@@ -26,7 +26,7 @@ namespace mars {
         std::size_t size() const noexcept {
             return mSize;
         }
-        T& operator[](std::size_t index) const noexcept {
+        const T& operator[](std::size_t index) const noexcept {
             return mPtr[index];
         }
         T& operator[](std::size_t index) noexcept {
@@ -53,7 +53,7 @@ namespace mars {
         T* data() noexcept {
             return mPtr;
         }
-        T const* data() const noexcept {
+        const T* data() const noexcept {
             return mPtr;
         }
         void clear() noexcept {
@@ -65,7 +65,7 @@ namespace mars {
             mPtr = new T[size];
             mSize = size;
         }
-        void init(std::size_t size, T const& value) noexcept {
+        void init(std::size_t size, const T& value) noexcept {
             resize(size);
             for(std::size_t i = 0; i < size; i++) mPtr[i] = value;
         }
@@ -83,10 +83,10 @@ namespace mars {
                 mPtr++;
                 return *this;
             }
-            bool operator==(Iterator const& rhs) const noexcept {
+            bool operator==(const Iterator& rhs) const noexcept {
                 return mPtr == rhs.mPtr;
             }
-            bool operator!=(Iterator const& rhs) const noexcept {
+            bool operator!=(const Iterator& rhs) const noexcept {
                 return mPtr != rhs.mPtr;
             }
             T& operator*() noexcept {
@@ -113,16 +113,16 @@ namespace mars {
         public:
         Slice() noexcept : mPtr(nullptr), mSize(0) {}
         Slice(T* ptr, std::size_t size) noexcept : mPtr(ptr), mSize(size) {}
-        Slice(HeapArray<T> const& array) noexcept : mPtr(array.data()), mSize(array.size()) {}
+        Slice(const HeapArray<T>& array) noexcept : mPtr(array.data()), mSize(array.size()) {}
         template<std::size_t size>
-        Slice(std::array<T, size> const& array) noexcept : mPtr(array.data()), mSize(size) {}
-        static Error<Slice<T>> make(HeapArray<T> const& array, std::size_t start) noexcept {
+        Slice(const std::array<T, size>& array) noexcept : mPtr(array.data()), mSize(size) {}
+        static Error<Slice<T>> make(HeapArray<T>& array, std::size_t start) noexcept {
             if(start >= array.size()) {
                 return {ErrorTag::FATAL_ERROR, std::format("Index out of bounds: {} is greater than or equal to array size {}", start, array.size())};
             }
             return Slice{&array[start], array.size() - start};
         }
-        static Error<Slice<T>> make(HeapArray<T> const& array, std::size_t start, std::size_t count) noexcept {
+        static Error<Slice<T>> make(HeapArray<T>& array, std::size_t start, std::size_t count) noexcept {
             if(start + count > array.size()) {
                 return {ErrorTag::FATAL_ERROR, std::format("Array out of bounds: {} + {} = {}, which is greater than or equal to array size {}", start, count, start + count, array.size())};
             }
@@ -131,7 +131,7 @@ namespace mars {
         T* data() noexcept {
             return mPtr;
         }
-        T const* data() const noexcept {
+        const T* data() const noexcept {
             return mPtr;
         }
         std::size_t size() const noexcept {
@@ -157,10 +157,10 @@ namespace mars {
                 mPtr++;
                 return *this;
             }
-            bool operator==(Iterator const& rhs) const noexcept {
+            bool operator==(const Iterator& rhs) const noexcept {
                 return mPtr == rhs.mPtr;
             }
-            bool operator!=(Iterator const& rhs) const noexcept {
+            bool operator!=(const Iterator& rhs) const noexcept {
                 return mPtr != rhs.mPtr;
             }
             T& operator*() noexcept {
@@ -180,41 +180,41 @@ namespace mars {
     export template <class T>
     class ConstSlice {
         private:
-        T const* mPtr;
+        const T* mPtr;
         std::size_t mSize;
         public:
-        ConstSlice(T const* ptr, std::size_t size) noexcept : mPtr(ptr), mSize(size) {}
-        ConstSlice(HeapArray<T> const& array) noexcept : mPtr(array.data()), mSize(array.size()) {}
+        ConstSlice(const T* ptr, std::size_t size) noexcept : mPtr(ptr), mSize(size) {}
+        ConstSlice(const HeapArray<T>& array) noexcept : mPtr(array.data()), mSize(array.size()) {}
         template<std::size_t size>
-        ConstSlice(std::array<T, size> const& array) noexcept : mPtr(array.data()), mSize(size) {}
-        static Error<ConstSlice<T>> make(HeapArray<T> const& array, std::size_t start) noexcept {
+        ConstSlice(const std::array<T, size>& array) noexcept : mPtr(array.data()), mSize(size) {}
+        static Error<ConstSlice<T>> make(const HeapArray<T>& array, std::size_t start) noexcept {
             if(start >= array.size()) {
                 return {ErrorTag::FATAL_ERROR, std::format("Index out of bounds: {} is greater than or equal to array size {}", start, array.size())};
             }
             return ConstSlice{&array[start], array.size() - start};
         }
-        static Error<ConstSlice<T>> make(HeapArray<T> const& array, std::size_t start, std::size_t count) noexcept {
+        static Error<ConstSlice<T>> make(const HeapArray<T>& array, std::size_t start, std::size_t count) noexcept {
             if(start + count > array.size()) {
                 return {ErrorTag::FATAL_ERROR, std::format("Array out of bounds: {} + {} = {}, which is greater than or equal to array size {}", start, count, start + count, array.size())};
             }
             return ConstSlice{&array[start], count};
         }
-        T const* data() const noexcept {
+        const T* data() const noexcept {
             return mPtr;
         }
         std::size_t size() const noexcept {
             return mSize;
         }
-        T const& operator[](std::size_t index) const noexcept {
+        const T& operator[](std::size_t index) const noexcept {
             return mPtr[index];
         }
 
         class Iterator {
             private:
-            T const* mPtr;
+            const T* mPtr;
             public:
             Iterator() = delete;
-            Iterator(T const* inPtr) noexcept : mPtr(inPtr) {}
+            Iterator(const T* inPtr) noexcept : mPtr(inPtr) {}
             Iterator operator++(int) noexcept {
                 return Iterator(mPtr++);
             }
@@ -222,16 +222,16 @@ namespace mars {
                 mPtr++;
                 return *this;
             }
-            bool operator==(Iterator const& rhs) const noexcept {
+            bool operator==(const Iterator& rhs) const noexcept {
                 return mPtr == rhs.mPtr;
             }
-            bool operator!=(Iterator const& rhs) const noexcept {
+            bool operator!=(const Iterator& rhs) const noexcept {
                 return mPtr != rhs.mPtr;
             }
-            T const& operator*() const noexcept {
+            const T& operator*() const noexcept {
                 return *mPtr;
             }
-            T const* operator->() const noexcept {
+            const T* operator->() const noexcept {
                 return mPtr;
             }
         };

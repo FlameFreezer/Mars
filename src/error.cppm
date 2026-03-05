@@ -57,11 +57,11 @@ namespace mars {
         }
         public:
         Error() noexcept : mTag(ErrorTag::ALL_OKAY), mData() {}
-        Error(T const& inData) noexcept : mTag(ErrorTag::ALL_OKAY), mData(inData) {}
+        Error(const T& inData) noexcept : mTag(ErrorTag::ALL_OKAY), mData(inData) {}
         Error(T&& inData) noexcept : mTag(ErrorTag::ALL_OKAY), mData(std::move(inData)) {}
-        Error(ErrorTag inTag, std::string const& inMessage) noexcept : mTag(inTag), mMessage(inMessage) {}
+        Error(ErrorTag inTag, const std::string& inMessage) noexcept : mTag(inTag), mMessage(inMessage) {}
         Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage(std::move(inMessage)) {}
-        Error(Error<T> const& other) noexcept {
+        Error(const Error<T>& other) noexcept {
             //Zero memory, so that any pointers stored within data members are null before any attempted initialization
             std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
             mTag = other.mTag;
@@ -120,7 +120,7 @@ namespace mars {
         ErrorTag tag() const noexcept {
             return mTag;
         }
-        T const& data() const {
+        const T& data() const {
             if(!okay()) [[unlikely]] throw std::runtime_error("Called \"data\" on an error union which does not have a value");
             return mData;
         }
@@ -128,8 +128,8 @@ namespace mars {
             if(!okay()) [[unlikely]] throw std::runtime_error("Called \"data\" on an error union which does not have a value");
             return mData;
         }
-        operator T const&() const {
-            if(!okay()) [[unlikely]] throw std::runtime_error("Called \"operator T const&\" on an error union which does not have a value");
+        operator const T&() const {
+            if(!okay()) [[unlikely]] throw std::runtime_error("Called \"operator T& const\" on an error union which does not have a value");
             return mData;
         }
         //Creates an rvalue reference to `data`. `data` is invalid after calling this, 
@@ -138,7 +138,7 @@ namespace mars {
             if(!okay()) [[unlikely]] throw std::runtime_error("Called \"moveData\" on an error union which does not have a value");
             return std::move(mData);
         }
-        std::string const& message() const {
+        const std::string& message() const {
             if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\"  on an error union which does not have a message");
             return mMessage;
         }
@@ -167,7 +167,9 @@ namespace mars {
     };
 
     template<>
-    noreturn const& Error<noreturn>::data() const = delete;
+    const noreturn& Error<noreturn>::data() const = delete;
+    template<>
+    noreturn& Error<noreturn>::data() = delete;
 
     //Returns an `Error<noreturn>` with `key == ALL_OKAY`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
     export Error<noreturn> success() noexcept {
@@ -179,7 +181,7 @@ namespace mars {
         return Error<T>(ErrorTag::FATAL_ERROR, std::move(message));
     }
     export template<typename T = noreturn>
-    Error<T> fatal(std::string const& message) noexcept {
+    Error<T> fatal(const std::string& message) noexcept {
         return Error<T>(ErrorTag::FATAL_ERROR, message);
     }
 }

@@ -17,7 +17,7 @@ namespace vkhelper {
         deviceMemProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
         vkGetPhysicalDeviceMemoryProperties2(physicalDevice, &deviceMemProperties);
         for(std::uint32_t i = 0; i < deviceMemProperties.memoryProperties.memoryTypeCount; i++) {
-            std::uint32_t const currentTypeBit = 1U << i;
+            const std::uint32_t currentTypeBit = 1U << i;
             if(availableTypes & currentTypeBit and deviceMemProperties.memoryProperties.memoryTypes[i].propertyFlags & memProperties) {
                 return i;
             }
@@ -30,7 +30,7 @@ namespace vkhelper {
         Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
         if(!memType) return memType.moveError<VkDeviceMemory>();
 
-        VkMemoryAllocateInfo const allocInfo = {
+        const VkMemoryAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .pNext = nullptr,
             .allocationSize = memRequirements.size,
@@ -51,7 +51,7 @@ namespace vkhelper {
         Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
         if(!memType) return memType.moveError<VkDeviceMemory>();
 
-        VkMemoryAllocateInfo const allocInfo = {
+        const VkMemoryAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .pNext = nullptr,
             .allocationSize = memRequirements.size,

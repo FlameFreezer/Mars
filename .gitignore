@@ -1,4 +1,3 @@
-zig-out/
 build/
 compile_commands.json
 *.spv

@@ -29,7 +29,7 @@ namespace mars {
                 VkImageAspectFlags aspect
             ) noexcept {
             GPUImage result{};
-            VkImageCreateInfo const imageInfo = {
+            const VkImageCreateInfo imageInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
@@ -54,7 +54,7 @@ namespace mars {
             if(!mem) return mem.moveError<GPUImage>();
             result.memory = mem;
 
-            VkImageViewCreateInfo const viewInfo = {
+            const VkImageViewCreateInfo viewInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,

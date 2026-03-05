@@ -16,8 +16,8 @@ namespace mars {
     export class VertexBuffers : public ArrayMultimap {
         void realloc() noexcept {
             this->ArrayMultimap::realloc();
-            std::size_t const cap = this->capacity();
-            std::size_t const s = this->size();
+            const std::size_t cap = this->capacity();
+            const std::size_t s = this->size();
 
             VkBuffer* newHandles = new VkBuffer[cap];
             VkDeviceMemory* newMemories = new VkDeviceMemory[cap];
@@ -70,9 +70,9 @@ namespace mars {
         }
         //Removes the object from the map with id. Does not perform any memory cleanup or destruction
         void remove(ID id) noexcept {
-            std::size_t const index = this->getIndex(id);
+            const std::size_t index = this->getIndex(id);
             //Swap element at end of array to index
-            std::size_t const back = this->size() - 1;
+            const std::size_t back = this->size() - 1;
             handles[index] = handles[back];
             memories[index] = memories[back];
             sizes[index] = sizes[back];
@@ -85,8 +85,8 @@ namespace mars {
         void realloc() noexcept {
             //Reallocate backing multimap
             this->ArrayMultimap::realloc();
-            std::size_t const cap = this->capacity();
-            std::size_t const s = this->size();
+            const std::size_t cap = this->capacity();
+            const std::size_t s = this->size();
             //Allocate arrays
             VkImage* newHandles = new VkImage[cap];
             VkDeviceMemory* newMemories = new VkDeviceMemory[cap];

@@ -29,8 +29,8 @@ namespace mars {
 
         void realloc() noexcept {
             this->ArrayMultimap::realloc();
-            std::size_t const cap = this->capacity();
-            std::size_t const s = this->size();
+            const std::size_t cap = this->capacity();
+            const std::size_t s = this->size();
 
             ID* newMeshes = new ID[cap];
             ID* newTextures = new ID[cap];
@@ -62,10 +62,10 @@ namespace mars {
             models = new glm::mat4[this->capacity()];
         }
 
-        Error<noreturn> updateModelMatrices(std::vector<ID> const& toUpdate) const noexcept {
-            std::size_t const s = this->size();
+        Error<noreturn> updateModelMatrices(const std::vector<ID>& toUpdate) const noexcept {
+            const std::size_t s = this->size();
             for(ID id : toUpdate) {
-                ID const index = this->getIndex(id);
+                const ID index = this->getIndex(id);
                 if(index >= s) {
                     return fatal(std::format("Out of bounds: Object ID {} (index {}) is invalid for object array of size {}", id, index, s));
                 }
@@ -77,11 +77,11 @@ namespace mars {
             clear();
         }
 
-        ID append(ID meshID, ID textureID, glm::vec3 const& position, glm::vec3 const& scale) noexcept {
+        ID append(ID meshID, ID textureID, const glm::vec3& position, const glm::vec3& scale) noexcept {
             if(this->size() == this->capacity()) {
                 realloc();
             }
-            std::size_t const s = this->size();
+            const std::size_t s = this->size();
             meshIDs[s] = meshID;
             textureIDs[s] = textureID;
             positions[s] = position;

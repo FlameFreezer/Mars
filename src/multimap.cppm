@@ -57,7 +57,7 @@ namespace mars {
             return map[mIndices[id]];
         }
         template<typename T>
-        T& at(T* map, ID id) const noexcept {
+        const T& at(T* map, ID id) const noexcept {
             return map[mIndices[id]];
         }
     };

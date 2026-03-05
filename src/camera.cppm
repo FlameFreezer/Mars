@@ -21,14 +21,14 @@ namespace mars {
         float fov;
         float aspect;
         Camera() noexcept : aspect(autoAspect), fov(0.0f) {}
-        Camera(glm::vec3 const& inPos, glm::vec3 const& inDir, glm::vec3 inUp, float inFov, float inAspect) noexcept 
+        Camera(const glm::vec3& inPos, const glm::vec3& inDir, glm::vec3 inUp, float inFov, float inAspect) noexcept 
             : pos(inPos), dir(glm::normalize(inDir)), up(glm::normalize(inUp)), fov(inFov), aspect(inAspect) {
                 if(dir.y < -MAX_Y) dir.y = -MAX_Y;
                 else if(dir.y > MAX_Y) dir.y = MAX_Y;
             }
         glm::mat4 loadMatrices() const noexcept {
             //dir + pos = target (position the camera is looking at)
-            glm::mat4 const view = glm::lookAt(pos, dir + pos, up);
+            const glm::mat4 view = glm::lookAt(pos, dir + pos, up);
             glm::mat4 proj = glm::perspective(fov, aspect, NEAR_PLANE, FAR_PLANE);
             proj[1][1] *= -1.0f;
             return proj * view;
@@ -39,8 +39,8 @@ namespace mars {
             if(d.y >= MAX_Y and deltaY > 0.0f) deltaY = 0.0f;
             else if(d.y <= -MAX_Y and deltaY < 0.0f) deltaY = 0.0f;
 
-            float const deltaYaw = deltaX * SENSITIVITY;
-            float const deltaPitch = deltaY * SENSITIVITY;
+            const float deltaYaw = deltaX * SENSITIVITY;
+            const float deltaPitch = deltaY * SENSITIVITY;
 
             //This gives the angle of dir with the xz-plane
             float pitch = glm::asin(d.y);
@@ -51,7 +51,7 @@ namespace mars {
             //Since -pi <= acos <= pi, we have to use d.x to increase the range of yaw
             constexpr float pi = glm::pi<float>();
             //sign(0) = 1
-            float const sign = d.x == 0.0f ? 1.0f : glm::sign(d.x);
+            const float sign = d.x == 0.0f ? 1.0f : glm::sign(d.x);
             yaw = pi - (pi - yaw) * sign;
 
             pitch += deltaPitch;

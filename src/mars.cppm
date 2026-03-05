@@ -10,6 +10,7 @@ module;
 #include <glm/glm.hpp>
 
 export module mars;
+export import types;
 export import :camera;
 import :renderer;
 export import flag_bits;
@@ -17,11 +18,12 @@ export import error;
 export import heap_array;
 export import object;
 export import multimap;
+export import ecs;
 
 namespace mars {
     export struct Rect2D {
-        std::uint64_t w;
-        std::uint64_t h;
+        u64 w;
+        u64 h;
     };
 
     export class Game {
@@ -32,13 +34,14 @@ namespace mars {
         std::chrono::nanoseconds deltaTime;
         GameFlags flags;
         std::vector<ID> objectsToUpdate; 
+        EntityManager entityManager;
         public:
         struct {
-            ID const square = 0;
+            const ID square = 0;
         } shapes;
         Objects objects;
         Camera camera;
-        bool const* keyState;
+        const bool* keyState;
         SDL_Gamepad* gamepad;
         //Constructors - don't do any actual initialization. Call `init` to initialize the game and necessary libraries
         Game() noexcept;
@@ -75,31 +78,31 @@ namespace mars {
         // Returns: void    Nothing
         void updateKeyState() noexcept;
         // Resizes the window to the dimensions provided by the arguments. CURRENTLY UNTESTED
-        // std::unit32_t width  The new width of the window
-        // std::uint32_t height The new height of the window
+        // u32 width  The new width of the window
+        // u32 height The new height of the window
         // Returns: void    Nothing
-        void resizeWindow(std::uint32_t width, std::uint32_t height) noexcept;
+        void resizeWindow(u32 width, u32 height) noexcept;
         // Loads the mesh located at `path`.
         // std::string const& path  The file path of the model to load.
         // Returns: Error<ID>   The ID of the mesh, or an error indicating that loading failed.
-        Error<ID> loadMesh(std::string const& path) noexcept;
+        Error<ID> loadMesh(const std::string& path) noexcept;
         // Loads the texture located at `path`.
-        // std::string const& path  The file path of the texture to load.
+        // const std::string& path  The file path of the texture to load.
         // Returns: Error<ID>   The ID of the texture, or an error indicating that loading failed.
-        Error<ID> loadTexture(std::string const& path) noexcept;
+        Error<ID> loadTexture(const std::string& path) noexcept;
         // Creates an object with the provided mesh, texture, position, and size.
         // ID mesh  The ID of the mesh to use.
         // ID texture   The ID of the texture to use.
-        // glm::vec3 const& pos The position of the object.
-        // glm::vec3 const& scale   The size of the object.
-        Error<ID> createObject(ID mesh, ID texture, glm::vec3 const& pos, glm::vec3 const& scale) noexcept;
+        // const glm::vec3& pos The position of the object.
+        // const glm::vec3& scale   The size of the object.
+        Error<ID> createObject(ID mesh, ID texture, const glm::vec3& pos, const glm::vec3& scale) noexcept;
         // Returns the dimensions of the window.
         // Returns: Rect2D  The dimensions of the window.
         Rect2D getWindowDimensions() const noexcept;
-        Error<noreturn> setPosition(ID object, glm::vec3 const& pos) noexcept;
-        Error<noreturn> addPosition(ID object, glm::vec3 const& pos) noexcept;
+        Error<noreturn> setPosition(ID object, const glm::vec3& pos) noexcept;
+        Error<noreturn> addPosition(ID object, const glm::vec3& pos) noexcept;
         Error<glm::vec3> getPosition(ID object) const noexcept;
-        Error<noreturn> setScale(ID object, glm::vec3 const& pos) noexcept;
+        Error<noreturn> setScale(ID object, const glm::vec3& pos) noexcept;
         Error<glm::vec3> getScale(ID object) const noexcept;
         bool checkCollision(ID o1, ID o2) const noexcept;
         Error<noreturn> setTexture(ID object, ID texture) noexcept;

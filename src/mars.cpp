@@ -66,7 +66,7 @@ namespace mars {
         return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(deltaTime).count();
     }
     void Game::updateTime() noexcept {
-        auto const now = std::chrono::steady_clock::now();
+        const auto now = std::chrono::steady_clock::now();
         deltaTime = now - time;
         time = now;
     }
@@ -92,13 +92,13 @@ namespace mars {
         return success();
     }
 
-    Error<ID> Game::loadMesh(std::string const& path) noexcept {
+    Error<ID> Game::loadMesh(const std::string& path) noexcept {
         return 0;
     }
-    Error<ID> Game::loadTexture(std::string const& path) noexcept {
+    Error<ID> Game::loadTexture(const std::string& path) noexcept {
         return renderer->createTexture(path);
     }
-    Error<ID> Game::createObject(ID meshID, ID textureID, glm::vec3 const& pos, glm::vec3 const& scale) noexcept {
+    Error<ID> Game::createObject(ID meshID, ID textureID, const glm::vec3& pos, const glm::vec3& scale) noexcept {
         ID id = objects.append(meshID, textureID, pos, scale);
         objectsToUpdate.push_back(id);
         return id;
@@ -106,21 +106,21 @@ namespace mars {
     Rect2D Game::getWindowDimensions() const noexcept {
         int w, h;
         SDL_GetWindowSize(renderer->window, &w, &h);
-        return {static_cast<std::uint64_t>(w), static_cast<std::uint64_t>(h)};
+        return {static_cast<u64>(w), static_cast<u64>(h)};
     }
-    void Game::resizeWindow(std::uint32_t width, std::uint32_t height) noexcept {
+    void Game::resizeWindow(u32 width, u32 height) noexcept {
         int w = static_cast<int>(width), h = static_cast<int>(height);
         SDL_SetWindowSize(renderer->window, w, h);
         renderer->flags |= flagBits::recreateSwapchain;
     }
 
-    Error<noreturn> Game::setPosition(ID object, glm::vec3 const& pos) noexcept {
+    Error<noreturn> Game::setPosition(ID object, const glm::vec3& pos) noexcept {
         objects.at(objects.positions, object) = pos;
         objectsToUpdate.push_back(object);
         return success();
     }
 
-    Error<noreturn> Game::addPosition(ID object, glm::vec3 const& pos) noexcept {
+    Error<noreturn> Game::addPosition(ID object, const glm::vec3& pos) noexcept {
         objects.at(objects.positions, object) += pos;
         objectsToUpdate.push_back(object);
         return success();
@@ -130,7 +130,7 @@ namespace mars {
         return objects.at(objects.positions, object);
     }
 
-    Error<noreturn> Game::setScale(ID object, glm::vec3 const& pos) noexcept {
+    Error<noreturn> Game::setScale(ID object, const glm::vec3& pos) noexcept {
         objects.at(objects.scales, object) = pos;
         objectsToUpdate.push_back(object);
         return success();
@@ -140,10 +140,10 @@ namespace mars {
     }
 
     bool Game::checkCollision(ID o1, ID o2) const noexcept {
-        glm::vec3 const& s1 = objects.at(objects.scales, o1);
-        glm::vec3 const& p1 = objects.at(objects.positions, o1);
-        glm::vec3 const& p2 = objects.at(objects.positions, o2);
-        glm::vec3 const& s2 = objects.at(objects.scales, o2);
+        const glm::vec3& s1 = objects.at(objects.scales, o1);
+        const glm::vec3& p1 = objects.at(objects.positions, o1);
+        const glm::vec3& p2 = objects.at(objects.positions, o2);
+        const glm::vec3& s2 = objects.at(objects.scales, o2);
         bool xWithin = std::max(p1.x, p2.x) <= std::min(p1.x + s1.x, p2.x + s2.x);
         bool yWithin = std::max(p1.y, p2.y) <= std::min(p1.y + s1.y, p2.y + s2.y);
         return xWithin and yWithin;
