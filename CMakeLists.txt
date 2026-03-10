@@ -18,22 +18,37 @@ add_subdirectory(libraries/glm EXCLUDE_FROM_ALL)
 
 # Shader Compilation
 set(MARS_SHADER_PATH "${PROJECT_SOURCE_DIR}/shaders")
-add_custom_command(OUTPUT slang.spv
-    COMMAND slangc "${MARS_SHADER_PATH}/shader.slang" 
+add_custom_command(OUTPUT shader2d.spv
+    COMMAND slangc "${MARS_SHADER_PATH}/shader2d.slang" 
         -target spirv 
         -profile spirv_1_4 
         -emit-spirv-directly 
         -fvk-use-entrypoint-name 
         -entry vertMain 
         -entry fragMain 
-        -o shader.spv
-    DEPENDS "${MARS_SHADER_PATH}/shader.slang"
+        -o shader2d.spv
+    DEPENDS "${MARS_SHADER_PATH}/shader2d.slang"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
-    COMMENT "Compiling shaders"
+    COMMENT "Compiling 2D shaders"
     CODEGEN
     VERBATIM
 )
-add_custom_target(marsShaders DEPENDS slang.spv)
+add_custom_command(OUTPUT shader3d.spv
+    COMMAND slangc "${MARS_SHADER_PATH}/shader3d.slang" 
+        -target spirv 
+        -profile spirv_1_4 
+        -emit-spirv-directly 
+        -fvk-use-entrypoint-name 
+        -entry vertMain 
+        -entry fragMain 
+        -o shader3d.spv
+    DEPENDS "${MARS_SHADER_PATH}/shader3d.slang"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
+    COMMENT "Compiling 3D shaders"
+    CODEGEN
+    VERBATIM
+)
+add_custom_target(marsShaders DEPENDS shader2d.spv shader3d.spv)
 
 # Set compiler flags for Mars library (these cause issues when building SDL3 
 #   so I have to set them after it it built)

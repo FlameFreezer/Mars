@@ -23,10 +23,7 @@ module;
 
 #include "mars_macros.h"
 
-#define MAX_CONCURRENT_FRAMES 2U
-
 export module mars:renderer;
-import maps;
 import gpubuffer;
 import gpuimage;
 import error;
@@ -34,15 +31,19 @@ import heap_array;
 import flag_bits;
 import vkhelper;
 import types;
+import ecs;
 
 namespace mars {
-    constexpr std::array<const char*, 2> neededDeviceExtensions = {
+    constexpr std::array<const char*, 3> neededDeviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
+        VK_EXT_SHADER_OBJECT_EXTENSION_NAME
     };
     constexpr std::array<const char*, 1> validationLayers = {
         "VK_LAYER_KHRONOS_validation"
     };
+    
+    constexpr u32 maxConcurrentFrames = 2;
 
     #ifdef NDEBUG
     constexpr bool enableValidationLayers = false;
@@ -66,17 +67,16 @@ namespace mars {
 
     struct Vertex {
         alignas(4) glm::vec3 pos;
-        alignas(4) glm::vec3 color;
         alignas(4) glm::vec2 texCoord;
 
-        constexpr Vertex(glm::vec3 inPos, glm::vec2 inTexCoord) noexcept : pos(inPos), color(glm::vec3{0.0f}), texCoord(inTexCoord) {}
+        constexpr Vertex(glm::vec3 inPos, glm::vec2 inTexCoord) noexcept : pos(inPos), texCoord(inTexCoord) {}
 
         static constexpr VkVertexInputBindingDescription getInputBindingDescription() noexcept {
             return { 0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
         }
 
-        static constexpr std::array<VkVertexInputAttributeDescription, 3> getInputAttributeDescriptions() noexcept {
-            std::array<VkVertexInputAttributeDescription, 3> descs;
+        static constexpr std::array<VkVertexInputAttributeDescription, 2> getInputAttributeDescriptions() noexcept {
+            std::array<VkVertexInputAttributeDescription, 2> descs;
             // POS
             descs[0] = {
                 .location = 0,
@@ -84,16 +84,9 @@ namespace mars {
                 .format = VK_FORMAT_R32G32B32_SFLOAT,
                 .offset = offsetof(Vertex, pos)
             };
-            // COLOR
+            // TEXCOORD
             descs[1] = {
                 .location = 1,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = offsetof(Vertex, color)
-            };
-            // TEXCOORD
-            descs[2] = {
-                .location = 2,
                 .binding = 0,
                 .format = VK_FORMAT_R32G32_SFLOAT,
                 .offset = offsetof(Vertex, texCoord)
@@ -173,8 +166,7 @@ namespace mars {
 
     export class Renderer {
         friend class Game;
-        VertexBuffers vertexBuffers;
-        Textures textures;
+        RendererEntityManager entityManager;
         Cube cube;
         UniformBuffer<glm::mat4> cameraMatrices;
     	HeapArray<VkImage> swapchainImages;
@@ -189,9 +181,10 @@ namespace mars {
         GPUImage depthImage2D;
         GPUImage depthImage3D;
         //Each frame needs a command buffer for the 2D and 3D scenes, and one reserved for transfer
-    	std::array<VkCommandBuffer, (2 * MAX_CONCURRENT_FRAMES) + 1> commandBuffers;
-        std::array<VkFence, MAX_CONCURRENT_FRAMES> fences;
-        VkDescriptorSetLayout descriptorSetLayout;
+    	std::array<VkCommandBuffer, (2 * maxConcurrentFrames) + 1> commandBuffers;
+        std::array<VkFence, maxConcurrentFrames> fences;
+        std::array<VkPipeline, 2> graphicsPipelines;
+        VkDescriptorSetLayout pushSetLayout;
         VkInstance instance;
         SDL_Window* window;
         VkDebugUtilsMessengerEXT debugMessenger;
@@ -201,8 +194,8 @@ namespace mars {
         VkSwapchainKHR swapchain;
         VkExtent2D swapchainImageExtent;
     	VkCommandPool commandPool;
-    	VkPipeline graphicsPipeline;
-        VkPipelineLayout graphicsPipelineLayout;
+        VkPipelineLayout pipelineLayout2D;
+        VkPipelineLayout pipelineLayout3D;
         VkSampler sampler;
         u32 currentFrame;
         u32 graphicsQueueFamilyIndex;
@@ -237,7 +230,7 @@ namespace mars {
         Error<noreturn> createCamera() noexcept {
             auto res = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
                 //Each frame gets its own 3D camera, while one 2D camera exists
-                sizeof(glm::mat4) * (MAX_CONCURRENT_FRAMES + 1)); 
+                sizeof(glm::mat4) * (maxConcurrentFrames + 1)); 
             if(!res) {
                 return res.moveError();
             }
@@ -247,8 +240,7 @@ namespace mars {
             return success();
         }
 
-        //Due to the circular dependency of the Mesh and Renderer classes, this has to be a renderer method
-        Error<std::size_t> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept {
+        Error<ID> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept {
             const VkDeviceSize verticesSize = vertices.size() * sizeof(Vertex);
             const VkDeviceSize indicesSize = indices.size() * sizeof(u32);
             const VkDeviceSize size = verticesSize + indicesSize;
@@ -330,10 +322,10 @@ namespace mars {
             flags &= ~flagBits::beganTransferOps;
             transferBuffer.destroy(device);
 
-            return vertexBuffers.append(vertexBuffer.handle, vertexBuffer.memory, {verticesSize, indicesSize});
+            return entityManager.insertMesh(vertexBuffer.handle, vertexBuffer.memory, verticesSize, indicesSize / sizeof(u32));
         }
 
-        Error<std::size_t> createTexture(std::string const& texturePath) noexcept {
+        Error<ID> makeTexture(std::string const& texturePath) noexcept {
             int texWidth, texHeight, texChannels;
             stbi_uc* pixels = nullptr;
             pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
@@ -526,14 +518,17 @@ namespace mars {
             }
 
             transferBuffer.destroy(device);
-            return textures.append(textureImage.handle, textureImage.memory, textureImage.view);
+            Texture t;
+            t.handle = textureImage.handle;
+            t.memory = textureImage.memory;
+            t.view = textureImage.view;
+            return entityManager.insertTexture(t);
         }
 
-        struct Objects {
-            glm::mat4 const* modelMatrices;
-            std::size_t const* meshIDs;
-            std::size_t const* textureIDs;
-            std::size_t size;
+        struct Systems {
+            const ComponentSystem<Transform>* transform;
+            const ComponentSystem<ID>* mesh;
+            const ComponentSystem<ID>* texture;
         };
 
         struct SurfaceInfo {
@@ -664,7 +659,7 @@ namespace mars {
             //The 2D render area is the face of the cube, so it has to be square
             const u32 d = cube.dim;
             //create 2D render targets
-            renderTargets2D.resize(MAX_CONCURRENT_FRAMES);
+            renderTargets2D.resize(maxConcurrentFrames);
             for(GPUImage& target : renderTargets2D) {
                 Error<GPUImage> t = GPUImage::make(
                     device, physicalDevice,
@@ -681,7 +676,7 @@ namespace mars {
                 else target = t;
             }
             //create 2D textures - for mapping to the cube
-            textures2DScene.resize(MAX_CONCURRENT_FRAMES);
+            textures2DScene.resize(maxConcurrentFrames);
             for(GPUImage& tex : textures2DScene) {
                 Error<GPUImage> t = GPUImage::make(
                     device, physicalDevice,
@@ -698,7 +693,7 @@ namespace mars {
                 else tex = t;
             }
             //create 3D render targets
-            renderTargets3D.resize(MAX_CONCURRENT_FRAMES);
+            renderTargets3D.resize(maxConcurrentFrames);
             for(GPUImage& target : renderTargets3D) {
                 Error<GPUImage> t = GPUImage::make(
                     device, physicalDevice,
@@ -744,7 +739,8 @@ namespace mars {
         }
 
         Error<noreturn> createDescriptorSetLayouts() noexcept {
-            std::array<VkDescriptorSetLayoutBinding, 2> constexpr pushBindings = {
+            std::array<VkDescriptorSetLayoutBinding, 2> pushBindings = {
+                //Camera matrix
                 VkDescriptorSetLayoutBinding{
                     .binding = 0,
                     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -752,6 +748,7 @@ namespace mars {
                     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                     .pImmutableSamplers = nullptr
                 },
+                //Texture image sampler
                 VkDescriptorSetLayoutBinding{
                     .binding = 1,
                     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -767,7 +764,7 @@ namespace mars {
                 .bindingCount = pushBindings.max_size(),
                 .pBindings = pushBindings.data()
             };
-            if(vkCreateDescriptorSetLayout(device, &pushLayout, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            if(vkCreateDescriptorSetLayout(device, &pushLayout, nullptr, &pushSetLayout) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create descriptor set layout"};
             }
             return success();
@@ -861,6 +858,7 @@ namespace mars {
         }
 
         void renderPass3D(u32 imageIndex, VkCommandBuffer commandBuffer) noexcept {
+            //Render to the 3D render target, resolve to the swapchain image
             const VkRenderingAttachmentInfo renderAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .pNext = nullptr,
@@ -873,6 +871,7 @@ namespace mars {
                 .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
                 .clearValue = {.color = {.float32 = {1.0f, 1.0f, 1.0f, 1.0f}}}
             };
+            //Carry the depth image
             const VkRenderingAttachmentInfo depthAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .pNext = nullptr,
@@ -901,8 +900,10 @@ namespace mars {
                 .pStencilAttachment = nullptr
             };
             vkCmdBeginRendering(commandBuffer, &renderingInfo);
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+            //Bind the 3D graphics pipeline
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[1]);
 
+            //Viewport and scissor are the size of the swapchain image
             const VkViewport viewport = {
                 .x = 0.0f, .y = 0.0f, 
                 .width = static_cast<float>(swapchainImageExtent.width), 
@@ -916,8 +917,10 @@ namespace mars {
             };
             vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
 
+            //Write the 3D camera to the push descriptor
             const VkDescriptorBufferInfo camera3DBufferInfo = {
                 .buffer = cameraMatrices.buffer.handle,
+                //Offset correctly for the current frame's camera
                 .offset = sizeof(glm::mat4) * (1 + currentFrame),
                 .range = sizeof(glm::mat4)
             };
@@ -936,7 +939,7 @@ namespace mars {
             vkCmdPushDescriptorSet(
                 commandBuffer, 
                 VK_PIPELINE_BIND_POINT_GRAPHICS, 
-                graphicsPipelineLayout, 
+                pipelineLayout3D, 
                 0, 
                 1, 
                 &writeCamera
@@ -962,21 +965,25 @@ namespace mars {
             vkCmdPushDescriptorSet(
                 commandBuffer, 
                 VK_PIPELINE_BIND_POINT_GRAPHICS, 
-                graphicsPipelineLayout, 
+                pipelineLayout3D, 
                 0, 
                 1, 
                 &writeMaterial
             );
+            //Bind the cube's mesh
             const VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, &cube.buffer.handle, &offset);
-            vkCmdPushConstants(commandBuffer, graphicsPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &cube.matrix);
-            static constexpr glm::vec3 zero(0.0f);
+            //Push the cube's model matrix
+            vkCmdPushConstants(commandBuffer, pipelineLayout3D, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &cube.matrix);
+            //Bind the cube's index buffer
             vkCmdBindIndexBuffer(commandBuffer, cube.buffer.handle, Cube::vertices.size() * sizeof(Vertex), VK_INDEX_TYPE_UINT32);
             vkCmdDrawIndexed(commandBuffer, Cube::indices.max_size(), 1, 0, 0, 0);
             vkCmdEndRendering(commandBuffer);
         }
 
-        void renderPass2D(u32 d, VkCommandBuffer commandBuffer, Objects const& objects) noexcept {
+        void renderPass2D(u32 d, VkCommandBuffer commandBuffer, Systems systems) noexcept {
+            //Render to the 2D render target, resolve to the 2D scene texture image
+            //The texture image will be used as the texture for the cube
             const VkRenderingAttachmentInfo renderAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .pNext = nullptr,
@@ -989,6 +996,7 @@ namespace mars {
                 .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
                 .clearValue = {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}
             };
+            //Carry the depth attachment
             const VkRenderingAttachmentInfo depthAttachment = {
                 .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                 .pNext = nullptr,
@@ -1017,8 +1025,10 @@ namespace mars {
                 .pStencilAttachment = nullptr
             };
             vkCmdBeginRendering(commandBuffer, &renderingInfo);
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+            //Bind the 2D graphics pipeline
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[0]);
 
+            //Viewport and scissor are the size of the cube
             const VkViewport viewport = {
                 .x = 0.0f, .y = 0.0f, 
                 .width = static_cast<float>(d), 
@@ -1032,6 +1042,7 @@ namespace mars {
             };
             vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
 
+            //Write the 2D camera to the push descriptor
             const VkDescriptorBufferInfo camera2DBufferInfo = {
                 .buffer = cameraMatrices.buffer.handle,
                 .offset = 0,
@@ -1052,21 +1063,32 @@ namespace mars {
             vkCmdPushDescriptorSet(
                 commandBuffer, 
                 VK_PIPELINE_BIND_POINT_GRAPHICS, 
-                graphicsPipelineLayout, 
+                pipelineLayout2D, 
                 0, 
                 1, 
                 &writeCamera
             );
 
-            HeapArray<VkDeviceSize> offsets(vertexBuffers.size(), 0);
-            if(vertexBuffers.size() != 0) {
-                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<u32>(vertexBuffers.size()), vertexBuffers.handles, offsets.data());
+            //Bind the vertex buffers for the meshes
+            HeapArray<VkDeviceSize> offsets;
+            if(entityManager.sysMesh.size() != 0) {
+                offsets.init(entityManager.sysMesh.size(), 0);
+                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<u32>(entityManager.sysMesh.size()), entityManager.sysMesh.handles(), offsets.data());
             }
 
-            for(std::size_t i = 0; i < objects.size; i++) {
+            //Iterate through every transform (the most frequently varying data)
+            for(u64 i = 0; i < systems.transform->size(); i++) {
+                //Get the ID of the entity associated with the current transform
+                const ID entityID = systems.transform->getIDs()[i];
+                //Get the ID of the mesh associated with the entity
+                const ID meshID = (*systems.texture)[entityID];
+                //Get the ID of the texture associated with the entity
+                const ID textureID = (*systems.texture)[entityID];
+
+                //Push the descriptor for the texture
                 const VkDescriptorImageInfo materialInfo = {
                     .sampler = sampler,
-                    .imageView = textures.at(textures.views, objects.textureIDs[i]),
+                    .imageView = entityManager.sysTexture[textureID].view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                 };
                 const VkWriteDescriptorSet writeMaterial = {
@@ -1084,18 +1106,25 @@ namespace mars {
                 vkCmdPushDescriptorSet(
                     commandBuffer, 
                     VK_PIPELINE_BIND_POINT_GRAPHICS, 
-                    graphicsPipelineLayout, 
+                    pipelineLayout2D, 
                     0, 
                     1, 
                     &writeMaterial
                 );
 
-                vkCmdPushConstants(commandBuffer, graphicsPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &objects.modelMatrices[i]);
+                //Create model matrix
+                glm::mat4 modelMatrix(1.0f);
+                modelMatrix[0][0] = systems.transform->data()[i].scale.x;
+                modelMatrix[1][1] = systems.transform->data()[i].scale.y;
+                modelMatrix[3] = glm::vec4(systems.transform->data()[i].position, 1.0f);
+                //Push the model matrix to the shader
+                vkCmdPushConstants(commandBuffer, pipelineLayout2D, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
 
-                const std::size_t meshIndex = vertexBuffers.getIndex(objects.meshIDs[i]);
-                vkCmdBindIndexBuffer(commandBuffer, vertexBuffers.handles[meshIndex], vertexBuffers.sizes[meshIndex].vertices, VK_INDEX_TYPE_UINT32);
-                const u32 numIndices = vertexBuffers.sizes[meshIndex].indices / sizeof(u32);
-                vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, meshIndex, 0);
+                //Get the index for the current mesh within the array of vertex buffers
+                const u64 meshIndex = entityManager.sysMesh.index(meshID);
+                //Bind the index buffer at the end of the current mesh
+                vkCmdBindIndexBuffer(commandBuffer, entityManager.sysMesh.handles()[meshIndex], entityManager.sysMesh.getIndexOffset(meshID), VK_INDEX_TYPE_UINT32);
+                vkCmdDrawIndexed(commandBuffer, entityManager.sysMesh.getNumIndices(meshID), 1, 0, meshIndex, 0);
             }
 
             vkCmdEndRendering(commandBuffer);
@@ -1104,7 +1133,7 @@ namespace mars {
         Error<noreturn> createSyncObjects() noexcept {
             //One semaphore for each swapchain image - to tell which is presentable
             //Two semaphores for each frame - for 2D and 3D render targets 
-            semaphores.resize(swapchainImages.size() + (2 * MAX_CONCURRENT_FRAMES));
+            semaphores.resize(swapchainImages.size() + (2 * maxConcurrentFrames));
             const VkSemaphoreCreateInfo semaphoreInfo = {
                 .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
                 .pNext = nullptr,
@@ -1128,8 +1157,8 @@ namespace mars {
             return success();
         }
 
-        Error<VkShaderModule> createShaderModule() noexcept {
-            std::ifstream shaderFile("shader.spv", std::ios::binary | std::ios::ate);
+        static Error<std::vector<char>> loadShaderFile(const std::string& filename) noexcept {
+            std::ifstream shaderFile(filename, std::ios::binary | std::ios::ate);
             if(!shaderFile.is_open()) {
                 return {ErrorTag::FATAL_ERROR, "Failed to find shader code!"};
             }
@@ -1137,41 +1166,66 @@ namespace mars {
             shaderFile.seekg(0, std::ios::beg);
             shaderFile.read(code.data(), static_cast<std::streamsize>(code.size()));
             shaderFile.close();
+            return code;
+        }
 
-            const VkShaderModuleCreateInfo shaderModuleInfo = {
+        Error<VkShaderModule> createShaderModule(const std::string& filename) const noexcept {
+            auto shader = loadShaderFile(filename);
+            if(!shader) return shader.moveError<VkShaderModule>();
+            const VkShaderModuleCreateInfo moduleInfo = {
                 .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 .pNext = nullptr,
-                .flags = 0,                                                     
-                .codeSize = code.size(),                                  
-                .pCode = reinterpret_cast<u32*>(code.data())
+                .flags = 0,
+                .codeSize = shader.data().size(),
+                .pCode = reinterpret_cast<const u32*>(shader.data().data())
             };
-            VkShaderModule result;
-            if(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &result) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create shader module!"};
+            VkShaderModule mod;
+            if(vkCreateShaderModule(device, &moduleInfo, nullptr, &mod) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to create shader module"};
             }
-            return result;
+            return mod;
         }
 
         Error<noreturn> createGraphicsPipeline() noexcept {
-            Error<VkShaderModule> shaderModule = createShaderModule();
-            if(!shaderModule) return shaderModule.moveError();
-
-            std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos;
-            shaderStageInfos[0] = {
+            auto shaderMod2D = createShaderModule("shader2d.spv");
+            if(!shaderMod2D) return shaderMod2D.moveError();
+            auto shaderMod3D = createShaderModule("shader3d.spv");
+            if(!shaderMod3D) return shaderMod3D.moveError();
+            std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos2D;
+            shaderStageInfos2D[0] = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .pNext = nullptr, 
+                .pNext = nullptr,
                 .flags = 0,
                 .stage = VK_SHADER_STAGE_VERTEX_BIT,
-                .module = shaderModule,
+                .module = shaderMod2D,
                 .pName = "vertMain",
                 .pSpecializationInfo = nullptr
             };
-            shaderStageInfos[1] = {
+            shaderStageInfos2D[1] = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .pNext = nullptr, 
+                .pNext = nullptr,
                 .flags = 0,
                 .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .module = shaderModule,
+                .module = shaderMod2D,
+                .pName = "fragMain",
+                .pSpecializationInfo = nullptr
+            };
+            std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos3D;
+            shaderStageInfos3D[0] = {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .stage = VK_SHADER_STAGE_VERTEX_BIT,
+                .module = shaderMod3D,
+                .pName = "vertMain",
+                .pSpecializationInfo = nullptr
+            };
+            shaderStageInfos3D[1] = {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = shaderMod3D,
                 .pName = "fragMain",
                 .pSpecializationInfo = nullptr
             };
@@ -1283,33 +1337,61 @@ namespace mars {
                 .pDynamicStates = dynamicStates.data()
             };
 
-            std::array<VkPushConstantRange, 1> pushConstantRanges;
-            //Model matrix
-            pushConstantRanges[0] = {
-                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-                .offset = 0,
-                .size = sizeof(glm::mat4)
+            const VkPushConstantRange pushConstantRanges2D[] = {
+                //Model matrix being pushed
+                {
+                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                    .offset = 0,
+                    .size = sizeof(glm::mat4)
+                }
             };
-            const VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+            const VkDescriptorSetLayout descriptorSetLayouts2D[] = {
+                pushSetLayout
+            };
+            const VkPipelineLayoutCreateInfo pipelineLayoutInfo2D = {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
                 .setLayoutCount = 1,
-                .pSetLayouts = &descriptorSetLayout,
-                .pushConstantRangeCount = pushConstantRanges.max_size(),
-                .pPushConstantRanges = pushConstantRanges.data()
+                .pSetLayouts = descriptorSetLayouts2D,
+                .pushConstantRangeCount = 1,
+                .pPushConstantRanges = pushConstantRanges2D
             };
-            if(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout) != VK_SUCCESS) {
-                vkDestroyShaderModule(device, shaderModule, nullptr);
+            if(vkCreatePipelineLayout(device, &pipelineLayoutInfo2D, nullptr, &pipelineLayout2D) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline layout!"};
             }
-           
-            const VkGraphicsPipelineCreateInfo pipelineInfo = {
+            const VkPushConstantRange pushConstantRanges3D[] = {
+                //Model Matrix for the cube
+                {
+                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                    .offset = 0,
+                    .size = sizeof(glm::mat4)
+                }
+            };
+            const VkDescriptorSetLayout descriptorSetLayouts3D[] = {
+                pushSetLayout
+            };
+            const VkPipelineLayoutCreateInfo pipelineLayoutInfo3D = {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .setLayoutCount = 1,
+                .pSetLayouts = descriptorSetLayouts3D,
+                .pushConstantRangeCount = 1,
+                .pPushConstantRanges = pushConstantRanges3D
+            };
+            if(vkCreatePipelineLayout(device, &pipelineLayoutInfo3D, nullptr, &pipelineLayout3D) != VK_SUCCESS) {
+                return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline layout!"};
+            }
+             
+            std::array<VkGraphicsPipelineCreateInfo, 2> graphicsPipelineInfos;
+            //2D Pipeline Info
+            graphicsPipelineInfos[0] = {
                 .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
                 .pNext = &pipelineRenderingInfo,
                 .flags = 0,
-                .stageCount = shaderStageInfos.max_size(),
-                .pStages = shaderStageInfos.data(),
+                .stageCount = shaderStageInfos2D.max_size(),
+                .pStages = shaderStageInfos2D.data(),
                 .pVertexInputState = &vertexInputStateInfo,
                 .pInputAssemblyState = &inputAssemblyInfo,
                 .pTessellationState = nullptr,
@@ -1319,19 +1401,24 @@ namespace mars {
                 .pDepthStencilState = &depthStencilStateInfo,
                 .pColorBlendState = &colorBlendStateInfo,
                 .pDynamicState = &dynamicStateInfo,
-                .layout = graphicsPipelineLayout, 
+                .layout = pipelineLayout2D, 
                 .renderPass = nullptr,
                 .subpass = 0,
                 .basePipelineHandle = nullptr,
                 .basePipelineIndex = 0
             };
+            //3D Pipeline Info
+            graphicsPipelineInfos[1] = graphicsPipelineInfos[0];
+            graphicsPipelineInfos[1].stageCount = shaderStageInfos3D.max_size();
+            graphicsPipelineInfos[1].pStages = shaderStageInfos3D.data();
+            graphicsPipelineInfos[1].layout = pipelineLayout3D;
 
-            if(vkCreateGraphicsPipelines(device, nullptr, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
-                vkDestroyShaderModule(device, shaderModule, nullptr);
+            if(vkCreateGraphicsPipelines(device, nullptr, graphicsPipelineInfos.max_size(), graphicsPipelineInfos.data(), nullptr, graphicsPipelines.data()) != VK_SUCCESS) {
                 return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline!"};
             }
+            vkDestroyShaderModule(device, shaderMod2D, nullptr);
+            vkDestroyShaderModule(device, shaderMod3D, nullptr);
 
-            vkDestroyShaderModule(device, shaderModule, nullptr);
             return success();
         }
         Error<noreturn> getSwapchainImages(VkFormat format) noexcept {
@@ -1703,8 +1790,8 @@ namespace mars {
 
             if(differentQueueFamilies) {
                 queueCreateInfoCount = 2U;
-                graphicsQueueCount = std::min(graphicsQueueCount, MAX_CONCURRENT_FRAMES);
-                presentQueueCount = std::min(presentQueueCount, MAX_CONCURRENT_FRAMES);
+                graphicsQueueCount = std::min(graphicsQueueCount, maxConcurrentFrames);
+                presentQueueCount = std::min(presentQueueCount, maxConcurrentFrames);
                 queuePriorities.init(graphicsQueueCount + presentQueueCount, 0.0f);
                 queueCreateInfos[0] = {
                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -1724,7 +1811,7 @@ namespace mars {
                 };
             }
             else {
-                graphicsQueueCount = std::min(graphicsQueueCount, 2U * MAX_CONCURRENT_FRAMES);
+                graphicsQueueCount = std::min(graphicsQueueCount, 2U * maxConcurrentFrames);
                 queuePriorities.init(graphicsQueueCount, 0.0f);
                 queueCreateInfos[0] = {
                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -1925,7 +2012,7 @@ namespace mars {
             return success();
         }
         public:
-        Error<noreturn> init(std::string const& name) noexcept {
+        Error<noreturn> init(std::string const& name, ID& squareID) noexcept {
             if(Error<noreturn> res = createInstance(name); !res) {
                 flags |= flagBits::instanceInvalid;
                 return res;
@@ -1952,9 +2039,11 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, "Failed to show window"};
             }
 
-            //create square mesh - this must be the first mesh made so that it always has ID 0
+            //Create square mesh
             auto sq = makeMesh(Square::vertices, Square::indices);
             if(!sq) return sq.moveError();
+            //Give ID number of square mesh back to the game
+            else squareID = sq;
 
             currentFrame = 0;
             flags = {};
@@ -1964,21 +2053,19 @@ namespace mars {
         ~Renderer() noexcept {
             if((flags & flagBits::deviceInvalid) == 0) [[likely]] {
                 vkDeviceWaitIdle(device);
-                cube.buffer.destroy(device);
                 vkDestroySwapchainKHR(device, swapchain, nullptr);
-                for(std::size_t i = 0; i < vertexBuffers.size(); i++) {
-                    vkDestroyBuffer(device, vertexBuffers.handles[i], nullptr);
-                    vkFreeMemory(device, vertexBuffers.memories[i], nullptr);
-                }
-                for(std::size_t i = 0; i < textures.size(); i++) {
-                    vkDestroyImage(device, textures.handles[i], nullptr);
-                    vkFreeMemory(device, textures.memories[i], nullptr);
-                    vkDestroyImageView(device, textures.views[i], nullptr);
-                }
                 for(VkImageView view : swapchainImageViews) {
                     vkDestroyImageView(device, view, nullptr);
                 }
-                vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+                cube.buffer.destroy(device);
+                entityManager.sysMesh.destroySystem(device);
+                for(u64 i = 0; i < entityManager.sysTexture.size(); i++) {
+                    Texture& t = entityManager.sysTexture.data()[i];
+                    vkDestroyImage(device, t.handle, nullptr);
+                    vkFreeMemory(device, t.memory, nullptr);
+                    vkDestroyImageView(device, t.view, nullptr);
+                }
+                vkDestroyDescriptorSetLayout(device, pushSetLayout, nullptr);
                 for(VkSemaphore semaphore : semaphores) {
                     vkDestroySemaphore(device, semaphore, nullptr);
                 }
@@ -1993,8 +2080,9 @@ namespace mars {
                 vkDestroySampler(device, sampler, nullptr);
                 vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
                 vkDestroyCommandPool(device, commandPool, nullptr);
-                vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr);
-                vkDestroyPipeline(device, graphicsPipeline, nullptr);
+                vkDestroyPipelineLayout(device, pipelineLayout2D, nullptr);
+                vkDestroyPipelineLayout(device, pipelineLayout3D, nullptr);
+                for(VkPipeline pipeline : graphicsPipelines) vkDestroyPipeline(device, pipeline, nullptr);
                 cameraMatrices.destroy(device);
                 vkDestroyDevice(device, nullptr);
             }
@@ -2140,7 +2228,7 @@ namespace mars {
             };
         }
 
-        Error<noreturn> drawFrame(std::chrono::nanoseconds deltaTime, float fov, float aspect, Objects& objects) noexcept {
+        Error<noreturn> drawFrame(std::chrono::nanoseconds deltaTime, float fov, float aspect, Systems systems) noexcept {
             //Fix the cube - only if any of the viewport details changed
             if(fov != cube.fov or aspect != cube.aspect) {
                 float halfd = glm::tan(fov / 2.0f);
@@ -2162,11 +2250,11 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiting on fence {}", currentFrame)};
             }
             //These semaphores indicate that we have successfully acquired an image on this frame
-            Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, MAX_CONCURRENT_FRAMES);
+            Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames);
             //These semaphores indicate that we have finished rendering a 2D scene on this frame
-            Slice<VkSemaphore> scene2DReadySemaphores = Slice<VkSemaphore>::make(semaphores, MAX_CONCURRENT_FRAMES, 2);
+            Slice<VkSemaphore> scene2DReadySemaphores = Slice<VkSemaphore>::make(semaphores, maxConcurrentFrames, 2);
             //These semaphores indicate that the image acquired is ready to present
-            Slice<VkSemaphore> presentReadySemaphores = Slice<VkSemaphore>::make(semaphores, 2 * MAX_CONCURRENT_FRAMES);
+            Slice<VkSemaphore> presentReadySemaphores = Slice<VkSemaphore>::make(semaphores, 2 * maxConcurrentFrames);
 
             u32 imageIndex;
             VkResult res = vkAcquireNextImageKHR(
@@ -2193,7 +2281,7 @@ namespace mars {
                 depthImage3D.destroy(device);
                 TRY(createDepthImages());
                 flags &= ~flagBits::recreateSwapchain;
-                return drawFrame(deltaTime, fov, aspect, objects);
+                return drawFrame(deltaTime, fov, aspect, systems);
             }
             //Fatal error has occurred
             else if(res != VK_SUCCESS) {
@@ -2244,7 +2332,7 @@ namespace mars {
 
             vkCmdPipelineBarrier2(commandBuffer2D, &colorWriteDependency2D);
 
-            renderPass2D(cube.dim, commandBuffer2D, objects);
+            renderPass2D(cube.dim, commandBuffer2D, systems);
 
             //Submit to create 2D scene
             if(vkEndCommandBuffer(commandBuffer2D) != VK_SUCCESS) {
@@ -2408,7 +2496,7 @@ namespace mars {
                 return {ErrorTag::FATAL_ERROR, "Failed to present graphics queue"};
             }
 
-            currentFrame = (currentFrame + 1) % MAX_CONCURRENT_FRAMES;
+            currentFrame = (currentFrame + 1) % maxConcurrentFrames;
 
             return success();
         }

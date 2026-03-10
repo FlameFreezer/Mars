@@ -1,12 +1,10 @@
 struct VertexIn {
     float3 position;
-    float3 color;
     float2 texCoord;
 };
 
 struct VertexOut {
     float4 position : SV_Position;
-    float3 color;
     float2 texCoord;
 };
 
@@ -21,7 +19,6 @@ ParameterBlock<PushDescriptors> push;
 func vertMain(input : VertexIn, uniform model: float4x4) -> VertexOut {
     VertexOut output;
     output.position = mul(push.camera, mul(model, float4(input.position, 1.0f)));
-    output.color = input.color;
     output.texCoord = input.texCoord;
     return output;
 }

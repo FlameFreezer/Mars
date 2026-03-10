@@ -29,11 +29,11 @@ namespace mars {
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
         renderer = new Renderer();
-        TRY(renderer->init(appName));
+        TRY(renderer->init(appName, shapes.rectangle));
 
         int numGamepads;
         SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
-        if(gamepads != nullptr) {
+        if(numGamepads != 0) {
             gamepad = SDL_OpenGamepad(gamepads[0]);
         }
         time = std::chrono::steady_clock::now();
@@ -85,10 +85,11 @@ namespace mars {
             renderer->cameraMatrices.mappedMemory[1 + renderer->currentFrame] = camera.loadMatrices();
             aspect = camera.aspect;
         }
-        TRY(objects.updateModelMatrices(objectsToUpdate));
-        objectsToUpdate.clear();
-        Renderer::Objects rendererObjects{objects.models, objects.meshIDs, objects.textureIDs, objects.size()};
-        TRY(renderer->drawFrame(deltaTime, camera.fov, aspect, rendererObjects));
+        Renderer::Systems rendererSystems;
+        rendererSystems.transform = &entityManager.system<Components::TRANSFORM>();
+        rendererSystems.mesh = &entityManager.system<Components::MESH>();
+        rendererSystems.texture = &entityManager.system<Components::TEXTURE>();
+        TRY(renderer->drawFrame(deltaTime, camera.fov, aspect, rendererSystems));
         return success();
     }
 
@@ -96,61 +97,25 @@ namespace mars {
         return 0;
     }
     Error<ID> Game::loadTexture(const std::string& path) noexcept {
-        return renderer->createTexture(path);
+        return renderer->makeTexture(path);
     }
-    Error<ID> Game::createObject(ID meshID, ID textureID, const glm::vec3& pos, const glm::vec3& scale) noexcept {
-        ID id = objects.append(meshID, textureID, pos, scale);
-        objectsToUpdate.push_back(id);
-        return id;
-    }
-    Rect2D Game::getWindowDimensions() const noexcept {
-        int w, h;
-        SDL_GetWindowSize(renderer->window, &w, &h);
-        return {static_cast<u64>(w), static_cast<u64>(h)};
-    }
-    void Game::resizeWindow(u32 width, u32 height) noexcept {
-        int w = static_cast<int>(width), h = static_cast<int>(height);
-        SDL_SetWindowSize(renderer->window, w, h);
-        renderer->flags |= flagBits::recreateSwapchain;
-    }
-
-    Error<noreturn> Game::setPosition(ID object, const glm::vec3& pos) noexcept {
-        objects.at(objects.positions, object) = pos;
-        objectsToUpdate.push_back(object);
-        return success();
-    }
-
-    Error<noreturn> Game::addPosition(ID object, const glm::vec3& pos) noexcept {
-        objects.at(objects.positions, object) += pos;
-        objectsToUpdate.push_back(object);
-        return success();
-    }
-
-    Error<glm::vec3> Game::getPosition(ID object) const noexcept {
-        return objects.at(objects.positions, object);
-    }
-
-    Error<noreturn> Game::setScale(ID object, const glm::vec3& pos) noexcept {
-        objects.at(objects.scales, object) = pos;
-        objectsToUpdate.push_back(object);
-        return success();
-    }
-    Error<glm::vec3> Game::getScale(ID object) const noexcept {
-        return objects.at(objects.scales, object);
-    }
-
-    bool Game::checkCollision(ID o1, ID o2) const noexcept {
-        const glm::vec3& s1 = objects.at(objects.scales, o1);
-        const glm::vec3& p1 = objects.at(objects.positions, o1);
-        const glm::vec3& p2 = objects.at(objects.positions, o2);
-        const glm::vec3& s2 = objects.at(objects.scales, o2);
-        bool xWithin = std::max(p1.x, p2.x) <= std::min(p1.x + s1.x, p2.x + s2.x);
-        bool yWithin = std::max(p1.y, p2.y) <= std::min(p1.y + s1.y, p2.y + s2.y);
+    bool Game::checkCollision(const Transform& t1, const Transform& t2) const noexcept {
+        bool xWithin = std::max(t1.position.x, t2.position.x) <= std::min(t1.position.x + t1.scale.x, t2.position.x + t2.scale.x); 
+        bool yWithin = std::max(t1.position.y, t2.position.y) <= std::min(t1.position.y + t1.scale.y, t2.position.y + t2.scale.y); 
         return xWithin and yWithin;
     }
 
-    Error<noreturn> Game::setTexture(ID object, ID texture) noexcept {
-        objects.at(objects.textureIDs, object) = texture;
-        return success();
+    Transform& Game::getTransform(Entity e) noexcept {
+        return entityManager.system<Components::TRANSFORM>()[e.id()];
+    }
+    glm::vec2& Game::getVelocity(Entity e) noexcept {
+        return entityManager.system<Components::PHYSICS>()[e.id()].velocity;
+    }
+
+    void Game::setMesh(Entity e, ID id) noexcept {
+        entityManager.system<Components::MESH>()[e.id()] = id;
+    }
+    void Game::setTexture(Entity e, ID id) noexcept {
+        entityManager.system<Components::TEXTURE>()[e.id()] = id;
     }
 }

@@ -2,7 +2,6 @@ module;
 
 #include <string>
 #include <chrono>
-#include <vector>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -16,8 +15,6 @@ import :renderer;
 export import flag_bits;
 export import error;
 export import heap_array;
-export import object;
-export import multimap;
 export import ecs;
 
 namespace mars {
@@ -33,13 +30,11 @@ namespace mars {
         std::chrono::steady_clock::time_point time;
         std::chrono::nanoseconds deltaTime;
         GameFlags flags;
-        std::vector<ID> objectsToUpdate; 
-        EntityManager entityManager;
         public:
+        EntityManager entityManager;
         struct {
-            const ID square = 0;
+            ID rectangle;
         } shapes;
-        Objects objects;
         Camera camera;
         const bool* keyState;
         SDL_Gamepad* gamepad;
@@ -90,21 +85,10 @@ namespace mars {
         // const std::string& path  The file path of the texture to load.
         // Returns: Error<ID>   The ID of the texture, or an error indicating that loading failed.
         Error<ID> loadTexture(const std::string& path) noexcept;
-        // Creates an object with the provided mesh, texture, position, and size.
-        // ID mesh  The ID of the mesh to use.
-        // ID texture   The ID of the texture to use.
-        // const glm::vec3& pos The position of the object.
-        // const glm::vec3& scale   The size of the object.
-        Error<ID> createObject(ID mesh, ID texture, const glm::vec3& pos, const glm::vec3& scale) noexcept;
-        // Returns the dimensions of the window.
-        // Returns: Rect2D  The dimensions of the window.
-        Rect2D getWindowDimensions() const noexcept;
-        Error<noreturn> setPosition(ID object, const glm::vec3& pos) noexcept;
-        Error<noreturn> addPosition(ID object, const glm::vec3& pos) noexcept;
-        Error<glm::vec3> getPosition(ID object) const noexcept;
-        Error<noreturn> setScale(ID object, const glm::vec3& pos) noexcept;
-        Error<glm::vec3> getScale(ID object) const noexcept;
-        bool checkCollision(ID o1, ID o2) const noexcept;
-        Error<noreturn> setTexture(ID object, ID texture) noexcept;
+        bool checkCollision(const Transform& t1, const Transform& t2) const noexcept;
+        Transform& getTransform(Entity e) noexcept;
+        glm::vec2& getVelocity(Entity e) noexcept;
+        void setMesh(Entity e, ID id) noexcept;
+        void setTexture(Entity e, ID id) noexcept;
     };
 };

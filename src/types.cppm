@@ -17,4 +17,6 @@ export {
 
     using f32 = float;
     using f64 = double;
+
+    using ID = u64;
 }
