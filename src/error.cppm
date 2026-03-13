@@ -9,9 +9,9 @@ module;
 #include <stdexcept>
 
 export module error;
+import types;
 
 namespace mars {
-    export class noreturn {};
 
     export enum class ErrorTag : uint32_t {
         ALL_OKAY = 0,
@@ -33,7 +33,6 @@ namespace mars {
 
     export template <class T>
     class [[nodiscard("Potentially unhandled error value")]] Error {
-        private:
         union {
             T mData;
             std::string mMessage;

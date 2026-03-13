@@ -27,7 +27,7 @@ namespace mars {
         public:
         EntityManager() noexcept;
         ~EntityManager() noexcept;
-        Entity createEntity(Signature s) noexcept;
+        Error<Entity> createEntity(Signature s) noexcept;
         void destroyEntity(Entity e) noexcept;
         //GetComp is a struct template defined in components.cppm which has a member Type
         //This member matches a component enum member to the type for its component

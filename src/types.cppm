@@ -19,4 +19,6 @@ export {
     using f64 = double;
 
     using ID = u64;
+
+    class noreturn{};
 }

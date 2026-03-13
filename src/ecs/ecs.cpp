@@ -29,7 +29,10 @@ namespace mars {
         }
     }
 
-    Entity EntityManager::createEntity(Signature sig) noexcept {
+    Error<Entity> EntityManager::createEntity(Signature sig) noexcept {
+        if(mIDQueue.empty()) {
+            return fatal<Entity>("Tried to create an entity, but the maximum number of entities were made!");
+        }
         const ID id = mIDQueue.front();
         mIDQueue.pop();
         //Number of the current bit we are checking in the signature

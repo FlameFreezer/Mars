@@ -12,6 +12,7 @@ namespace mars {
     export class Signature {
         u32 mBits;
         public:
+        Signature() noexcept;
         explicit Signature(std::initializer_list<Components> comps) noexcept;
         Signature(const Signature& s) noexcept;
         bool has(std::initializer_list<Components> comps) const noexcept;
@@ -25,6 +26,7 @@ namespace mars {
         ID mID;
         Signature mSignature; 
         public:
+        Entity() = default;
         Entity(ID id, Signature sig) noexcept;
         ID id() const noexcept;
         Signature signature() const noexcept;

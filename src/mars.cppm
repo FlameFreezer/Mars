@@ -24,12 +24,12 @@ namespace mars {
     };
 
     export class Game {
-        Renderer* renderer;
-        std::string windowName;
-        std::string appName;
-        std::chrono::steady_clock::time_point time;
-        std::chrono::nanoseconds deltaTime;
-        GameFlags flags;
+        Renderer* mRenderer;
+        std::string mWindowName;
+        std::string mAppName;
+        std::chrono::steady_clock::time_point mTime;
+        std::chrono::nanoseconds mDeltaTime;
+        GameFlags mFlags;
         public:
         EntityManager entityManager;
         struct {
@@ -59,24 +59,19 @@ namespace mars {
         bool hasFlags(GameFlags flag) noexcept;
         // Gets the epoch time for the start of the frame. Make sure to call `updateTime` before any calls to this within the current frame.
         // Returns:     The epoch time of the start of the current frame, in nanoseconds
-        std::chrono::steady_clock::time_point::rep getFrameTime() const noexcept;
+        std::chrono::steady_clock::time_point::rep frameTime() const noexcept;
         // Gets the time between the last frame and the current frame. Make sure to call `updateTime` before any calls to this within the current frame.
         // Returns:     The time between the last frame and the current frame, in nanoseconds
-        std::chrono::nanoseconds::rep getDeltaTime() const noexcept;
+        std::chrono::nanoseconds::rep deltaTimeNanoseconds() const noexcept;
         // Gets the time between the last frame and the current frame. Make sure to call `updateTime` before any calls to this within the current frame.
         // Returns: float   The time between the last frame and the current frame, in seconds
-        std::chrono::duration<float, std::chrono::seconds::period>::rep getDeltaTimeSeconds() const noexcept;
+        std::chrono::duration<float, std::chrono::seconds::period>::rep deltaTime() const noexcept;
         // Updates the `time` and `deltaTime` private class members to reflect the current frame. Should be called at the start of the current frame.
         // Returns: void    Nothing
         void updateTime() noexcept;
         // Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
         // Returns: void    Nothing
         void updateKeyState() noexcept;
-        // Resizes the window to the dimensions provided by the arguments. CURRENTLY UNTESTED
-        // u32 width  The new width of the window
-        // u32 height The new height of the window
-        // Returns: void    Nothing
-        void resizeWindow(u32 width, u32 height) noexcept;
         // Loads the mesh located at `path`.
         // std::string const& path  The file path of the model to load.
         // Returns: Error<ID>   The ID of the mesh, or an error indicating that loading failed.
@@ -86,8 +81,8 @@ namespace mars {
         // Returns: Error<ID>   The ID of the texture, or an error indicating that loading failed.
         Error<ID> loadTexture(const std::string& path) noexcept;
         bool checkCollision(const Transform& t1, const Transform& t2) const noexcept;
-        Transform& getTransform(Entity e) noexcept;
-        glm::vec2& getVelocity(Entity e) noexcept;
+        Error<Transform*> transform(Entity e) noexcept;
+        Error<Physics*> physics(Entity e) noexcept;
         void setMesh(Entity e, ID id) noexcept;
         void setTexture(Entity e, ID id) noexcept;
     };

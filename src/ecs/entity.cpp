@@ -5,6 +5,8 @@ module;
 module entity;
 
 namespace mars {
+    Signature::Signature() noexcept : mBits(0) {}
+
     Signature::Signature(std::initializer_list<Components> comps) noexcept : mBits(0) {
         u32 currentBit;
         for(Components c : comps) {

@@ -6,6 +6,7 @@ module;
 
 export module component;
 import types;
+import error;
 
 namespace mars {
     export enum class Components : u8 {
@@ -24,9 +25,14 @@ namespace mars {
         float angle;
     };
     export struct Physics {
-        glm::vec2 velocity;
-        glm::vec2 acceleration;
+        glm::vec3 velocity;
+        glm::vec2 gravity;
+        float acceleration;
+        float friction;
+        float drag;
+        float maxSpeed;
     };
+        
     //The Mesh and Texture component systems are internal to the renderer and are managed by their own entity manager
     export constexpr u64 maxMeshes = 1000;
     export struct Mesh {
