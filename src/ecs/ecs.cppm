@@ -12,36 +12,40 @@ import types;
 import error;
 
 namespace mars {
-    //Simple wrapper over the systems to allow easily indexing them with members of the Components enum
+    //Simple wrapper over the systems to allow easily indexing them with members of the Component enum
     export class ComponentSystems {
         ComponentSystemParent* mSystems[numComponents];
         public:
         friend class EntityManager;
-        ComponentSystemParent*& operator[](Components c) noexcept;
-        const ComponentSystemParent* const& operator[](Components c) const noexcept;
+        ComponentSystemParent*& operator[](Component c) noexcept;
+        const ComponentSystemParent* const& operator[](Component c) const noexcept;
     };
 
     export class EntityManager {
         std::queue<ID> mIDQueue;
         ComponentSystems mSystems;
+        Entity mEntities[maxEntities];
+        template<Component c>
+        void allocSystem() noexcept;
         public:
+        static constexpr Entity nullEntity{nullID, Signature()};
         EntityManager() noexcept;
         ~EntityManager() noexcept;
         Error<Entity> createEntity(Signature s) noexcept;
         void destroyEntity(Entity e) noexcept;
+        Entity getEntity(ID id) const noexcept;
         //GetComp is a struct template defined in components.cppm which has a member Type
         //This member matches a component enum member to the type for its component
-        template<Components c>
+        template<Component c>
         ComponentSystem<typename GetComp<c>::Type>& system() noexcept {
             //Using GetComp::Type to get the type of the component in order to downcast the parent pointer safely
             return *reinterpret_cast<ComponentSystem<typename GetComp<c>::Type>*>(mSystems[c]);
         }
-        template<Components c>
+        template<Component c>
         const ComponentSystem<typename GetComp<c>::Type>& system() const noexcept {
             //Using GetComp::Type to get the type of the component in order to downcast the parent pointer safely
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mSystems[c]);
         }
-
     };
     //This one manages the entities used internally by the renderer
     export class RendererEntityManager {

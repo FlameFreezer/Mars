@@ -11,7 +11,7 @@ module;
 export module mars;
 export import types;
 export import :camera;
-import :renderer;
+export import :renderer;
 export import flag_bits;
 export import error;
 export import heap_array;
@@ -22,6 +22,8 @@ namespace mars {
         u64 w;
         u64 h;
     };
+
+    export constexpr Entity nullEntity = EntityManager::nullEntity;
 
     export class Game {
         Renderer* mRenderer;
@@ -80,9 +82,15 @@ namespace mars {
         // const std::string& path  The file path of the texture to load.
         // Returns: Error<ID>   The ID of the texture, or an error indicating that loading failed.
         Error<ID> loadTexture(const std::string& path) noexcept;
-        bool checkCollision(const Transform& t1, const Transform& t2) const noexcept;
+        bool checkCollision(Entity e1, Entity e2) const noexcept;
+        Entity getCollision(Entity e) const noexcept;
+        Entity getFloor(Entity e) noexcept;
         Error<Transform*> transform(Entity e) noexcept;
+        Error<const Transform*> transform(Entity e) const noexcept;
         Error<Physics*> physics(Entity e) noexcept;
+        Error<const Physics*> physics(Entity e) const noexcept;
+        Error<Solid*> solid(Entity e) noexcept;
+        Error<const Solid*> solid(Entity e) const noexcept;
         void setMesh(Entity e, ID id) noexcept;
         void setTexture(Entity e, ID id) noexcept;
     };

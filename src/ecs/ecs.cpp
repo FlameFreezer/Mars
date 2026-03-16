@@ -5,27 +5,34 @@ module;
 module ecs;
 
 namespace mars {
-    ComponentSystemParent*& ComponentSystems::operator[](Components c) noexcept {
+    ComponentSystemParent*& ComponentSystems::operator[](Component c) noexcept {
         return mSystems[static_cast<u8>(c)];
     }
 
-    const ComponentSystemParent* const& ComponentSystems::operator[](Components c) const noexcept {
+    const ComponentSystemParent* const& ComponentSystems::operator[](Component c) const noexcept {
         return mSystems[static_cast<u8>(c)];
+    }
+
+    template<Component c>
+    void EntityManager::allocSystem() noexcept {
+        mSystems[c] = new ComponentSystem<typename GetComp<c>::Type>();
     }
 
     EntityManager::EntityManager() noexcept {
         for(ID i = 0; i < maxEntities; i++) {
             mIDQueue.push(i);
+            mEntities[i] = nullEntity;
         }
-        mSystems[Components::TRANSFORM] = new ComponentSystem<Transform>();
-        mSystems[Components::PHYSICS] = new ComponentSystem<Physics>();
-        mSystems[Components::MESH] = new ComponentSystem<ID>();
-        mSystems[Components::TEXTURE] = new ComponentSystem<ID>();
+        allocSystem<Component::TRANSFORM>();
+        allocSystem<Component::PHYSICS>();
+        allocSystem<Component::MESH>();
+        allocSystem<Component::TEXTURE>();
+        allocSystem<Component::SOLID>();
     }
 
     EntityManager::~EntityManager() noexcept {
         for(u8 i = 0; i < numComponents; i++) {
-            delete mSystems[static_cast<Components>(i)];
+            delete mSystems[static_cast<Component>(i)];
         }
     }
 
@@ -41,10 +48,13 @@ namespace mars {
         //For each bit in the signature
         for(u32 x = 1; x < (1 << 31); x <<= 1) {             
             if(sig.getBits() & x) {
-                mSystems[static_cast<Components>(bitNum++)]->reserve(id);
+                mSystems[static_cast<Component>(bitNum)]->reserve(id);
             }
+            bitNum++;
         }
-        return Entity(id, sig);
+        Entity e(id, sig);
+        mEntities[id] = e;
+        return e;
     }
 
     void EntityManager::destroyEntity(Entity e) noexcept {
@@ -54,9 +64,14 @@ namespace mars {
         u8 bitNum = 0;
         for(u32 x = 1; x < (1 << 31); x <<= 1) {
             if(sig.getBits() & x) {
-                mSystems[static_cast<Components>(bitNum++)]->erase(id);
+                mSystems[static_cast<Component>(bitNum++)]->erase(id);
             }
         }
+        mEntities[id] = nullEntity;
+    }
+
+    Entity EntityManager::getEntity(ID id) const noexcept {
+        return mEntities[id];
     }
 
     RendererEntityManager::RendererEntityManager() noexcept {

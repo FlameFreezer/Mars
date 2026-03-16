@@ -20,12 +20,15 @@ namespace mars {
         }
         return success();
     }
+
     void deinitLibrary() noexcept {
         SDL_Quit();
     }
 
     Game::Game() noexcept : mWindowName("My Mars Game"), mAppName("My Mars Game"), mFlags(0), mRenderer(nullptr), gamepad(nullptr) {}
+
     Game::Game(const std::string& name) noexcept : mWindowName(name), mAppName(name), mFlags(0), mRenderer(nullptr), gamepad(nullptr) {}
+
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
         mRenderer = new Renderer();
@@ -39,40 +42,51 @@ namespace mars {
         mTime = std::chrono::steady_clock::now();
         return success();
     }
+
     Game::~Game() noexcept {
         delete mRenderer;
         SDL_CloseGamepad(gamepad);
         deinitLibrary();
     }
+
     void Game::setFlags(RendererFlags flag) noexcept {
         mRenderer->flags |= flag;
     }
+
     void Game::setFlags(GameFlags flag) noexcept {
         mFlags |= flag;
     }
+
     bool Game::hasFlags(RendererFlags flag) noexcept {
         return mRenderer->flags & flag;
     }
+
     bool Game::hasFlags(GameFlags flag) noexcept {
         return mFlags & flag;
     }
+
     std::chrono::steady_clock::time_point::rep Game::frameTime() const noexcept {
         return mTime.time_since_epoch().count();
     }
+
     std::chrono::nanoseconds::rep Game::deltaTimeNanoseconds() const noexcept {
         return mDeltaTime.count();
     }
+
     std::chrono::duration<float, std::chrono::seconds::period>::rep Game::deltaTime() const noexcept {
         return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(mDeltaTime).count();
     }
+
     void Game::updateTime() noexcept {
         const auto now = std::chrono::steady_clock::now();
         mDeltaTime = now - mTime;
         mTime = now;
     }
+
     void Game::updateKeyState() noexcept {
         keyState = SDL_GetKeyboardState(nullptr);
     }
+
     Error<noreturn> Game::draw() noexcept {
         float aspect = 0.0f;
         if(camera.aspect == Camera::autoAspect) {
@@ -86,9 +100,9 @@ namespace mars {
             aspect = camera.aspect;
         }
         Renderer::Systems mRendererSystems;
-        mRendererSystems.transform = &entityManager.system<Components::TRANSFORM>();
-        mRendererSystems.mesh = &entityManager.system<Components::MESH>();
-        mRendererSystems.texture = &entityManager.system<Components::TEXTURE>();
+        mRendererSystems.transform = &entityManager.system<Component::TRANSFORM>();
+        mRendererSystems.mesh = &entityManager.system<Component::MESH>();
+        mRendererSystems.texture = &entityManager.system<Component::TEXTURE>();
         TRY(mRenderer->drawFrame(mDeltaTime, camera.fov, aspect, mRendererSystems));
         return success();
     }
@@ -96,32 +110,94 @@ namespace mars {
     Error<ID> Game::loadMesh(const std::string& path) noexcept {
         return 0;
     }
+
     Error<ID> Game::loadTexture(const std::string& path) noexcept {
         return mRenderer->makeTexture(path);
     }
-    bool Game::checkCollision(const Transform& t1, const Transform& t2) const noexcept {
-        bool xWithin = std::max(t1.position.x, t2.position.x) <= std::min(t1.position.x + t1.scale.x, t2.position.x + t2.scale.x); 
-        bool yWithin = std::max(t1.position.y, t2.position.y) <= std::min(t1.position.y + t1.scale.y, t2.position.y + t2.scale.y); 
+
+    bool Game::checkCollision(Entity e1, Entity e2) const noexcept {
+        //Entities cannot collide with themselves
+        if(e1 == e2) return false;
+        //Null entity produces no collisions
+        if(e1 == EntityManager::nullEntity or e2 == EntityManager::nullEntity) return false;
+        const Solid& s1 = *solid(e1).data();
+        const Solid& s2 = *solid(e2).data();
+        bool xWithin = false, yWithin = false;
+        if(s1.boundingShape == BoundingShape::RECTANGLE and s2.boundingShape == BoundingShape::RECTANGLE) { 
+            xWithin = s1.position.x + s1.scale.x >= s2.position.x and s2.position.x + s2.scale.x >= s1.position.x;
+            yWithin = s1.position.y + s1.scale.y >= s2.position.y and s2.position.y + s2.scale.y >= s1.position.y;
+        }
+        else if(s1.boundingShape == BoundingShape::RECTANGLE and s2.boundingShape == BoundingShape::CIRCLE) {}
+        else if(s1.boundingShape == BoundingShape::CIRCLE and s2.boundingShape == BoundingShape::RECTANGLE) {}
+        else {}
         return xWithin and yWithin;
     }
 
+    Entity Game::getCollision(Entity e) const noexcept {
+        const auto sysSolid = entityManager.system<Component::SOLID>();
+        const ID* ids = sysSolid.getIDs();
+        for(u64 i = 0; i < sysSolid.size(); i++) {
+            Entity other = entityManager.getEntity(ids[i]);
+            if(checkCollision(e, other)) {
+                return other;
+            }
+        }
+        return EntityManager::nullEntity;
+    }
+
+
+    Entity Game::getFloor(Entity e) noexcept {
+        Solid* s = solid(e).data();
+        s->position.y++;
+        Entity floor = getCollision(e);
+        s->position.y--;
+        return floor;
+    }
+
     Error<Transform*> Game::transform(Entity e) noexcept {
-        if(!e.signature().has(Components::TRANSFORM)) {
+        if(!e.signature().has(Component::TRANSFORM)) {
             return fatal<Transform*>(std::format("Tried to get Transform for the Entity with ID {}, which does not have a Transform component", e.id()));
         }
-        return &entityManager.system<Components::TRANSFORM>()[e.id()];
+        return &entityManager.system<Component::TRANSFORM>()[e.id()];
     }
+    Error<const Transform*> Game::transform(Entity e) const noexcept {
+        if(!e.signature().has(Component::TRANSFORM)) {
+            return fatal<const Transform*>(std::format("Tried to get Transform for the Entity with ID {}, which does not have a Transform component", e.id()));
+        }
+        return &entityManager.system<Component::TRANSFORM>()[e.id()];
+    }
+
     Error<Physics*> Game::physics(Entity e) noexcept {
-        if(!e.signature().has(Components::PHYSICS)) {
+        if(!e.signature().has(Component::PHYSICS)) {
             return fatal<Physics*>(std::format("Tried to get Physics for the Entity with ID {}, which does not have a Physics component", e.id()));
         }
-        return &entityManager.system<Components::PHYSICS>()[e.id()];
+        return &entityManager.system<Component::PHYSICS>()[e.id()];
+    }
+    Error<const Physics*> Game::physics(Entity e) const noexcept {
+        if(!e.signature().has(Component::PHYSICS)) {
+            return fatal<const Physics*>(std::format("Tried to get Physics for the Entity with ID {}, which does not have a Physics component", e.id()));
+        }
+        return &entityManager.system<Component::PHYSICS>()[e.id()];
+    }
+
+    Error<Solid*> Game::solid(Entity e) noexcept {
+        if(!e.signature().has(Component::SOLID)) {
+            return fatal<Solid*>(std::format("Tried to get Solid for the Entity with ID {}, which does not have a Solid component", e.id()));
+        }
+        return &entityManager.system<Component::SOLID>()[e.id()];
+    }
+
+    Error<const Solid*> Game::solid(Entity e) const noexcept {
+        if(!e.signature().has(Component::SOLID)) {
+            return fatal<const Solid*>(std::format("Tried to get Solid for the Entity with ID {}, which does not have a Solid component", e.id()));
+        }
+        return &entityManager.system<Component::SOLID>()[e.id()];
     }
 
     void Game::setMesh(Entity e, ID id) noexcept {
-        entityManager.system<Components::MESH>()[e.id()] = id;
+        entityManager.system<Component::MESH>()[e.id()] = id;
     }
     void Game::setTexture(Entity e, ID id) noexcept {
-        entityManager.system<Components::TEXTURE>()[e.id()] = id;
+        entityManager.system<Component::TEXTURE>()[e.id()] = id;
     }
 }
