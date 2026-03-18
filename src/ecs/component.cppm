@@ -9,7 +9,8 @@ import types;
 import error;
 
 namespace mars {
-    export enum class Component : u8 {
+    export using ComponentT = u8;
+    export enum class Component : ComponentT {
         TRANSFORM,
         PHYSICS,
         MESH,
@@ -18,7 +19,7 @@ namespace mars {
         //KEEP THIS AT THE END OF THE ENUM
         MAX_COMPONENT
     };
-    export constexpr u8 numComponents = static_cast<u8>(Component::MAX_COMPONENT);
+    export constexpr ComponentT numComponents = static_cast<ComponentT>(Component::MAX_COMPONENT);
 
     export struct Transform {
         glm::vec3 position;
@@ -34,7 +35,7 @@ namespace mars {
         float maxSpeed;
         float jumpSpeed;
     };
-    export enum class BoundingShape : u8 {
+    export enum class BoundingShape : ComponentT {
         RECTANGLE,
         CIRCLE,
     };
@@ -49,23 +50,6 @@ namespace mars {
         };
     };
         
-    //The Mesh and Texture component systems are internal to the renderer and are managed by their own entity manager
-    export constexpr u64 maxMeshes = 1000;
-    export struct Mesh {
-        VkBuffer handles[maxMeshes];
-        VkDeviceMemory memories[maxMeshes];
-        struct {
-            VkDeviceSize indexOffset;
-            u32 numIndices;
-        } sizes[maxMeshes];
-    };
-    export constexpr u64 maxTextures = 1000;
-    export struct Texture {
-        VkImage handle;
-        VkDeviceMemory memory;
-        VkImageView view;
-    };
-
     //This struct template allows accessing the type of a component at compile time just using the actual component enum member
     export template<Component c>
     struct GetComp {};

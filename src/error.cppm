@@ -1,6 +1,5 @@
 module;
 
-#include <cstdint>
 #include <string>
 #include <utility>
 #include <cstring>
@@ -13,7 +12,7 @@ import types;
 
 namespace mars {
 
-    export enum class ErrorTag : uint32_t {
+    export enum class ErrorTag : u8 {
         ALL_OKAY = 0,
         SEARCH_FAIL,
         FATAL_ERROR,

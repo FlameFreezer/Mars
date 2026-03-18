@@ -7,11 +7,12 @@ import component;
 import types;
 
 namespace mars {
-    export constexpr u64 maxEntities = 5000;
+    export constexpr u64 maxEntities = 500;
     export constexpr ID nullID = -1;
 
+    export using SignatureT = u32;
     export class Signature {
-        u32 mBits;
+        SignatureT mBits;
         public:
         constexpr Signature() noexcept : mBits(0) {}
         explicit Signature(std::initializer_list<Component> comps) noexcept;
@@ -20,7 +21,7 @@ namespace mars {
         bool has(Component comp) const noexcept;
         bool operator==(std::initializer_list<Component> comps) const noexcept;
         bool operator!=(std::initializer_list<Component> comps) const noexcept;
-        u32 getBits() const noexcept;
+        SignatureT getBits() const noexcept;
     };
 
     export class Entity {

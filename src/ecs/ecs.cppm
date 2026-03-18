@@ -25,8 +25,6 @@ namespace mars {
         std::queue<ID> mIDQueue;
         ComponentSystems mSystems;
         Entity mEntities[maxEntities];
-        template<Component c>
-        void allocSystem() noexcept;
         public:
         static constexpr Entity nullEntity{nullID, Signature()};
         EntityManager() noexcept;
@@ -46,18 +44,5 @@ namespace mars {
             //Using GetComp::Type to get the type of the component in order to downcast the parent pointer safely
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mSystems[c]);
         }
-    };
-    //This one manages the entities used internally by the renderer
-    export class RendererEntityManager {
-        std::queue<ID> mMeshIDQueue;
-        std::queue<ID> mTextureIDQueue;
-        public:
-        RendererEntityManager() noexcept;
-        ComponentSystem<Mesh> sysMesh;
-        ComponentSystem<Texture> sysTexture;
-        ID insertMesh(VkBuffer handle, VkDeviceMemory memory, VkDeviceSize indexOffset, u32 numIndices) noexcept;
-        ID insertTexture(const Texture& t) noexcept;
-        void eraseMesh(ID id) noexcept;
-        void eraseTexture(ID id) noexcept;
     };
 }

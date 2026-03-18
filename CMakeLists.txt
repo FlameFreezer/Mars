@@ -87,8 +87,8 @@ endif()
 target_include_directories(Mars PUBLIC 
     "${PROJECT_SOURCE_DIR}/libraries/SDL/include" 
     "${PROJECT_SOURCE_DIR}/libraries/glm"
+    "${PROJECT_SOURCE_DIR}/libraries/stb"
     "$ENV{VULKAN_SDK}/include" 
-    "${PROJECT_SOURCE_DIR}/libraries"
     "${PROJECT_SOURCE_DIR}/include"
 )
 target_link_directories(Mars INTERFACE

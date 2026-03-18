@@ -1,21 +1,16 @@
 module;
 
-#include <vulkan/vulkan.h>
-
 module ecs;
+
+#define ALLOC_SYSTEM(component) mSystems[(component)] = new ComponentSystem<typename GetComp<(component)>::Type>()
 
 namespace mars {
     ComponentSystemParent*& ComponentSystems::operator[](Component c) noexcept {
-        return mSystems[static_cast<u8>(c)];
+        return mSystems[static_cast<ComponentT>(c)];
     }
 
     const ComponentSystemParent* const& ComponentSystems::operator[](Component c) const noexcept {
-        return mSystems[static_cast<u8>(c)];
-    }
-
-    template<Component c>
-    void EntityManager::allocSystem() noexcept {
-        mSystems[c] = new ComponentSystem<typename GetComp<c>::Type>();
+        return mSystems[static_cast<ComponentT>(c)];
     }
 
     EntityManager::EntityManager() noexcept {
@@ -23,16 +18,16 @@ namespace mars {
             mIDQueue.push(i);
             mEntities[i] = nullEntity;
         }
-        allocSystem<Component::TRANSFORM>();
-        allocSystem<Component::PHYSICS>();
-        allocSystem<Component::MESH>();
-        allocSystem<Component::TEXTURE>();
-        allocSystem<Component::SOLID>();
+        ALLOC_SYSTEM(Component::TRANSFORM);
+        ALLOC_SYSTEM(Component::PHYSICS);
+        ALLOC_SYSTEM(Component::MESH);
+        ALLOC_SYSTEM(Component::TEXTURE);
+        ALLOC_SYSTEM(Component::SOLID);
     }
 
     EntityManager::~EntityManager() noexcept {
-        for(u8 i = 0; i < numComponents; i++) {
-            delete mSystems[static_cast<Component>(i)];
+        for(ComponentT i = 0; i < numComponents; i++) {
+            delete mSystems.mSystems[i];
         }
     }
 
@@ -44,9 +39,9 @@ namespace mars {
         mIDQueue.pop();
         //Number of the current bit we are checking in the signature
         //Corresponds to the component number for this bit
-        u8 bitNum = 0;
+        ComponentT bitNum = 0;
         //For each bit in the signature
-        for(u32 x = 1; x < (1 << 31); x <<= 1) {             
+        for(SignatureT x = 1; x < (1 << 31); x <<= 1) {             
             if(sig.getBits() & x) {
                 mSystems[static_cast<Component>(bitNum)]->reserve(id);
             }
@@ -61,8 +56,8 @@ namespace mars {
         ID id = e.id();        
         mIDQueue.push(id);
         Signature sig = e.signature();
-        u8 bitNum = 0;
-        for(u32 x = 1; x < (1 << 31); x <<= 1) {
+        ComponentT bitNum = 0;
+        for(SignatureT x = 1; x < (1 << 31); x <<= 1) {
             if(sig.getBits() & x) {
                 mSystems[static_cast<Component>(bitNum++)]->erase(id);
             }
@@ -72,36 +67,5 @@ namespace mars {
 
     Entity EntityManager::getEntity(ID id) const noexcept {
         return mEntities[id];
-    }
-
-    RendererEntityManager::RendererEntityManager() noexcept {
-        for(ID i = 0; i < maxMeshes; i++) {
-            mMeshIDQueue.push(i);
-        }
-        for(ID i = 0; i < maxTextures; i++) {
-            mTextureIDQueue.push(i);
-        }
-    }
-
-    ID RendererEntityManager::insertMesh(VkBuffer handle, VkDeviceMemory memory, VkDeviceSize indexOffset, u32 numIndices) noexcept {
-        const ID id = mMeshIDQueue.front();
-        mMeshIDQueue.pop();
-        sysMesh.insert(id, handle, memory, indexOffset, numIndices);
-        return id;
-    }
-    ID RendererEntityManager::insertTexture(const Texture& t) noexcept {
-        const ID id = mTextureIDQueue.front();
-        mTextureIDQueue.pop();
-        sysTexture.insert(id, t);
-        return id;
-    }
-
-    void RendererEntityManager::eraseMesh(ID id) noexcept {
-        sysMesh.erase(id);
-        mMeshIDQueue.push(id);
-    }
-    void RendererEntityManager::eraseTexture(ID id) noexcept {
-        sysTexture.erase(id);
-        mTextureIDQueue.push(id);
     }
 };

@@ -31,7 +31,9 @@ import heap_array;
 import flag_bits;
 import vkhelper;
 import types;
-import ecs;
+import component_system;
+import component;
+import renderer_ecs;
 
 namespace mars {
     constexpr std::array<const char*, 3> neededDeviceExtensions = {
@@ -1689,13 +1691,15 @@ namespace mars {
             for(VkPhysicalDevice const& currentPhysicalDevice : physicalDevices) {
                 //Check device extension support for the current physical device
                 switch(Error<noreturn> procResult = checkDeviceExtensionSupport(currentPhysicalDevice); procResult.tag()) {
-                    case ErrorTag::SEARCH_FAIL: goto Continue_Search;
+                    case ErrorTag::SEARCH_FAIL: continue;
                     case ErrorTag::FATAL_ERROR: return procResult.moveError<PickPhysicalDeviceResult>();
                     case ErrorTag::ALL_OKAY: break;
                 }
 
                 //Check physical device's support for needed features
-                if(!checkDeviceFeatureSupport(currentPhysicalDevice)) goto Continue_Search;
+                if(!checkDeviceFeatureSupport(currentPhysicalDevice)) {
+                    continue;
+                }
 
                 //Get physical device's capabilities with the surface
                 if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -1714,14 +1718,14 @@ namespace mars {
 
                 //Choose a present mode to use
                 switch(Error<VkPresentModeKHR> presentMode = choosePresentMode(currentPhysicalDevice, surface); presentMode.tag()) {
-                    case ErrorTag::SEARCH_FAIL: goto Continue_Search;
+                    case ErrorTag::SEARCH_FAIL: continue;
                     case ErrorTag::FATAL_ERROR: return presentMode.moveError<PickPhysicalDeviceResult>();
                     case ErrorTag::ALL_OKAY: result.surfaceInfo.presentMode = presentMode;
                 }
 
                 //Pick the desired queue family index
                 switch(Error<PickQueueFamilyIndexResult> queueFamilyInfo = pickQueueFamilyIndex(currentPhysicalDevice, surface); queueFamilyInfo.tag()) {
-                    case ErrorTag::SEARCH_FAIL: goto Continue_Search;
+                    case ErrorTag::SEARCH_FAIL: continue;
                     case ErrorTag::FATAL_ERROR: return queueFamilyInfo.moveError<PickPhysicalDeviceResult>();
                     case ErrorTag::ALL_OKAY: result.queueFamilyInfo = queueFamilyInfo;
                 }
@@ -1730,11 +1734,6 @@ namespace mars {
                 // create the logical device
                 result.physicalDevice = currentPhysicalDevice;
                 return result;
-
-                //This label simply causes the loop to continue. I'm doing this because I don't
-                // like using the `continue` keyword in switch statements due to `break` having
-                // different behavior within them.
-                Continue_Search:
             }
             return {ErrorTag::SEARCH_FAIL, "Failed to find suitable physical device"};
         }
@@ -1936,13 +1935,16 @@ namespace mars {
                     return {ErrorTag::FATAL_ERROR, "Failed to enumerate instance layer properties!"};
                 }
                 for(char const* layer : validationLayers) {
+                    bool foundLayer = false;
                     for(VkLayerProperties const& property : layerProperties) {
                         if(std::strcmp(layer, property.layerName) == 0) {
-                            goto Next_Layer;
+                            foundLayer = true;
+                            break;
                         }
                     }
-                    return {ErrorTag::FATAL_ERROR, std::format("Needed layer \"{}\" not found", layer)};
-                    Next_Layer:
+                    if(!foundLayer) {
+                        return {ErrorTag::FATAL_ERROR, std::format("Needed layer \"{}\" not found", layer)};
+                    }
                 }
             }
             u32 extCount = 0;
