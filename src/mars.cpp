@@ -101,8 +101,7 @@ namespace mars {
         }
         Renderer::Systems mRendererSystems;
         mRendererSystems.transform = &entityManager.system<Component::TRANSFORM>();
-        mRendererSystems.mesh = &entityManager.system<Component::MESH>();
-        mRendererSystems.texture = &entityManager.system<Component::TEXTURE>();
+        mRendererSystems.draw = &entityManager.system<Component::DRAW>();
         TRY(mRenderer->drawFrame(mDeltaTime, camera.fov, aspect, mRendererSystems));
         return success();
     }
@@ -195,9 +194,9 @@ namespace mars {
     }
 
     void Game::setMesh(Entity e, ID id) noexcept {
-        entityManager.system<Component::MESH>()[e.id()] = id;
+        entityManager.system<Component::DRAW>()[e.id()].meshID = id;
     }
     void Game::setTexture(Entity e, ID id) noexcept {
-        entityManager.system<Component::TEXTURE>()[e.id()] = id;
+        entityManager.system<Component::DRAW>()[e.id()].textureID = id;
     }
 }

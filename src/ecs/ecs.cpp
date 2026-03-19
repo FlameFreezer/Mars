@@ -20,8 +20,7 @@ namespace mars {
         }
         ALLOC_SYSTEM(Component::TRANSFORM);
         ALLOC_SYSTEM(Component::PHYSICS);
-        ALLOC_SYSTEM(Component::MESH);
-        ALLOC_SYSTEM(Component::TEXTURE);
+        ALLOC_SYSTEM(Component::DRAW);
         ALLOC_SYSTEM(Component::SOLID);
     }
 

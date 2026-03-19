@@ -529,8 +529,7 @@ namespace mars {
 
         struct Systems {
             const ComponentSystem<Transform>* transform;
-            const ComponentSystem<ID>* mesh;
-            const ComponentSystem<ID>* texture;
+            const ComponentSystem<Draw>* draw;
         };
 
         struct SurfaceInfo {
@@ -1083,9 +1082,9 @@ namespace mars {
                 //Get the ID of the entity associated with the current transform
                 const ID entityID = systems.transform->getIDs()[i];
                 //Get the ID of the mesh associated with the entity
-                const ID meshID = (*systems.texture)[entityID];
+                const ID meshID = (*systems.draw)[entityID].meshID;
                 //Get the ID of the texture associated with the entity
-                const ID textureID = (*systems.texture)[entityID];
+                const ID textureID = (*systems.draw)[entityID].textureID;
 
                 //Push the descriptor for the texture
                 const VkDescriptorImageInfo materialInfo = {

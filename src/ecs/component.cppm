@@ -13,8 +13,7 @@ namespace mars {
     export enum class Component : ComponentT {
         TRANSFORM,
         PHYSICS,
-        MESH,
-        TEXTURE,
+        DRAW,
         SOLID,
         //KEEP THIS AT THE END OF THE ENUM
         MAX_COMPONENT
@@ -34,6 +33,10 @@ namespace mars {
         float drag;
         float maxSpeed;
         float jumpSpeed;
+    };
+    export struct Draw {
+        ID meshID;
+        ID textureID;
     };
     export enum class BoundingShape : ComponentT {
         RECTANGLE,
@@ -55,7 +58,6 @@ namespace mars {
     struct GetComp {};
     template<> struct GetComp<Component::TRANSFORM> {using Type = Transform;};
     template<> struct GetComp<Component::PHYSICS> {using Type = Physics;};
-    template<> struct GetComp<Component::MESH> {using Type = ID;};
-    template<> struct GetComp<Component::TEXTURE> {using Type = ID;};
+    template<> struct GetComp<Component::DRAW> {using Type = Draw;};
     template<> struct GetComp<Component::SOLID> {using Type = Solid;};
 }
