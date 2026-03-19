@@ -21,6 +21,20 @@ The renderer, for now, is a two-phase system which first draws a 2D scene and th
 - No use of C++ Standard Template Library
 - Extensibility for Component Systems
 - Proper documentation
+- Support for compilers other than Clang
+
+## How to Compile
+
+Notes:
+
+- Mars only compiles with Clang for now
+- Mars does not support UNIX Makefiles because of its use of C++20's modules feature
+
+1. Install clang
+2. `$ git clone --recurse-submodules https://github.com/FlameFreezer/Mars`
+3. `$ cd Mars`
+4. `$ mkdir build && cmake --B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++`
+5. Build with your chosen build system or `$ cmake --build build`
 
 ## Why is it called Mars?
 
