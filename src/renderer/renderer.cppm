@@ -982,7 +982,7 @@ namespace mars {
             vkCmdEndRendering(commandBuffer);
         }
 
-        void renderPass2D(u32 d, VkCommandBuffer commandBuffer, Systems systems) noexcept {
+        void renderPass2D(u32 d, float pixelsPerMeter, VkCommandBuffer commandBuffer, Systems systems) noexcept {
             //Render to the 2D render target, resolve to the 2D scene texture image
             //The texture image will be used as the texture for the cube
             const VkRenderingAttachmentInfo renderAttachment = {
@@ -1115,9 +1115,9 @@ namespace mars {
 
                 //Create model matrix
                 glm::mat4 modelMatrix(1.0f);
-                modelMatrix[0][0] = systems.transform->data()[i].scale.x;
-                modelMatrix[1][1] = systems.transform->data()[i].scale.y;
-                modelMatrix[3] = glm::vec4(systems.transform->data()[i].position, 1.0f);
+                modelMatrix[0][0] = systems.transform->data()[i].scale.x * pixelsPerMeter;
+                modelMatrix[1][1] = systems.transform->data()[i].scale.y * pixelsPerMeter;
+                modelMatrix[3] = glm::vec4(systems.transform->data()[i].position * pixelsPerMeter, 1.0f);
                 //Push the model matrix to the shader
                 vkCmdPushConstants(commandBuffer, pipelineLayout2D, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
 
@@ -2229,7 +2229,7 @@ namespace mars {
             };
         }
 
-        Error<noreturn> drawFrame(std::chrono::nanoseconds deltaTime, float fov, float aspect, Systems systems) noexcept {
+        Error<noreturn> drawFrame(std::chrono::nanoseconds deltaTime, float fov, float aspect, float pixelsPerMeter, Systems systems) noexcept {
             //Fix the cube - only if any of the viewport details changed
             if(fov != cube.fov or aspect != cube.aspect) {
                 float halfd = glm::tan(fov / 2.0f);
@@ -2282,7 +2282,7 @@ namespace mars {
                 depthImage3D.destroy(device);
                 TRY(createDepthImages());
                 flags &= ~flagBits::recreateSwapchain;
-                return drawFrame(deltaTime, fov, aspect, systems);
+                return drawFrame(deltaTime, fov, aspect, pixelsPerMeter, systems);
             }
             //Fatal error has occurred
             else if(res != VK_SUCCESS) {
@@ -2333,7 +2333,7 @@ namespace mars {
 
             vkCmdPipelineBarrier2(commandBuffer2D, &colorWriteDependency2D);
 
-            renderPass2D(cube.dim, commandBuffer2D, systems);
+            renderPass2D(cube.dim, pixelsPerMeter, commandBuffer2D, systems);
 
             //Submit to create 2D scene
             if(vkEndCommandBuffer(commandBuffer2D) != VK_SUCCESS) {

@@ -31,12 +31,6 @@ namespace mars {
         u64 size() const noexcept {
             return mSize;
         }
-        //Writes the ID to correct spaces of constituent arrays, then increments size
-        u64 reserve(ID id) noexcept {
-            mIndices[id] = mSize;
-            mIDs[mSize] = id;
-            return mSize++;
-        }
         //Gets the internal index associated with the ID
         u64 index(ID id) const noexcept {
             return mIndices[id];
@@ -47,6 +41,12 @@ namespace mars {
         }
         const ID* getIDs() const noexcept {
             return mIDs;
+        }
+        //Writes the ID to correct spaces of constituent arrays, then increments size
+        u64 reserve(ID id) noexcept {
+            mIndices[id] = mSize;
+            mIDs[mSize] = id;
+            return mSize++;
         }
         //Abstract function which should swap the data at id with the data at the end, then calls
         // swapErase

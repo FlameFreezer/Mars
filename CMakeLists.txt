@@ -48,7 +48,6 @@ add_custom_command(OUTPUT shader3d.spv
     CODEGEN
     VERBATIM
 )
-add_custom_target(marsShaders DEPENDS shader2d.spv shader3d.spv)
 
 # Set compiler flags for Mars library (these cause issues when building SDL3 
 #   so I have to set them after it it built)
@@ -57,7 +56,6 @@ set(CMAKE_LINK_WARNING_AS_ERROR True)
 
 # Set up mars target library
 add_library(Mars)
-add_dependencies(Mars marsShaders)
 file(GLOB_RECURSE 
     MARS_MODULE_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/*.cppm")
 file(GLOB_RECURSE 
@@ -68,7 +66,7 @@ target_sources(Mars
     TYPE CXX_MODULES 
     BASE_DIRS src
     FILES "${MARS_MODULE_FILES}"   
-    PRIVATE "${MARS_SOURCE_FILES}"
+    PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv"
 )
 
 # Link libraries to mars

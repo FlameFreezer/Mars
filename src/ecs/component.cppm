@@ -14,7 +14,7 @@ namespace mars {
         TRANSFORM,
         PHYSICS,
         DRAW,
-        SOLID,
+        COLLIDE,
         //KEEP THIS AT THE END OF THE ENUM
         MAX_COMPONENT
     };
@@ -42,7 +42,7 @@ namespace mars {
         RECTANGLE,
         CIRCLE,
     };
-    export struct Solid {
+    export struct Collide {
         BoundingShape boundingShape;
         glm::vec2 position;
         union {
@@ -51,6 +51,8 @@ namespace mars {
             //Only valid if shape is a rectangle
             glm::vec2 scale;
         };
+        bool isSolid;
+        Collide() noexcept : isSolid(false) {}
     };
         
     //This struct template allows accessing the type of a component at compile time just using the actual component enum member
@@ -59,5 +61,5 @@ namespace mars {
     template<> struct GetComp<Component::TRANSFORM> {using Type = Transform;};
     template<> struct GetComp<Component::PHYSICS> {using Type = Physics;};
     template<> struct GetComp<Component::DRAW> {using Type = Draw;};
-    template<> struct GetComp<Component::SOLID> {using Type = Solid;};
+    template<> struct GetComp<Component::COLLIDE> {using Type = Collide;};
 }

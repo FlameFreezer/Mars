@@ -13,6 +13,8 @@ module;
 
 module mars;
 
+constexpr float defaultPixelsPerMeter = 64.0f;
+
 namespace mars {
     Error<noreturn> initLibrary() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -25,9 +27,21 @@ namespace mars {
         SDL_Quit();
     }
 
-    Game::Game() noexcept : mWindowName("My Mars Game"), mAppName("My Mars Game"), mFlags(0), mRenderer(nullptr), gamepad(nullptr) {}
+    Game::Game() noexcept : 
+        mWindowName("My Mars Game"), 
+        mAppName("My Mars Game"), 
+        mFlags(0), 
+        mRenderer(nullptr), 
+        gamepad(nullptr),
+        pixelsPerMeter(defaultPixelsPerMeter) {}
 
-    Game::Game(const std::string& name) noexcept : mWindowName(name), mAppName(name), mFlags(0), mRenderer(nullptr), gamepad(nullptr) {}
+    Game::Game(const std::string& name) noexcept : 
+        mWindowName(name), 
+        mAppName(name), 
+        mFlags(0), 
+        mRenderer(nullptr), 
+        gamepad(nullptr),
+        pixelsPerMeter(defaultPixelsPerMeter) {}
 
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
@@ -102,7 +116,7 @@ namespace mars {
         Renderer::Systems mRendererSystems;
         mRendererSystems.transform = &entityManager.system<Component::TRANSFORM>();
         mRendererSystems.draw = &entityManager.system<Component::DRAW>();
-        TRY(mRenderer->drawFrame(mDeltaTime, camera.fov, aspect, mRendererSystems));
+        TRY(mRenderer->drawFrame(mDeltaTime, camera.fov, aspect, pixelsPerMeter, mRendererSystems));
         return success();
     }
 
@@ -119,8 +133,8 @@ namespace mars {
         if(e1 == e2) return false;
         //Null entity produces no collisions
         if(e1 == EntityManager::nullEntity or e2 == EntityManager::nullEntity) return false;
-        const Solid& s1 = *solid(e1).data();
-        const Solid& s2 = *solid(e2).data();
+        const Collide& s1 = *collide(e1).data();
+        const Collide& s2 = *collide(e2).data();
         bool xWithin = false, yWithin = false;
         if(s1.boundingShape == BoundingShape::RECTANGLE and s2.boundingShape == BoundingShape::RECTANGLE) { 
             xWithin = s1.position.x + s1.scale.x >= s2.position.x and s2.position.x + s2.scale.x >= s1.position.x;
@@ -133,9 +147,9 @@ namespace mars {
     }
 
     Entity Game::getCollision(Entity e) const noexcept {
-        const auto sysSolid = entityManager.system<Component::SOLID>();
-        const ID* ids = sysSolid.getIDs();
-        for(u64 i = 0; i < sysSolid.size(); i++) {
+        const auto sysCollide = entityManager.system<Component::COLLIDE>();
+        const ID* ids = sysCollide.getIDs();
+        for(u64 i = 0; i < sysCollide.size(); i++) {
             Entity other = entityManager.getEntity(ids[i]);
             if(checkCollision(e, other)) {
                 return other;
@@ -144,12 +158,12 @@ namespace mars {
         return EntityManager::nullEntity;
     }
 
-
     Entity Game::getFloor(Entity e) noexcept {
-        Solid* s = solid(e).data();
-        s->position.y++;
+        Collide* s = collide(e).data();
+        static constexpr float snappingRange = 0.05f;
+        s->position.y += snappingRange;
         Entity floor = getCollision(e);
-        s->position.y--;
+        s->position.y -= snappingRange;
         return floor;
     }
 
@@ -179,18 +193,18 @@ namespace mars {
         return &entityManager.system<Component::PHYSICS>()[e.id()];
     }
 
-    Error<Solid*> Game::solid(Entity e) noexcept {
-        if(!e.signature().has(Component::SOLID)) {
-            return fatal<Solid*>(std::format("Tried to get Solid for the Entity with ID {}, which does not have a Solid component", e.id()));
+    Error<Collide*> Game::collide(Entity e) noexcept {
+        if(!e.signature().has(Component::COLLIDE)) {
+            return fatal<Collide*>(std::format("Tried to get Collide for the Entity with ID {}, which does not have a Collide component", e.id()));
         }
-        return &entityManager.system<Component::SOLID>()[e.id()];
+        return &entityManager.system<Component::COLLIDE>()[e.id()];
     }
 
-    Error<const Solid*> Game::solid(Entity e) const noexcept {
-        if(!e.signature().has(Component::SOLID)) {
-            return fatal<const Solid*>(std::format("Tried to get Solid for the Entity with ID {}, which does not have a Solid component", e.id()));
+    Error<const Collide*> Game::collide(Entity e) const noexcept {
+        if(!e.signature().has(Component::COLLIDE)) {
+            return fatal<const Collide*>(std::format("Tried to get Collide for the Entity with ID {}, which does not have a Collide component", e.id()));
         }
-        return &entityManager.system<Component::SOLID>()[e.id()];
+        return &entityManager.system<Component::COLLIDE>()[e.id()];
     }
 
     void Game::setMesh(Entity e, ID id) noexcept {

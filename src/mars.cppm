@@ -40,6 +40,7 @@ namespace mars {
         Camera camera;
         const bool* keyState;
         SDL_Gamepad* gamepad;
+        float pixelsPerMeter;
         //Constructors - don't do any actual initialization. Call `init` to initialize the game and necessary libraries
         Game() noexcept;
         Game(const std::string& name) noexcept;
@@ -89,8 +90,8 @@ namespace mars {
         Error<const Transform*> transform(Entity e) const noexcept;
         Error<Physics*> physics(Entity e) noexcept;
         Error<const Physics*> physics(Entity e) const noexcept;
-        Error<Solid*> solid(Entity e) noexcept;
-        Error<const Solid*> solid(Entity e) const noexcept;
+        Error<Collide*> collide(Entity e) noexcept;
+        Error<const Collide*> collide(Entity e) const noexcept;
         void setMesh(Entity e, ID id) noexcept;
         void setTexture(Entity e, ID id) noexcept;
     };

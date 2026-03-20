@@ -21,7 +21,7 @@ namespace mars {
         ALLOC_SYSTEM(Component::TRANSFORM);
         ALLOC_SYSTEM(Component::PHYSICS);
         ALLOC_SYSTEM(Component::DRAW);
-        ALLOC_SYSTEM(Component::SOLID);
+        ALLOC_SYSTEM(Component::COLLIDE);
     }
 
     EntityManager::~EntityManager() noexcept {

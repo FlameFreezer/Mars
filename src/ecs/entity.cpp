@@ -13,7 +13,7 @@ namespace mars {
         }
     }
 
-    bool Signature::has(std::initializer_list<Component> comps) const noexcept {
+    bool Signature::has(const std::initializer_list<Component> comps) const noexcept {
         SignatureT currentBit;
         SignatureT sig = 0;
         for(Component c : comps) {
