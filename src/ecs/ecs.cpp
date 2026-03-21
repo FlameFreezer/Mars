@@ -22,6 +22,7 @@ namespace mars {
         ALLOC_SYSTEM(Component::PHYSICS);
         ALLOC_SYSTEM(Component::DRAW);
         ALLOC_SYSTEM(Component::COLLIDE);
+        ALLOC_SYSTEM(Component::DYNAMICS);
     }
 
     EntityManager::~EntityManager() noexcept {
@@ -40,7 +41,7 @@ namespace mars {
         //Corresponds to the component number for this bit
         ComponentT bitNum = 0;
         //For each bit in the signature
-        for(SignatureT x = 1; x < (1 << 31); x <<= 1) {             
+        for(SignatureT x = 1; x != 0; x <<= 1) {             
             if(sig.getBits() & x) {
                 mSystems[static_cast<Component>(bitNum)]->reserve(id);
             }

@@ -15,7 +15,7 @@ namespace mars {
         SignatureT mBits;
         public:
         constexpr Signature() noexcept : mBits(0) {}
-        explicit Signature(std::initializer_list<Component> comps) noexcept;
+        Signature(std::initializer_list<Component> comps) noexcept;
         constexpr Signature(const Signature& s) noexcept : mBits(s.mBits) {}
         bool has(const std::initializer_list<Component> comps) const noexcept;
         bool has(Component comp) const noexcept;

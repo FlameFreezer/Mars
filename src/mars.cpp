@@ -133,8 +133,8 @@ namespace mars {
         if(e1 == e2) return false;
         //Null entity produces no collisions
         if(e1 == EntityManager::nullEntity or e2 == EntityManager::nullEntity) return false;
-        const Collide& s1 = *collide(e1).data();
-        const Collide& s2 = *collide(e2).data();
+        const Collide& s1 = collide(e1);
+        const Collide& s2 = collide(e2);
         bool xWithin = false, yWithin = false;
         if(s1.boundingShape == BoundingShape::RECTANGLE and s2.boundingShape == BoundingShape::RECTANGLE) { 
             xWithin = s1.position.x + s1.scale.x >= s2.position.x and s2.position.x + s2.scale.x >= s1.position.x;
@@ -159,52 +159,42 @@ namespace mars {
     }
 
     Entity Game::getFloor(Entity e) noexcept {
-        Collide* s = collide(e).data();
+        auto& s = collide(e);
         static constexpr float snappingRange = 0.05f;
-        s->position.y += snappingRange;
+        s.position.y += snappingRange;
         Entity floor = getCollision(e);
-        s->position.y -= snappingRange;
+        s.position.y -= snappingRange;
         return floor;
     }
 
-    Error<Transform*> Game::transform(Entity e) noexcept {
-        if(!e.signature().has(Component::TRANSFORM)) {
-            return fatal<Transform*>(std::format("Tried to get Transform for the Entity with ID {}, which does not have a Transform component", e.id()));
-        }
-        return &entityManager.system<Component::TRANSFORM>()[e.id()];
+    Transform& Game::transform(Entity e) noexcept {
+        return entityManager.system<Component::TRANSFORM>()[e.id()];
     }
-    Error<const Transform*> Game::transform(Entity e) const noexcept {
-        if(!e.signature().has(Component::TRANSFORM)) {
-            return fatal<const Transform*>(std::format("Tried to get Transform for the Entity with ID {}, which does not have a Transform component", e.id()));
-        }
-        return &entityManager.system<Component::TRANSFORM>()[e.id()];
+    const Transform& Game::transform(Entity e) const noexcept {
+        return entityManager.system<Component::TRANSFORM>()[e.id()];
     }
 
-    Error<Physics*> Game::physics(Entity e) noexcept {
-        if(!e.signature().has(Component::PHYSICS)) {
-            return fatal<Physics*>(std::format("Tried to get Physics for the Entity with ID {}, which does not have a Physics component", e.id()));
-        }
-        return &entityManager.system<Component::PHYSICS>()[e.id()];
+    Physics& Game::physics(Entity e) noexcept {
+        return entityManager.system<Component::PHYSICS>()[e.id()];
     }
-    Error<const Physics*> Game::physics(Entity e) const noexcept {
-        if(!e.signature().has(Component::PHYSICS)) {
-            return fatal<const Physics*>(std::format("Tried to get Physics for the Entity with ID {}, which does not have a Physics component", e.id()));
-        }
-        return &entityManager.system<Component::PHYSICS>()[e.id()];
+    const Physics& Game::physics(Entity e) const noexcept {
+        return entityManager.system<Component::PHYSICS>()[e.id()];
     }
 
-    Error<Collide*> Game::collide(Entity e) noexcept {
-        if(!e.signature().has(Component::COLLIDE)) {
-            return fatal<Collide*>(std::format("Tried to get Collide for the Entity with ID {}, which does not have a Collide component", e.id()));
-        }
-        return &entityManager.system<Component::COLLIDE>()[e.id()];
+    Collide& Game::collide(Entity e) noexcept {
+        return entityManager.system<Component::COLLIDE>()[e.id()];
     }
 
-    Error<const Collide*> Game::collide(Entity e) const noexcept {
-        if(!e.signature().has(Component::COLLIDE)) {
-            return fatal<const Collide*>(std::format("Tried to get Collide for the Entity with ID {}, which does not have a Collide component", e.id()));
-        }
-        return &entityManager.system<Component::COLLIDE>()[e.id()];
+    const Collide& Game::collide(Entity e) const noexcept {
+        return entityManager.system<Component::COLLIDE>()[e.id()];
+    }
+
+    Dynamics& Game::dynamics(Entity e) noexcept {
+        return entityManager.system<Component::DYNAMICS>()[e.id()];
+    }
+
+    const Dynamics& Game::dynamics(Entity e) const noexcept {
+        return entityManager.system<Component::DYNAMICS>()[e.id()];
     }
 
     void Game::setMesh(Entity e, ID id) noexcept {
@@ -212,5 +202,47 @@ namespace mars {
     }
     void Game::setTexture(Entity e, ID id) noexcept {
         entityManager.system<Component::DRAW>()[e.id()].textureID = id;
+    }
+    void Game::applyPhysics() noexcept {
+        auto& sysPhysics = entityManager.system<Component::PHYSICS>();
+        //For every physics component
+        for(u64 i = 0; i < sysPhysics.size(); i++) {
+            //Get the entity associated with the component
+            const Entity e = entityManager.getEntity(sysPhysics.getIDs()[i]);
+            const Physics& p = sysPhysics.data()[i];
+            Transform& t = transform(e);
+            //Update its position using the velocity
+            t.position += glm::vec3(p.velocity, 0.0f) * deltaTime();
+            //If it has a collision component, update that too
+            if(e.signature().has(Component::COLLIDE)) {
+                Collide& c = collide(e);
+                c.position = t.position;
+            }
+        }
+    }
+    void Game::findCollisions() noexcept {
+        auto& sysDynamics = entityManager.system<Component::DYNAMICS>();
+        auto& sysCollide = entityManager.system<Component::COLLIDE>();
+        //Clear out all collision lists before going on to refill them
+        for(u64 i = 0; i < sysDynamics.size(); i++) {
+            sysDynamics.data()[i].collisions.clear();
+        }
+        //For every dynamic entity
+        for(u64 i = 0; i < sysDynamics.size(); i++) {
+            const Entity e1 = entityManager.getEntity(sysDynamics.getIDs()[i]);
+            auto& d1 = sysDynamics.data()[i];
+            //For every entity with collision
+            for(u64 j = 0; j < sysCollide.size(); j++) {
+                const Entity e2 = entityManager.getEntity(sysCollide.getIDs()[j]);
+                if(checkCollision(e1, e2)) {
+                    d1.collisions.push_back(e2.id());
+                    //Add e1 to the collision list of e2 if it has Dynamics
+                    if(e2.signature().has(Component::DYNAMICS)) {
+                        auto& d2 = sysDynamics[e2.id()];
+                        d2.collisions.push_back(e1.id());
+                    }
+                }
+            }
+        }
     }
 }

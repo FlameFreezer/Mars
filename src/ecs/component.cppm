@@ -1,5 +1,7 @@
 module;
 
+#include <vector>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <vulkan/vulkan.h>
@@ -15,6 +17,7 @@ namespace mars {
         PHYSICS,
         DRAW,
         COLLIDE,
+        DYNAMICS,
         //KEEP THIS AT THE END OF THE ENUM
         MAX_COMPONENT
     };
@@ -28,15 +31,18 @@ namespace mars {
     export struct Physics {
         glm::vec2 velocity;
         glm::vec2 gravity;
+    };
+    export struct Draw {
+        ID meshID;
+        ID textureID;
+    };
+    export struct Dynamics {
+        std::vector<ID> collisions;
         float acceleration;
         float friction;
         float drag;
         float maxSpeed;
         float jumpSpeed;
-    };
-    export struct Draw {
-        ID meshID;
-        ID textureID;
     };
     export enum class BoundingShape : ComponentT {
         RECTANGLE,
@@ -62,4 +68,5 @@ namespace mars {
     template<> struct GetComp<Component::PHYSICS> {using Type = Physics;};
     template<> struct GetComp<Component::DRAW> {using Type = Draw;};
     template<> struct GetComp<Component::COLLIDE> {using Type = Collide;};
+    template<> struct GetComp<Component::DYNAMICS> {using Type = Dynamics;};
 }

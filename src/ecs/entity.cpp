@@ -5,27 +5,44 @@ module;
 module entity;
 
 namespace mars {
+
+    constexpr SignatureT componentToBit(Component c) noexcept {
+        return 1 << static_cast<SignatureT>(c);
+    }
+
+    SignatureT implyComponents(Component c) noexcept {
+        SignatureT result = componentToBit(c);
+        switch(c) {
+        case Component::PHYSICS:
+            result |= implyComponents(Component::TRANSFORM); 
+            break;
+        case Component::DRAW:
+            result |= implyComponents(Component::TRANSFORM);
+            break;
+        case Component::DYNAMICS:
+            result |= implyComponents(Component::PHYSICS) | implyComponents(Component::COLLIDE);
+            break;
+        default: break;
+        }
+        return result;
+    }
+
     Signature::Signature(std::initializer_list<Component> comps) noexcept : mBits(0) {
-        SignatureT currentBit;
         for(Component c : comps) {
-            currentBit = 1 << static_cast<SignatureT>(c);
-            mBits |= currentBit;
+            mBits |= implyComponents(c);
         }
     }
 
     bool Signature::has(const std::initializer_list<Component> comps) const noexcept {
-        SignatureT currentBit;
         SignatureT sig = 0;
         for(Component c : comps) {
-            currentBit = 1 << static_cast<SignatureT>(c);
-            sig |= currentBit;
+            sig |= componentToBit(c);
         }
         return mBits & sig;
     }
 
     bool Signature::has(Component comp) const noexcept {
-        SignatureT bit = 1 << static_cast<SignatureT>(comp);
-        return mBits & bit;
+        return mBits & componentToBit(comp);
     }
 
     SignatureT Signature::getBits() const noexcept {

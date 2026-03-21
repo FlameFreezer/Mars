@@ -86,13 +86,19 @@ namespace mars {
         bool checkCollision(Entity e1, Entity e2) const noexcept;
         Entity getCollision(Entity e) const noexcept;
         Entity getFloor(Entity e) noexcept;
-        Error<Transform*> transform(Entity e) noexcept;
-        Error<const Transform*> transform(Entity e) const noexcept;
-        Error<Physics*> physics(Entity e) noexcept;
-        Error<const Physics*> physics(Entity e) const noexcept;
-        Error<Collide*> collide(Entity e) noexcept;
-        Error<const Collide*> collide(Entity e) const noexcept;
+        Transform& transform(Entity e) noexcept;
+        const Transform& transform(Entity e) const noexcept;
+        Physics& physics(Entity e) noexcept;
+        const Physics& physics(Entity e) const noexcept;
+        Collide& collide(Entity e) noexcept;
+        const Collide& collide(Entity e) const noexcept;
+        Dynamics& dynamics(Entity e) noexcept;
+        const Dynamics& dynamics(Entity e) const noexcept;
         void setMesh(Entity e, ID id) noexcept;
         void setTexture(Entity e, ID id) noexcept;
+        void applyPhysics() noexcept;
+        /// Fills the collision list for every Entity with Dynamics with the IDs of every Entity it is in collision with.
+        /// Returns: void   Nothing
+        void findCollisions() noexcept;
     };
 };
