@@ -93,5 +93,104 @@ namespace mars {
             mData[mIndices[id]] = mData[mSize];
             swapErase(id);
         }
+        void swap(ID id1, ID id2) noexcept {
+            const u64 index1 = mIndices[id1];
+            const u64 index2 = mIndices[id2];
+
+            const C tmpData = mData[index1];
+            mData[index1] = mData[index2];
+            mData[index2] = tmpData;
+
+            const ID tmpID = mIDs[index1];
+            mIDs[index1] = mIDs[index2];
+            mIDs[index2] = tmpID;
+
+            mIndices[id1] = index2;
+            mIndices[id2] = index1;
+        }
+        struct Pair {
+            C& data;
+            ID id;
+        };
+        struct CPair {
+            const C& data;
+            ID id;
+        };
+        class Iterator {
+            u64 mIndex;
+            ComponentSystem<C>* mParent;
+            Iterator(u64 index, ComponentSystem<C>* parent) noexcept : mIndex(index), mParent(parent) {}
+            public:
+            friend class ComponentSystem<C>;
+            Iterator(const Iterator& other) : mIndex(other.mIndex), mParent(other.mParent) {}
+            Pair operator*() noexcept {
+                return {mParent->mData[mIndex], mParent->mIDs[mIndex]};
+            }
+            C* operator->() noexcept {
+                return &mParent->mData[mIndex];
+            }
+            Iterator& operator++(int) noexcept {
+                ++mIndex;
+                return *this;
+            }
+            Iterator operator++() noexcept {
+                Iterator res = *this;
+                mIndex++;
+                return res;
+            }
+            bool operator==(const Iterator& other) noexcept {
+                return mParent == other.mParent and mIndex == other.mIndex;
+            }
+            bool operator!=(const Iterator& other) noexcept {
+                return mParent != other.mParent or mIndex != other.mIndex;
+            }
+            Iterator& operator=(const Iterator& rhs) noexcept {
+                mIndex = rhs.mIndex;
+                mParent = rhs.mParent;
+            }
+        };
+        class CIterator {
+            u64 mIndex;
+            const ComponentSystem<C>& mParent;
+            CIterator(u64 index, const ComponentSystem<C>& parent) noexcept : mIndex(index), mParent(parent) {}
+            public:
+            friend class ComponentSystem<C>;
+            CIterator(const CIterator& other) : mIndex(other.mIndex), mParent(other.mParent) {}
+            CPair operator*() const noexcept {
+                return {mParent.mData[mIndex], mParent.mIDs[mIndex]};
+            }
+            const C* operator->() const noexcept {
+                return &mParent.mData[mIndex];
+            }
+            CIterator& operator++(int) noexcept {
+                ++mIndex;
+                return *this;
+            }
+            CIterator operator++() noexcept {
+                CIterator res = *this;
+                mIndex++;
+                return res;
+            }
+            bool operator==(const CIterator& other) noexcept {
+                return &mParent == &other.mParent and mIndex == other.mIndex;
+            }
+            bool operator!=(const CIterator& other) noexcept {
+                return &mParent != &other.mParent or mIndex != other.mIndex;
+            }
+        };
+
+        Iterator begin() noexcept {
+            return {0, this};
+        }
+        Iterator end() noexcept {
+            return {mSize, this};
+        }
+
+        CIterator begin() const noexcept {
+            return {0, *this};
+        }
+        CIterator end() const noexcept {
+            return {mSize, *this};
+        }
     };
 }

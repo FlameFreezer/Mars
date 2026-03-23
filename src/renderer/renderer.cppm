@@ -1078,9 +1078,7 @@ namespace mars {
             }
 
             //Iterate through every transform (the most frequently varying data)
-            for(u64 i = 0; i < systems.transform->size(); i++) {
-                //Get the ID of the entity associated with the current transform
-                const ID entityID = systems.transform->getIDs()[i];
+            for(auto [t, entityID] : *systems.transform) {
                 //Get the ID of the mesh associated with the entity
                 const ID meshID = (*systems.draw)[entityID].meshID;
                 //Get the ID of the texture associated with the entity
@@ -1115,9 +1113,9 @@ namespace mars {
 
                 //Create model matrix
                 glm::mat4 modelMatrix(1.0f);
-                modelMatrix[0][0] = systems.transform->data()[i].scale.x * pixelsPerMeter;
-                modelMatrix[1][1] = systems.transform->data()[i].scale.y * pixelsPerMeter;
-                modelMatrix[3] = glm::vec4(systems.transform->data()[i].position * pixelsPerMeter, 1.0f);
+                modelMatrix[0][0] = t.scale.x * pixelsPerMeter;
+                modelMatrix[1][1] = t.scale.y * pixelsPerMeter;
+                modelMatrix[3] = glm::vec4(t.position * pixelsPerMeter, 1.0f);
                 //Push the model matrix to the shader
                 vkCmdPushConstants(commandBuffer, pipelineLayout2D, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
 

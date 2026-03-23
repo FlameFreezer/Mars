@@ -100,5 +100,6 @@ namespace mars {
         /// Fills the collision list for every Entity with Dynamics with the IDs of every Entity it is in collision with.
         /// Returns: void   Nothing
         void findCollisions() noexcept;
+        void resolveCollisions() noexcept;
     };
 };

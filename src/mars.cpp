@@ -200,45 +200,146 @@ namespace mars {
     void Game::setMesh(Entity e, ID id) noexcept {
         entityManager.system<Component::DRAW>()[e.id()].meshID = id;
     }
+
     void Game::setTexture(Entity e, ID id) noexcept {
         entityManager.system<Component::DRAW>()[e.id()].textureID = id;
     }
-    void Game::applyPhysics() noexcept {
+
+    std::vector<ComponentSystem<Collide>::Pair> filterSolids(ComponentSystem<Collide>& sysCollide, const ComponentSystem<Physics>& sysPhysics, ID id) noexcept {
+        std::vector<ComponentSystem<Collide>::Pair> filtered;
+        const Physics& p = sysPhysics[id];
+        const Collide& c = sysCollide[id];
+        for(const auto pair : sysCollide) {
+            const Collide& cCurr = pair.data;
+
+            //If we're moving left, but its left edge is right of our right edge, continue
+            if(p.velocity.x < 0.0f and cCurr.position.x > c.position.x + c.scale.x) continue;
+            //If we're moving right, but its right edge is left of our left edge, continue
+            else if(p.velocity.x > 0.0f and cCurr.position.x + cCurr.scale.x < c.position.x) continue;
+            //If we're not going right or left, but it is beyond either of our edges, continue
+            else if(p.velocity.x == 0.0f and (cCurr.position.x + cCurr.scale.x < c.position.x 
+                or c.position.x + c.scale.x < cCurr.position.x)) continue;
+
+            //If we're moving up, but its top edge is under our bottom edge, continue
+            if(p.velocity.y < 0.0f and cCurr.position.y > c.position.y + c.scale.y) continue;
+            //If we're moving down, but its bottom edge is above our top edge, continue
+            else if(p.velocity.y > 0.0f and cCurr.position.y + cCurr.scale.y < c.position.y) continue;
+            //If we're not going up or down, but it is beyond either of our edges, continue
+            else if(p.velocity.y == 0.0f and (cCurr.position.y + cCurr.scale.y < c.position.y 
+                or c.position.y + c.scale.y < cCurr.position.y)) continue;
+
+            filtered.push_back(pair);
+        }
+        return filtered;
+    }
+
+    glm::vec2 getR(const Collide& c1, const Collide& c2) noexcept {
+        //Position is the rightmost/bottommost of the left/top edges
+        float xPos = std::max(c1.position.x, c2.position.x);
+        float yPos = std::max(c1.position.y, c2.position.y);
+        //Scale comes from the distance to the leftmost/topmost of the right/bottom edges
+        float xScale = std::min(c1.position.x + c1.scale.x, c2.position.x + c2.scale.x) - xPos;
+        float yScale = std::min(c1.position.y + c1.scale.y, c2.position.y + c2.scale.y) - yPos;
+        //r comes from the smaller axis of the dimensions of the region, or both if the region is square
+        //doing both for squares ensures that corner collisions are always resolved
+        glm::vec2 r(0.0f);
+        if(xScale <= yScale) {
+            r.x = xScale;
+        }
+        if(yScale <= xScale) {
+            r.y = yScale;
+        }
+        return r;
+    }
+
+    void Game::resolveCollisions() noexcept {
         auto& sysPhysics = entityManager.system<Component::PHYSICS>();
+        auto& sysCollide = entityManager.system<Component::COLLIDE>();
+        auto& sysTransform = entityManager.system<Component::TRANSFORM>();
+        auto& sysDynamics = entityManager.system<Component::DYNAMICS>();
+        for(auto [d, eid] : sysDynamics) {
+            //Assume there's no floor. If there is a floor, it will get set later
+            d.floorID = nullID;
+            const Entity e = entityManager.getEntity(eid);
+            for(ID id : d.collisions) {
+                if(!sysCollide[id].isSolid) continue;
+                glm::vec2 r = getR(sysCollide[eid], sysCollide[id]);
+                Physics& p = sysPhysics[eid];
+                //Give r its proper sign based on the entity's velocity
+                r.x *= glm::sign(p.velocity.x);
+                r.y *= glm::sign(p.velocity.y);
+                //Subtract r to take the entity out of the wall
+                sysCollide[eid].position -= r;
+                sysTransform[eid].position -= glm::vec3(r, 0.0f);
+                //Set the speeds that were into the wall to zero
+                if(r.x != 0.0f) p.velocity.x = 0.0f;
+                if(r.y != 0.0f) p.velocity.y = 0.0f;
+                //Report the floor
+                if(glm::sign(r.y) == glm::sign(p.gravity.y)) {
+                    d.floorID = id;
+                }
+            }
+        }
+    }
+
+    void sortCollidesP(ComponentSystem<Collide>& sysCollide, u64 start, u64 end) noexcept {
+        if(start >= end) return;
+        ID* IDs = sysCollide.getIDs();
+        u64 i = 0, j = 0;
+        while(j < end) {
+            if(sysCollide[j].position.y < sysCollide[end].position.y) {
+                if(i != j) {
+                    sysCollide.swap(IDs[i], IDs[j]);
+                }
+                i++;
+            }
+            j++;
+        }
+        sysCollide.swap(IDs[i], IDs[end]);
+        sortCollidesP(sysCollide, start, i - 1);
+        sortCollidesP(sysCollide, i + 1, end);
+    }
+
+    //Quicksorts the collides based on the x-coordinate of their positions
+    void sortCollides(ComponentSystem<Collide>& sysCollide) noexcept {
+        sortCollidesP(sysCollide, 0, sysCollide.size() - 1);
+    }
+
+    void Game::applyPhysics() noexcept {
+        const auto& sysPhysics = entityManager.system<Component::PHYSICS>();
         //For every physics component
-        for(u64 i = 0; i < sysPhysics.size(); i++) {
+        for(auto [p, id] : sysPhysics) {
             //Get the entity associated with the component
-            const Entity e = entityManager.getEntity(sysPhysics.getIDs()[i]);
-            const Physics& p = sysPhysics.data()[i];
+            const Entity e = entityManager.getEntity(id);
             Transform& t = transform(e);
             //Update its position using the velocity
             t.position += glm::vec3(p.velocity, 0.0f) * deltaTime();
             //If it has a collision component, update that too
             if(e.signature().has(Component::COLLIDE)) {
                 Collide& c = collide(e);
-                c.position = t.position;
+                c.position += p.velocity * deltaTime();
             }
         }
     }
+
     void Game::findCollisions() noexcept {
         auto& sysDynamics = entityManager.system<Component::DYNAMICS>();
         auto& sysCollide = entityManager.system<Component::COLLIDE>();
         //Clear out all collision lists before going on to refill them
-        for(u64 i = 0; i < sysDynamics.size(); i++) {
-            sysDynamics.data()[i].collisions.clear();
+        for(auto [d, id] : sysDynamics) {
+            d.collisions.clear();
         }
         //For every dynamic entity
-        for(u64 i = 0; i < sysDynamics.size(); i++) {
-            const Entity e1 = entityManager.getEntity(sysDynamics.getIDs()[i]);
-            auto& d1 = sysDynamics.data()[i];
+        for(auto [d1, id1] : sysDynamics) {
+            const Entity e1 = entityManager.getEntity(id1);
             //For every entity with collision
-            for(u64 j = 0; j < sysCollide.size(); j++) {
-                const Entity e2 = entityManager.getEntity(sysCollide.getIDs()[j]);
+            for(auto [c2, id2] : sysCollide) {
+                const Entity e2 = entityManager.getEntity(id2);
                 if(checkCollision(e1, e2)) {
-                    d1.collisions.push_back(e2.id());
+                    d1.collisions.push_back(id2);
                     //Add e1 to the collision list of e2 if it has Dynamics
                     if(e2.signature().has(Component::DYNAMICS)) {
-                        auto& d2 = sysDynamics[e2.id()];
+                        auto& d2 = sysDynamics[id2];
                         d2.collisions.push_back(e1.id());
                     }
                 }

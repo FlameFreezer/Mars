@@ -43,6 +43,7 @@ namespace mars {
         float drag;
         float maxSpeed;
         float jumpSpeed;
+        ID floorID = -1;
     };
     export enum class BoundingShape : ComponentT {
         RECTANGLE,
