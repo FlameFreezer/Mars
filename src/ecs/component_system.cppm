@@ -89,11 +89,15 @@ namespace mars {
             mData[index] = comp;
         }
         void erase(ID id) noexcept {
+            //Refuse to erase the null entity
+            if(id == nullID) return;
             //Swap the data at id for the data at the end
             mData[mIndices[id]] = mData[mSize];
             swapErase(id);
         }
         void swap(ID id1, ID id2) noexcept {
+            //Don't swap the null entity or an entity with itself
+            if(id1 == nullID or id2 == nullID or id1 == id2) return;
             const u64 index1 = mIndices[id1];
             const u64 index2 = mIndices[id2];
 
@@ -121,8 +125,9 @@ namespace mars {
             ComponentSystem<C>* mParent;
             Iterator(u64 index, ComponentSystem<C>* parent) noexcept : mIndex(index), mParent(parent) {}
             public:
+            Iterator() = delete;
             friend class ComponentSystem<C>;
-            Iterator(const Iterator& other) : mIndex(other.mIndex), mParent(other.mParent) {}
+            Iterator(const Iterator& other) noexcept : mIndex(other.mIndex), mParent(other.mParent) {}
             Pair operator*() noexcept {
                 return {mParent->mData[mIndex], mParent->mIDs[mIndex]};
             }
@@ -154,8 +159,9 @@ namespace mars {
             const ComponentSystem<C>& mParent;
             CIterator(u64 index, const ComponentSystem<C>& parent) noexcept : mIndex(index), mParent(parent) {}
             public:
+            CIterator() = delete;
             friend class ComponentSystem<C>;
-            CIterator(const CIterator& other) : mIndex(other.mIndex), mParent(other.mParent) {}
+            CIterator(const CIterator& other) noexcept : mIndex(other.mIndex), mParent(other.mParent) {}
             CPair operator*() const noexcept {
                 return {mParent.mData[mIndex], mParent.mIDs[mIndex]};
             }
@@ -179,15 +185,16 @@ namespace mars {
             }
         };
 
+        //Iterators start at 1 to skip the null entity
         Iterator begin() noexcept {
-            return {0, this};
+            return {1, this};
         }
         Iterator end() noexcept {
             return {mSize, this};
         }
 
         CIterator begin() const noexcept {
-            return {0, *this};
+            return {1, *this};
         }
         CIterator end() const noexcept {
             return {mSize, *this};

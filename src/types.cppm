@@ -19,6 +19,7 @@ export {
     using f64 = double;
 
     using ID = u64;
+    constexpr ID nullID = 0;
 
     class noreturn{};
 }

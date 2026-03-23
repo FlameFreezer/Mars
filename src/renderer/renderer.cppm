@@ -1072,9 +1072,9 @@ namespace mars {
 
             //Bind the vertex buffers for the meshes
             HeapArray<VkDeviceSize> offsets;
-            if(entityManager.sysMesh.size() != 0) {
-                offsets.init(entityManager.sysMesh.size(), 0);
-                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<u32>(entityManager.sysMesh.size()), entityManager.sysMesh.handles(), offsets.data());
+            if(entityManager.sysMesh->size() != 0) {
+                offsets.init(entityManager.sysMesh->size(), 0);
+                vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<u32>(entityManager.sysMesh->size()), entityManager.sysMesh->handles(), offsets.data());
             }
 
             //Iterate through every transform (the most frequently varying data)
@@ -1087,7 +1087,7 @@ namespace mars {
                 //Push the descriptor for the texture
                 const VkDescriptorImageInfo materialInfo = {
                     .sampler = sampler,
-                    .imageView = entityManager.sysTexture[textureID].view,
+                    .imageView = (*entityManager.sysTexture)[textureID].view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                 };
                 const VkWriteDescriptorSet writeMaterial = {
@@ -1115,15 +1115,15 @@ namespace mars {
                 glm::mat4 modelMatrix(1.0f);
                 modelMatrix[0][0] = t.scale.x * pixelsPerMeter;
                 modelMatrix[1][1] = t.scale.y * pixelsPerMeter;
-                modelMatrix[3] = glm::vec4(t.position * pixelsPerMeter, 1.0f);
+                modelMatrix[3] = glm::vec4(t.position * pixelsPerMeter, t.zLayer, 1.0f);
                 //Push the model matrix to the shader
                 vkCmdPushConstants(commandBuffer, pipelineLayout2D, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
 
                 //Get the index for the current mesh within the array of vertex buffers
-                const u64 meshIndex = entityManager.sysMesh.index(meshID);
+                const u64 meshIndex = entityManager.sysMesh->index(meshID);
                 //Bind the index buffer at the end of the current mesh
-                vkCmdBindIndexBuffer(commandBuffer, entityManager.sysMesh.handles()[meshIndex], entityManager.sysMesh.getIndexOffset(meshID), VK_INDEX_TYPE_UINT32);
-                vkCmdDrawIndexed(commandBuffer, entityManager.sysMesh.getNumIndices(meshID), 1, 0, meshIndex, 0);
+                vkCmdBindIndexBuffer(commandBuffer, entityManager.sysMesh->handles()[meshIndex], entityManager.sysMesh->getIndexOffset(meshID), VK_INDEX_TYPE_UINT32);
+                vkCmdDrawIndexed(commandBuffer, entityManager.sysMesh->getNumIndices(meshID), 1, 0, meshIndex, 0);
             }
 
             vkCmdEndRendering(commandBuffer);
@@ -2057,9 +2057,9 @@ namespace mars {
                     vkDestroyImageView(device, view, nullptr);
                 }
                 cube.buffer.destroy(device);
-                entityManager.sysMesh.destroySystem(device);
-                for(u64 i = 0; i < entityManager.sysTexture.size(); i++) {
-                    Texture& t = entityManager.sysTexture.data()[i];
+                entityManager.sysMesh->destroySystem(device);
+                for(u64 i = 0; i < entityManager.sysTexture->size(); i++) {
+                    Texture& t = entityManager.sysTexture->data()[i];
                     vkDestroyImage(device, t.handle, nullptr);
                     vkFreeMemory(device, t.memory, nullptr);
                     vkDestroyImageView(device, t.view, nullptr);

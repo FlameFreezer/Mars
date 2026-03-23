@@ -14,20 +14,29 @@ namespace mars {
     }
 
     EntityManager::EntityManager() noexcept {
-        for(ID i = 0; i < maxEntities; i++) {
+        //Skip the null entity
+        for(ID i = 1; i < maxEntities; i++) {
             mIDQueue.push(i);
-            mEntities[i] = nullEntity;
         }
         ALLOC_SYSTEM(Component::TRANSFORM);
         ALLOC_SYSTEM(Component::PHYSICS);
         ALLOC_SYSTEM(Component::DRAW);
         ALLOC_SYSTEM(Component::COLLIDE);
         ALLOC_SYSTEM(Component::DYNAMICS);
+        createNullEntity();
     }
 
     EntityManager::~EntityManager() noexcept {
+        delete[] mEntities;
         for(ComponentT i = 0; i < numComponents; i++) {
             delete mSystems.mSystems[i];
+        }
+    }
+
+    void EntityManager::createNullEntity() noexcept {
+        //The null entity takes up space in every component system
+        for(u64 i = 0; i < numComponents; i++) {
+            mSystems.mSystems[i]->reserve(nullID);
         }
     }
 
@@ -53,6 +62,8 @@ namespace mars {
     }
 
     void EntityManager::destroyEntity(Entity e) noexcept {
+        //Never destroy the null entity
+        if(e == nullEntity) return;
         ID id = e.id();        
         mIDQueue.push(id);
         Signature sig = e.signature();

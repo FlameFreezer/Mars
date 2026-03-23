@@ -10,20 +10,20 @@ import component_system;
 
 namespace mars {
     //The Mesh and Texture component systems are internal to the renderer and are managed by their own entity manager
-    export constexpr u64 maxMeshes = 100;
+    export constexpr u64 maxMeshes = 128;
     export struct Mesh {
         VkBuffer handles[maxMeshes];
         VkDeviceMemory memories[maxMeshes];
         struct {
-            VkDeviceSize indexOffset;
-            u32 numIndices;
+            VkDeviceSize indexOffset = 0;
+            u32 numIndices = 0;
         } sizes[maxMeshes];
     };
-    export constexpr u64 maxTextures = 200;
+    export constexpr u64 maxTextures = 256;
     export struct Texture {
-        VkImage handle;
-        VkDeviceMemory memory;
-        VkImageView view;
+        VkImage handle = nullptr;
+        VkDeviceMemory memory = nullptr;
+        VkImageView view = nullptr;
     };
 
     template<>
@@ -84,8 +84,9 @@ namespace mars {
         std::queue<ID> mTextureIDQueue;
         public:
         RendererEntityManager() noexcept;
-        ComponentSystem<Mesh> sysMesh;
-        ComponentSystem<Texture> sysTexture;
+        ~RendererEntityManager() noexcept;
+        ComponentSystem<Mesh>* sysMesh = new ComponentSystem<Mesh>;
+        ComponentSystem<Texture>* sysTexture = new ComponentSystem<Texture>;
         ID insertMesh(VkBuffer handle, VkDeviceMemory memory, VkDeviceSize indexOffset, u32 numIndices) noexcept;
         ID insertTexture(const Texture& t) noexcept;
         void eraseMesh(ID id) noexcept;

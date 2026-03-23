@@ -23,8 +23,6 @@ namespace mars {
         u64 h;
     };
 
-    export constexpr Entity nullEntity = EntityManager::nullEntity;
-
     export class Game {
         Renderer* mRenderer;
         std::string mWindowName;

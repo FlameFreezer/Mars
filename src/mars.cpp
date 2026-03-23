@@ -132,7 +132,7 @@ namespace mars {
         //Entities cannot collide with themselves
         if(e1 == e2) return false;
         //Null entity produces no collisions
-        if(e1 == EntityManager::nullEntity or e2 == EntityManager::nullEntity) return false;
+        if(e1 == nullEntity or e2 == nullEntity) return false;
         const Collide& s1 = collide(e1);
         const Collide& s2 = collide(e2);
         bool xWithin = false, yWithin = false;
@@ -155,7 +155,7 @@ namespace mars {
                 return other;
             }
         }
-        return EntityManager::nullEntity;
+        return nullEntity;
     }
 
     Entity Game::getFloor(Entity e) noexcept {
@@ -270,7 +270,7 @@ namespace mars {
                 r.y *= glm::sign(p.velocity.y);
                 //Subtract r to take the entity out of the wall
                 sysCollide[eid].position -= r;
-                sysTransform[eid].position -= glm::vec3(r, 0.0f);
+                sysTransform[eid].position -= r;
                 //Set the speeds that were into the wall to zero
                 if(r.x != 0.0f) p.velocity.x = 0.0f;
                 if(r.y != 0.0f) p.velocity.y = 0.0f;
@@ -313,7 +313,7 @@ namespace mars {
             const Entity e = entityManager.getEntity(id);
             Transform& t = transform(e);
             //Update its position using the velocity
-            t.position += glm::vec3(p.velocity, 0.0f) * deltaTime();
+            t.position += p.velocity * deltaTime();
             //If it has a collision component, update that too
             if(e.signature().has(Component::COLLIDE)) {
                 Collide& c = collide(e);

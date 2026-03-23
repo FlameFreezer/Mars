@@ -24,9 +24,9 @@ namespace mars {
     export class EntityManager {
         std::queue<ID> mIDQueue;
         ComponentSystems mSystems;
-        Entity mEntities[maxEntities];
+        Entity* mEntities = new Entity[maxEntities];
+        void createNullEntity() noexcept;
         public:
-        static constexpr Entity nullEntity{nullID, Signature()};
         EntityManager() noexcept;
         ~EntityManager() noexcept;
         Error<Entity> createEntity(Signature s) noexcept;

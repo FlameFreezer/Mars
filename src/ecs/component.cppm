@@ -24,17 +24,19 @@ namespace mars {
     export constexpr ComponentT numComponents = static_cast<ComponentT>(Component::MAX_COMPONENT);
 
     export struct Transform {
-        glm::vec3 position;
-        glm::vec2 scale;
-        float angle;
+        glm::vec2 position = glm::vec2(0.0f);
+        glm::vec2 scale = glm::vec2(1.0f);
+        float angle = 0;
+        float zLayer = 0;
     };
     export struct Physics {
-        glm::vec2 velocity;
-        glm::vec2 gravity;
+        glm::vec2 velocity = glm::vec2(0.0f);
+        glm::vec2 gravity = glm::vec2(0.0f, 1.0f);
     };
+    //TODO: default mesh/texture with ID = 0
     export struct Draw {
-        ID meshID;
-        ID textureID;
+        ID meshID = 0;
+        ID textureID = 0;
     };
     export struct Dynamics {
         std::vector<ID> collisions;
@@ -50,16 +52,15 @@ namespace mars {
         CIRCLE,
     };
     export struct Collide {
-        BoundingShape boundingShape;
-        glm::vec2 position;
+        BoundingShape boundingShape = BoundingShape::RECTANGLE;
+        glm::vec2 position = glm::vec2(0.0f);
         union {
             //Only valid if shape is a circle
             float radius;
             //Only valid if shape is a rectangle
-            glm::vec2 scale;
+            glm::vec2 scale = glm::vec2(1.0f);
         };
-        bool isSolid;
-        Collide() noexcept : isSolid(false) {}
+        bool isSolid = false;
     };
         
     //This struct template allows accessing the type of a component at compile time just using the actual component enum member

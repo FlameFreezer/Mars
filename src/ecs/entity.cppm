@@ -1,20 +1,22 @@
 module;
 
 #include <initializer_list>
+#include <limits>
 
 export module entity;
 import component;
 import types;
 
 namespace mars {
-    export constexpr u64 maxEntities = 500;
-    export constexpr ID nullID = -1;
+    export constexpr u64 maxEntities = 512;
 
     export using SignatureT = u32;
+    //Null Signature has every component such that storage in component systems is always reserved
+    export constexpr SignatureT nullSignature = std::numeric_limits<SignatureT>::max();
     export class Signature {
-        SignatureT mBits;
+        SignatureT mBits = nullSignature;
         public:
-        constexpr Signature() noexcept : mBits(0) {}
+        constexpr Signature() noexcept = default;
         Signature(std::initializer_list<Component> comps) noexcept;
         constexpr Signature(const Signature& s) noexcept : mBits(s.mBits) {}
         bool has(const std::initializer_list<Component> comps) const noexcept;
@@ -25,14 +27,16 @@ namespace mars {
     };
 
     export class Entity {
-        ID mID;
+        ID mID = nullID;
         Signature mSignature; 
         public:
-        Entity() = default;
+        constexpr Entity() = default;
         constexpr Entity(ID id, const Signature& sig) noexcept : mID(id), mSignature(sig) {}
         ID id() const noexcept;
         Signature signature() const noexcept;
         friend bool operator==(Entity lhs, Entity rhs) noexcept;
         friend bool operator!=(Entity lhs, Entity rhs) noexcept;
     };
+
+    export constexpr Entity nullEntity;
 }
