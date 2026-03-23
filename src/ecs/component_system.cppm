@@ -22,6 +22,8 @@ namespace mars {
         void swapErase(ID id) noexcept {
             //Swap the index of the data at id for the data at end
             mIndices[mIDs[mSize]] = mIndices[id];
+            //Invalidate the ID for the removed element
+            mIDs[mIndices[id]] = nullID;
             //Decrement size
             --mSize;
         }
@@ -48,6 +50,10 @@ namespace mars {
             mIDs[mSize] = id;
             return mSize++;
         }
+        //Tells whether the ID has this component
+        bool has(ID id) noexcept {
+            return mIDs[mIndices[id]] == id;
+        }
         //Abstract function which should swap the data at id with the data at the end, then calls
         // swapErase
         virtual void erase(ID id) noexcept = 0;
@@ -60,13 +66,13 @@ namespace mars {
         //Safety checked random access of data
         Error<const C*> at(ID id) const noexcept {
             if(id >= maxEntities) {
-                return {ErrorTag::FATAL_ERROR, std::format("Invalid ID {} passed to function \"at\"", id)};
+                return {ErrorTag::fatalError, std::format("Invalid ID {} passed to function \"at\"", id)};
             }
             return &mData[mIndices[id]];
         }
         Error<C*> at(ID id) noexcept {
             if(id >= maxEntities) {
-                return {ErrorTag::FATAL_ERROR, std::format("Invalid ID {} passed to function \"at\"", id)};
+                return {ErrorTag::fatalError, std::format("Invalid ID {} passed to function \"at\"", id)};
             }
             return &mData[mIndices[id]];
         }
@@ -76,6 +82,12 @@ namespace mars {
         }
         C& operator[](ID id) noexcept {
             return mData[mIndices[id]];
+        }
+        const C& operator[](Entity e) const noexcept {
+            return mData[mIndices[e.id()]];
+        }
+        C& operator[](Entity e) noexcept {
+            return mData[mIndices[e.id()]];
         }
         //Getter for internal data array
         C* data() noexcept {

@@ -47,7 +47,7 @@ namespace mars {
                 .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
             };
             if(vkCreateImage(device, &imageInfo, nullptr, &result.handle) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create image"};
+                return {ErrorTag::fatalError, "Failed to create image"};
             }
 
             Error<VkDeviceMemory> mem = vkhelper::allocateDeviceMemory(device, physicalDevice, result.handle, memProperties);
@@ -76,7 +76,7 @@ namespace mars {
                 }
             };
             if(vkCreateImageView(device, &viewInfo, nullptr, &result.view) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create image view"};
+                return {ErrorTag::fatalError, "Failed to create image view"};
             }
 
             return result;

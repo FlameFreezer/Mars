@@ -10,7 +10,6 @@ module;
 #include <fstream>
 #include <cstring>
 #include <limits>
-#include <chrono>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -272,7 +271,7 @@ namespace mars {
             if(vkMapMemory(device, transferBuffer.memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
                 vertexBuffer.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to map device memory"};
+                return {ErrorTag::fatalError, "Failed to map device memory"};
             }
             std::memcpy(memory, reinterpret_cast<void const*>(indices.data()), indicesSize);
             vkUnmapMemory(device, transferBuffer.memory);
@@ -295,7 +294,7 @@ namespace mars {
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
                 vertexBuffer.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to end transfer command buffer"};
+                return {ErrorTag::fatalError, "Failed to end transfer command buffer"};
             }
             const VkCommandBufferSubmitInfo commandBufferInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, 
@@ -317,7 +316,7 @@ namespace mars {
             if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
                 vertexBuffer.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to submit to transfer queue while creating vertex buffer"};
+                return {ErrorTag::fatalError, "Failed to submit to transfer queue while creating vertex buffer"};
             }
             vkQueueWaitIdle(graphicsQueues[0]);
             vkResetCommandBuffer(commandBuffers.back(), 0);
@@ -332,7 +331,7 @@ namespace mars {
             stbi_uc* pixels = nullptr;
             pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
             if(pixels == nullptr) {
-                return {ErrorTag::FATAL_ERROR, "Failed to find/load texture file"};
+                return {ErrorTag::fatalError, "Failed to find/load texture file"};
             }
             const VkDeviceSize imageSize = texWidth * texHeight * STBI_rgb_alpha; 
             GPUImage textureImage;
@@ -369,7 +368,7 @@ namespace mars {
                 stbi_image_free(pixels);
                 textureImage.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to map buffer memory to the host"};
+                return {ErrorTag::fatalError, "Failed to map buffer memory to the host"};
             }
             std::memcpy(memory, pixels, imageSize);
             vkUnmapMemory(device, transferBuffer.memory);
@@ -385,7 +384,7 @@ namespace mars {
             if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
                 textureImage.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to begin single time command buffer"};
+                return {ErrorTag::fatalError, "Failed to begin single time command buffer"};
             }
 
             const VkImageMemoryBarrier2 firstTransition = {
@@ -483,7 +482,7 @@ namespace mars {
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
                 textureImage.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to end command buffer while creating texture image"};
+                return {ErrorTag::fatalError, "Failed to end command buffer while creating texture image"};
             }
 
             const VkCommandBufferSubmitInfo commandInfo = {
@@ -506,17 +505,17 @@ namespace mars {
             if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
                 textureImage.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to submit to queue while creating texture image"};
+                return {ErrorTag::fatalError, "Failed to submit to queue while creating texture image"};
             }
             if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
                 textureImage.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to wait for queue while creating texture image"};
+                return {ErrorTag::fatalError, "Failed to wait for queue while creating texture image"};
             }
             if(vkResetCommandBuffer(commandBuffers.back(), 0) != VK_SUCCESS) {
                 textureImage.destroy(device);
                 transferBuffer.destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer while creating texture image"};
+                return {ErrorTag::fatalError, "Failed to reset command buffer while creating texture image"};
             }
 
             transferBuffer.destroy(device);
@@ -559,7 +558,7 @@ namespace mars {
                 .pInheritanceInfo = nullptr
             };
             if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to begin single time command buffer"}; 
+                return {ErrorTag::fatalError, "Failed to begin single time command buffer"}; 
             }
             flags |= flagBits::beganTransferOps;
             return success();
@@ -590,14 +589,14 @@ namespace mars {
             void* memory;
             if(vkMapMemory(device, transferBuffer.data().memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
                 transferBuffer.data().destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to map device memory"};
+                return {ErrorTag::fatalError, "Failed to map device memory"};
             }
             std::memcpy(memory, reinterpret_cast<void const*>(Cube::vertices.data()), verticesSize);
             vkUnmapMemory(device, transferBuffer.data().memory);
 
             if(vkMapMemory(device, transferBuffer.data().memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
                 transferBuffer.data().destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to map device memory"};
+                return {ErrorTag::fatalError, "Failed to map device memory"};
             }
             std::memcpy(memory, reinterpret_cast<void const*>(Cube::indices.data()), indicesSize);
             vkUnmapMemory(device, transferBuffer.data().memory);
@@ -610,7 +609,7 @@ namespace mars {
             };
             if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
                 transferBuffer.data().destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to begin single time command buffer"};
+                return {ErrorTag::fatalError, "Failed to begin single time command buffer"};
             }
 
             const VkBufferCopy region = {
@@ -621,7 +620,7 @@ namespace mars {
             vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.data().handle, cube.buffer.handle, 1, &region);
             if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
                 transferBuffer.data().destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to end transfer command buffer"};
+                return {ErrorTag::fatalError, "Failed to end transfer command buffer"};
             }
             const VkCommandBufferSubmitInfo commandBufferInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, 
@@ -642,7 +641,7 @@ namespace mars {
             };
             if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
                 transferBuffer.data().destroy(device);
-                return {ErrorTag::FATAL_ERROR, "Failed to submit to transfer queue while creating vertex buffer"};
+                return {ErrorTag::fatalError, "Failed to submit to transfer queue while creating vertex buffer"};
             }
             vkQueueWaitIdle(graphicsQueues[0]);
             vkResetCommandBuffer(commandBuffers.back(), 0);
@@ -766,7 +765,7 @@ namespace mars {
                 .pBindings = pushBindings.data()
             };
             if(vkCreateDescriptorSetLayout(device, &pushLayout, nullptr, &pushSetLayout) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create descriptor set layout"};
+                return {ErrorTag::fatalError, "Failed to create descriptor set layout"};
             }
             return success();
         }
@@ -796,7 +795,7 @@ namespace mars {
                 .unnormalizedCoordinates = VK_FALSE
             };
             if(vkCreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create texture sampler"};
+                return {ErrorTag::fatalError, "Failed to create texture sampler"};
             }
             return success();
         }
@@ -809,7 +808,7 @@ namespace mars {
 
             VkSurfaceCapabilitiesKHR surfaceCapabilities{};
             if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface capabilities while recreating the swapchain"};
+                return {ErrorTag::fatalError, "Failed to get physical device surface capabilities while recreating the swapchain"};
             }
 
             Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevice, surface);
@@ -844,7 +843,7 @@ namespace mars {
                 .oldSwapchain = swapchain
             };
             if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &newSwapchain) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to recreate swapchain"};
+                return {ErrorTag::fatalError, "Failed to recreate swapchain"};
             }
             vkDestroySwapchainKHR(device, swapchain, nullptr);
             swapchain = newSwapchain;
@@ -1140,7 +1139,7 @@ namespace mars {
             };
             for(VkSemaphore& semaphore : semaphores) {
                 if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS) {
-                    return {ErrorTag::FATAL_ERROR, "Failed to create semaphores"};
+                    return {ErrorTag::fatalError, "Failed to create semaphores"};
                 }
             }
             const VkFenceCreateInfo fenceInfo = {
@@ -1150,7 +1149,7 @@ namespace mars {
             };
             for(VkFence& fence : fences) {
                 if(vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS) {
-                    return {ErrorTag::FATAL_ERROR, "Failed to create fences!"};
+                    return {ErrorTag::fatalError, "Failed to create fences!"};
                 }
             }
             return success();
@@ -1159,7 +1158,7 @@ namespace mars {
         static Error<std::vector<char>> loadShaderFile(const std::string& filename) noexcept {
             std::ifstream shaderFile(filename, std::ios::binary | std::ios::ate);
             if(!shaderFile.is_open()) {
-                return {ErrorTag::FATAL_ERROR, "Failed to find shader code!"};
+                return {ErrorTag::fatalError, "Failed to find shader code!"};
             }
             std::vector<char> code(shaderFile.tellg());
             shaderFile.seekg(0, std::ios::beg);
@@ -1180,7 +1179,7 @@ namespace mars {
             };
             VkShaderModule mod;
             if(vkCreateShaderModule(device, &moduleInfo, nullptr, &mod) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create shader module"};
+                return {ErrorTag::fatalError, "Failed to create shader module"};
             }
             return mod;
         }
@@ -1357,7 +1356,7 @@ namespace mars {
                 .pPushConstantRanges = pushConstantRanges2D
             };
             if(vkCreatePipelineLayout(device, &pipelineLayoutInfo2D, nullptr, &pipelineLayout2D) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline layout!"};
+                return {ErrorTag::fatalError, "Failed to create graphics pipeline layout!"};
             }
             const VkPushConstantRange pushConstantRanges3D[] = {
                 //Model Matrix for the cube
@@ -1380,7 +1379,7 @@ namespace mars {
                 .pPushConstantRanges = pushConstantRanges3D
             };
             if(vkCreatePipelineLayout(device, &pipelineLayoutInfo3D, nullptr, &pipelineLayout3D) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline layout!"};
+                return {ErrorTag::fatalError, "Failed to create graphics pipeline layout!"};
             }
              
             std::array<VkGraphicsPipelineCreateInfo, 2> graphicsPipelineInfos;
@@ -1413,7 +1412,7 @@ namespace mars {
             graphicsPipelineInfos[1].layout = pipelineLayout3D;
 
             if(vkCreateGraphicsPipelines(device, nullptr, graphicsPipelineInfos.max_size(), graphicsPipelineInfos.data(), nullptr, graphicsPipelines.data()) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create graphics pipeline!"};
+                return {ErrorTag::fatalError, "Failed to create graphics pipeline!"};
             }
             vkDestroyShaderModule(device, shaderMod2D, nullptr);
             vkDestroyShaderModule(device, shaderMod3D, nullptr);
@@ -1423,11 +1422,11 @@ namespace mars {
         Error<noreturn> getSwapchainImages(VkFormat format) noexcept {
             u32 imageCount;
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
+                return {ErrorTag::fatalError, "Failed to get swapchain images!"};
             }
             swapchainImages.resize(imageCount);
             if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to get swapchain images!"};
+                return {ErrorTag::fatalError, "Failed to get swapchain images!"};
             }
             swapchainImageViews.resize(imageCount);
 
@@ -1455,7 +1454,7 @@ namespace mars {
             for(u32 i = 0; i < imageCount; i++) {
                 imageViewInfo.image = swapchainImages[i];
                 if(vkCreateImageView(device, &imageViewInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
-                    return {ErrorTag::FATAL_ERROR, std::format("Failed to create swapchain image view {}!", i)};
+                    return {ErrorTag::fatalError, std::format("Failed to create swapchain image view {}!", i)};
                 }
             }
             return success();
@@ -1468,7 +1467,7 @@ namespace mars {
                 .queueFamilyIndex = graphicsQueueFamilyIndex
             };
             if(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create VkCommandPool!"};
+                return {ErrorTag::fatalError, "Failed to create VkCommandPool!"};
             }
             const VkCommandBufferAllocateInfo allocInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -1478,7 +1477,7 @@ namespace mars {
                 .commandBufferCount = static_cast<u32>(commandBuffers.max_size())
             };
             if(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to allocate command vertexBuffers!"};
+                return {ErrorTag::fatalError, "Failed to allocate command vertexBuffers!"};
             }
             return success();
         }
@@ -1489,7 +1488,7 @@ namespace mars {
             int width = 0; 
             int height = 0;
             if(!SDL_GetWindowSize(window, &width, &height)) {
-                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+                return {ErrorTag::fatalError, SDL_GetError()};
             }
             return VkExtent2D{
                 .width = std::clamp<u32>(width, 
@@ -1527,7 +1526,7 @@ namespace mars {
             };
 
             if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create VkSwapchainKHR!"};
+                return {ErrorTag::fatalError, "Failed to create VkSwapchainKHR!"};
             }
 
             return success();
@@ -1559,7 +1558,7 @@ namespace mars {
                 }
                 VkBool32 surfaceSupport;
                 if(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &surfaceSupport) != VK_SUCCESS) {
-                    return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface support!"};
+                    return {ErrorTag::fatalError, "Failed to get physical device surface support!"};
                 }
                 if(surfaceSupport == VK_TRUE and currentQueueCount >= result.presentCount) {
                     result.presentIndex = i;
@@ -1568,7 +1567,7 @@ namespace mars {
             }
             if(result.presentIndex == std::numeric_limits<u32>::max() 
                     or result.graphicsIndex == std::numeric_limits<u32>::max()) {
-                return {ErrorTag::SEARCH_FAIL, "Physical Device did not have queue family with needed properties!"};
+                return {ErrorTag::searchFail, "Physical Device did not have queue family with needed properties!"};
             }
             return result;
         }
@@ -1583,7 +1582,7 @@ namespace mars {
                     &presentModeCount, 
                     nullptr
                 ) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface present modes!"};
+                return {ErrorTag::fatalError, "Failed to get physical device surface present modes!"};
             }
             HeapArray<VkPresentModeKHR> presentModes(presentModeCount);
             if(vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -1592,7 +1591,7 @@ namespace mars {
                     &presentModeCount, 
                     presentModes.data()
                 ) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface present modes!"};
+                return {ErrorTag::fatalError, "Failed to get physical device surface present modes!"};
             }
             //Select correct present mode
             for(VkPresentModeKHR mode : presentModes) {
@@ -1609,13 +1608,13 @@ namespace mars {
             if(vkGetPhysicalDeviceSurfaceFormatsKHR(
                     physicalDevice, surface, &surfaceFormatCount, nullptr
                 ) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface formats!"};
+                return {ErrorTag::fatalError, "Failed to get physical device surface formats!"};
             }
             HeapArray<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
             if(vkGetPhysicalDeviceSurfaceFormatsKHR(
                     physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()
                 ) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface formats!"};
+                return {ErrorTag::fatalError, "Failed to get physical device surface formats!"};
             }
             for(int i = 0; i < surfaceFormatCount; i++) {
                 if(surfaceFormats[i].format == VK_FORMAT_B8G8R8A8_SRGB 
@@ -1657,13 +1656,13 @@ namespace mars {
             if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, 
                     &deviceExtensionPropertyCount, nullptr
                 ) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical device extension properties!"};
+                return {ErrorTag::fatalError, "Failed to enumerate physical device extension properties!"};
             }
             HeapArray<VkExtensionProperties> extensionProperties(deviceExtensionPropertyCount);
             if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, 
                 &deviceExtensionPropertyCount, extensionProperties.data()
                 ) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical device extension properties!"};
+                return {ErrorTag::fatalError, "Failed to enumerate physical device extension properties!"};
             }
             //Construct set of extension names
             std::set<std::string> unfoundExtensions;
@@ -1678,7 +1677,7 @@ namespace mars {
                 //	extensions
                 if(unfoundExtensions.empty()) return success();
             }
-            return {ErrorTag::SEARCH_FAIL, "Physical Device did not support needed extensions!"};
+            return {ErrorTag::searchFail, "Physical Device did not support needed extensions!"};
         }
 
 
@@ -1688,9 +1687,9 @@ namespace mars {
             for(VkPhysicalDevice const& currentPhysicalDevice : physicalDevices) {
                 //Check device extension support for the current physical device
                 switch(Error<noreturn> procResult = checkDeviceExtensionSupport(currentPhysicalDevice); procResult.tag()) {
-                    case ErrorTag::SEARCH_FAIL: continue;
-                    case ErrorTag::FATAL_ERROR: return procResult.moveError<PickPhysicalDeviceResult>();
-                    case ErrorTag::ALL_OKAY: break;
+                    case ErrorTag::searchFail: continue;
+                    case ErrorTag::fatalError: return procResult.moveError<PickPhysicalDeviceResult>();
+                    case ErrorTag::allOkay: break;
                 }
 
                 //Check physical device's support for needed features
@@ -1704,7 +1703,7 @@ namespace mars {
                         surface, 
                         &result.surfaceInfo.capabilities
                     ) != VK_SUCCESS) {
-                    return {ErrorTag::FATAL_ERROR, "Failed to get physical device surface capabilities!"};
+                    return {ErrorTag::fatalError, "Failed to get physical device surface capabilities!"};
                 }
 
                 //Get a surface format to use
@@ -1715,16 +1714,16 @@ namespace mars {
 
                 //Choose a present mode to use
                 switch(Error<VkPresentModeKHR> presentMode = choosePresentMode(currentPhysicalDevice, surface); presentMode.tag()) {
-                    case ErrorTag::SEARCH_FAIL: continue;
-                    case ErrorTag::FATAL_ERROR: return presentMode.moveError<PickPhysicalDeviceResult>();
-                    case ErrorTag::ALL_OKAY: result.surfaceInfo.presentMode = presentMode;
+                    case ErrorTag::searchFail: continue;
+                    case ErrorTag::fatalError: return presentMode.moveError<PickPhysicalDeviceResult>();
+                    case ErrorTag::allOkay: result.surfaceInfo.presentMode = presentMode;
                 }
 
                 //Pick the desired queue family index
                 switch(Error<PickQueueFamilyIndexResult> queueFamilyInfo = pickQueueFamilyIndex(currentPhysicalDevice, surface); queueFamilyInfo.tag()) {
-                    case ErrorTag::SEARCH_FAIL: continue;
-                    case ErrorTag::FATAL_ERROR: return queueFamilyInfo.moveError<PickPhysicalDeviceResult>();
-                    case ErrorTag::ALL_OKAY: result.queueFamilyInfo = queueFamilyInfo;
+                    case ErrorTag::searchFail: continue;
+                    case ErrorTag::fatalError: return queueFamilyInfo.moveError<PickPhysicalDeviceResult>();
+                    case ErrorTag::allOkay: result.queueFamilyInfo = queueFamilyInfo;
                 }
 
                 //At this point if all has succeeded, we are ready to use the current physical device and
@@ -1732,7 +1731,7 @@ namespace mars {
                 result.physicalDevice = currentPhysicalDevice;
                 return result;
             }
-            return {ErrorTag::SEARCH_FAIL, "Failed to find suitable physical device"};
+            return {ErrorTag::searchFail, "Failed to find suitable physical device"};
         }
 
         Error<noreturn> createDevice(SurfaceInfo& surfaceInfo) noexcept {
@@ -1742,11 +1741,11 @@ namespace mars {
             //Get all the physical devices installed on the system
             u32 physicalDeviceCount = 0;
             if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical devices!"};
+                return {ErrorTag::fatalError, "Failed to enumerate physical devices!"};
             }
             std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
             if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices.data()) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to enumerate physical devices!"};
+                return {ErrorTag::fatalError, "Failed to enumerate physical devices!"};
             }
 
             //Pick a physical device to use
@@ -1761,9 +1760,9 @@ namespace mars {
                 presentQueueCount = res.queueFamilyInfo.presentCount;
                 surfaceInfo = res.surfaceInfo;
             }
-            //pickPhysicalDevice just returns SEARCH_FAIL if none of the devices are suitable, but 
+            //pickPhysicalDevice just returns searchFail if none of the devices are suitable, but 
             // I want this case to be fatal instead
-            else return {ErrorTag::FATAL_ERROR, pickResult.message()};
+            else return {ErrorTag::fatalError, pickResult.message()};
 
             VkPhysicalDeviceProperties2 props = {
                 .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
@@ -1851,7 +1850,7 @@ namespace mars {
             };
 
             if(vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &device) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create VkDevice!"};
+                return {ErrorTag::fatalError, "Failed to create VkDevice!"};
             }
 
             //Acquire handles to all the GPU queues we just created
@@ -1893,12 +1892,12 @@ namespace mars {
             vkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
                 vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
             if(vkCreateDebugUtilsMessengerEXT == nullptr) {
-                return {ErrorTag::FATAL_ERROR, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
+                return {ErrorTag::fatalError, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
             }
             vkDestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
                 vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
             if(vkDestroyDebugUtilsMessengerEXT == nullptr) {
-                return {ErrorTag::FATAL_ERROR, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
+                return {ErrorTag::fatalError, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
             }
             const VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -1916,7 +1915,7 @@ namespace mars {
             };
 
             if(vkCreateDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create vkDebugUtilsMessengerEXT!"};
+                return {ErrorTag::fatalError, "Failed to create vkDebugUtilsMessengerEXT!"};
             }
             return success();
         }
@@ -1925,11 +1924,11 @@ namespace mars {
             if constexpr(enableValidationLayers) {
                 u32 layerPropertyCount = 0;
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
-                    return {ErrorTag::FATAL_ERROR, "Failed to enumerate instance layer properties!"};
+                    return {ErrorTag::fatalError, "Failed to enumerate instance layer properties!"};
                 }
                 std::vector<VkLayerProperties> layerProperties(layerPropertyCount);
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, layerProperties.data()) != VK_SUCCESS) {
-                    return {ErrorTag::FATAL_ERROR, "Failed to enumerate instance layer properties!"};
+                    return {ErrorTag::fatalError, "Failed to enumerate instance layer properties!"};
                 }
                 for(char const* layer : validationLayers) {
                     bool foundLayer = false;
@@ -1940,7 +1939,7 @@ namespace mars {
                         }
                     }
                     if(!foundLayer) {
-                        return {ErrorTag::FATAL_ERROR, std::format("Needed layer \"{}\" not found", layer)};
+                        return {ErrorTag::fatalError, std::format("Needed layer \"{}\" not found", layer)};
                     }
                 }
             }
@@ -1978,7 +1977,7 @@ namespace mars {
             }
 
             if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to create VkInstance!"};
+                return {ErrorTag::fatalError, "Failed to create VkInstance!"};
             }
             return success();
         }
@@ -1987,12 +1986,12 @@ namespace mars {
             int numDisplays;
             SDL_DisplayID* displays = SDL_GetDisplays(&numDisplays);
             if(displays == nullptr) {
-                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+                return {ErrorTag::fatalError, SDL_GetError()};
             }
             //Be lazy and just use the first display
             SDL_Rect displayBounds{};
             if(!SDL_GetDisplayBounds(displays[0], &displayBounds)) {
-                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+                return {ErrorTag::fatalError, SDL_GetError()};
             }
             //SDL_WINDOW_MOUSE_GRABBED : mouse cannot escape window bounds - allows using relative
             // mouse mode
@@ -2002,10 +2001,10 @@ namespace mars {
             //Instead of tracking live mouse inputs and having on-screen cursor, just track
             // changes in mouse position
             if(!SDL_SetWindowRelativeMouseMode(window, true)) {
-                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+                return {ErrorTag::fatalError, SDL_GetError()};
             }
             if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
-                return {ErrorTag::FATAL_ERROR, SDL_GetError()};
+                return {ErrorTag::fatalError, SDL_GetError()};
             }
             SDL_free(displays);
             return success();
@@ -2035,7 +2034,7 @@ namespace mars {
             TRY(createGraphicsPipeline());
             TRY(createCamera());
             if(!SDL_ShowWindow(window)) {
-                return {ErrorTag::FATAL_ERROR, "Failed to show window"};
+                return {ErrorTag::fatalError, "Failed to show window"};
             }
 
             //Create square mesh
@@ -2227,7 +2226,7 @@ namespace mars {
             };
         }
 
-        Error<noreturn> drawFrame(std::chrono::nanoseconds deltaTime, float fov, float aspect, float pixelsPerMeter, Systems systems) noexcept {
+        Error<noreturn> drawFrame(float fov, float aspect, float pixelsPerMeter, Systems systems) noexcept {
             //Fix the cube - only if any of the viewport details changed
             if(fov != cube.fov or aspect != cube.aspect) {
                 float halfd = glm::tan(fov / 2.0f);
@@ -2246,7 +2245,7 @@ namespace mars {
                     VK_TRUE, 
                     std::numeric_limits<u64>::max()
                 ) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, std::format("Something went from while waiting on fence {}", currentFrame)};
+                return {ErrorTag::fatalError, std::format("Something went from while waiting on fence {}", currentFrame)};
             }
             //These semaphores indicate that we have successfully acquired an image on this frame
             Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames);
@@ -2274,21 +2273,21 @@ namespace mars {
                     .flags = 0
                 };
                 if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAcquiredSemaphores[currentFrame]) != VK_SUCCESS) {
-                    return {ErrorTag::FATAL_ERROR, "Failed to recreate semaphore while recreating swapchain during draw"};
+                    return {ErrorTag::fatalError, "Failed to recreate semaphore while recreating swapchain during draw"};
                 }
                 depthImage2D.destroy(device);
                 depthImage3D.destroy(device);
                 TRY(createDepthImages());
                 flags &= ~flagBits::recreateSwapchain;
-                return drawFrame(deltaTime, fov, aspect, pixelsPerMeter, systems);
+                return drawFrame(fov, aspect, pixelsPerMeter, systems);
             }
             //Fatal error has occurred
             else if(res != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to acquire next swapchain image index"};
+                return {ErrorTag::fatalError, "Failed to acquire next swapchain image index"};
             }
 
             if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, std::format("Failed to reset fence {}", currentFrame)};
+                return {ErrorTag::fatalError, std::format("Failed to reset fence {}", currentFrame)};
             }
 
             //Acquire the command buffers to use for this frame
@@ -2297,10 +2296,10 @@ namespace mars {
 
             //Reset command buffers for the current frame, both for the 2D and 3D scene
             if(vkResetCommandBuffer(commandBuffer2D, 0) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer"};
+                return {ErrorTag::fatalError, "Failed to reset command buffer"};
             }
             if(vkResetCommandBuffer(commandBuffer3D, 0) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to reset command buffer"};
+                return {ErrorTag::fatalError, "Failed to reset command buffer"};
             }
 
             //Render 2D scene
@@ -2311,7 +2310,7 @@ namespace mars {
                 .pInheritanceInfo = nullptr
             };
             if(vkBeginCommandBuffer(commandBuffer2D, &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, std::format("Failed to begin command buffer {}", currentFrame)};
+                return {ErrorTag::fatalError, std::format("Failed to begin command buffer {}", currentFrame)};
             }
 
             std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers2D;
@@ -2335,7 +2334,7 @@ namespace mars {
 
             //Submit to create 2D scene
             if(vkEndCommandBuffer(commandBuffer2D) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, std::format("Failed to end command buffer {}", currentFrame)};
+                return {ErrorTag::fatalError, std::format("Failed to end command buffer {}", currentFrame)};
             }
 
             VkCommandBufferSubmitInfo const commandBufferInfo2D = {
@@ -2366,12 +2365,12 @@ namespace mars {
 
             u32 const graphicsQueueIndex = currentFrame % graphicsQueues.size();
             if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo2D, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to submit draw commands to queue"};
+                return {ErrorTag::fatalError, "Failed to submit draw commands to queue"};
             }
 
             //Render 3D Scene
             if(vkBeginCommandBuffer(commandBuffer3D, &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, std::format("Failed to begin command buffer {}", 2 + currentFrame)};
+                return {ErrorTag::fatalError, std::format("Failed to begin command buffer {}", 2 + currentFrame)};
             }
 
             std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D;
@@ -2428,7 +2427,7 @@ namespace mars {
             vkCmdPipelineBarrier2(commandBuffer3D, &presentDependency);
 
             if(vkEndCommandBuffer(commandBuffer3D) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, std::format("Failed to end command buffer {}", currentFrame)};
+                return {ErrorTag::fatalError, std::format("Failed to end command buffer {}", currentFrame)};
             }
 
             std::array<VkSemaphoreSubmitInfo, 2> waitSemaphores;
@@ -2477,7 +2476,7 @@ namespace mars {
             };
 
             if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo3D, fences[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to submit draw commands to queue"};
+                return {ErrorTag::fatalError, "Failed to submit draw commands to queue"};
             }
 
             VkPresentInfoKHR const presentInfo = {
@@ -2492,7 +2491,7 @@ namespace mars {
             };
             u32 const presentQueueIndex = currentFrame % presentQueues.size();
             if(vkQueuePresentKHR(presentQueues[presentQueueIndex], &presentInfo) != VK_SUCCESS) {
-                return {ErrorTag::FATAL_ERROR, "Failed to present graphics queue"};
+                return {ErrorTag::fatalError, "Failed to present graphics queue"};
             }
 
             currentFrame = (currentFrame + 1) % maxConcurrentFrames;

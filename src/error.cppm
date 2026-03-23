@@ -13,18 +13,18 @@ import types;
 namespace mars {
 
     export enum class ErrorTag : u8 {
-        ALL_OKAY = 0,
-        SEARCH_FAIL,
-        FATAL_ERROR,
+        allOkay = 0,
+        searchFail,
+        fatalError,
     };
 
     export constexpr std::string tagToString(ErrorTag tag) noexcept {
         switch(tag) {
-        case ErrorTag::ALL_OKAY:
+        case ErrorTag::allOkay:
             return "All Okay";
-        case ErrorTag::SEARCH_FAIL:
+        case ErrorTag::searchFail:
             return "Search Fail";
-        case ErrorTag::FATAL_ERROR:
+        case ErrorTag::fatalError:
             return "Fatal Error";
         }
         std::unreachable();
@@ -38,10 +38,10 @@ namespace mars {
         };
         ErrorTag mTag;
         //Writes zeroes to the entire memory space taken up by the Error union, then sets the tag to 
-        // `ALL_OKAY`. Does NOT call destructors to the member `data` or `memory`.
+        // `allOkay`. Does NOT call destructors to the member `data` or `memory`.
         void reset() {
             std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-            mTag = ErrorTag::ALL_OKAY;
+            mTag = ErrorTag::allOkay;
         }
         //Calls the destructor of the active data member, then resets the union.
         void clear() {
@@ -54,9 +54,9 @@ namespace mars {
             reset();
         }
         public:
-        Error() noexcept : mTag(ErrorTag::ALL_OKAY), mData() {}
-        Error(const T& inData) noexcept : mTag(ErrorTag::ALL_OKAY), mData(inData) {}
-        Error(T&& inData) noexcept : mTag(ErrorTag::ALL_OKAY), mData(std::move(inData)) {}
+        Error() noexcept : mTag(ErrorTag::allOkay), mData() {}
+        Error(const T& inData) noexcept : mTag(ErrorTag::allOkay), mData(inData) {}
+        Error(T&& inData) noexcept : mTag(ErrorTag::allOkay), mData(std::move(inData)) {}
         Error(ErrorTag inTag, const std::string& inMessage) noexcept : mTag(inTag), mMessage(inMessage) {}
         Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage(std::move(inMessage)) {}
         Error(const Error<T>& other) noexcept {
@@ -110,7 +110,7 @@ namespace mars {
         }
         //Returns `true` if `this->tag` is of a value not indicating an error during execution.
         bool okay() const noexcept {
-            return mTag == ErrorTag::ALL_OKAY;
+            return mTag == ErrorTag::allOkay;
         }
         operator bool() const noexcept {
             return okay();
@@ -169,17 +169,17 @@ namespace mars {
     template<>
     noreturn& Error<noreturn>::data() = delete;
 
-    //Returns an `Error<noreturn>` with `key == ALL_OKAY`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
+    //Returns an `Error<noreturn>` with `key == allOkay`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
     export Error<noreturn> success() noexcept {
         return Error<noreturn>();
     }
-    //Returns an `Error<T>` with `key == FATAL_ERROR`.
+    //Returns an `Error<T>` with `key == fatalError`.
     export template<typename T = noreturn>
     Error<T> fatal(std::string&& message) noexcept {
-        return Error<T>(ErrorTag::FATAL_ERROR, std::move(message));
+        return Error<T>(ErrorTag::fatalError, std::move(message));
     }
     export template<typename T = noreturn>
     Error<T> fatal(const std::string& message) noexcept {
-        return Error<T>(ErrorTag::FATAL_ERROR, message);
+        return Error<T>(ErrorTag::fatalError, message);
     }
 }

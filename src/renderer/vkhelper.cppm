@@ -22,7 +22,7 @@ namespace vkhelper {
                 return i;
             }
         }
-        return {ErrorTag::FATAL_ERROR, "Physical device does not support needed memory type"};
+        return {ErrorTag::fatalError, "Physical device does not support needed memory type"};
     }
     export Error<VkDeviceMemory> allocateDeviceMemory(VkDevice device, VkPhysicalDevice physicalDevice, VkBuffer buffer, VkMemoryPropertyFlags memProperties) noexcept {
         VkMemoryRequirements memRequirements{};
@@ -38,10 +38,10 @@ namespace vkhelper {
         };
         VkDeviceMemory memory = nullptr;
         if(vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-            return {ErrorTag::FATAL_ERROR, "Failed to allocate device memory"};
+            return {ErrorTag::fatalError, "Failed to allocate device memory"};
         }
         if(vkBindBufferMemory(device, buffer, memory, 0) != VK_SUCCESS) {
-            return {ErrorTag::FATAL_ERROR, "Failed to bind buffer memory"};
+            return {ErrorTag::fatalError, "Failed to bind buffer memory"};
         }
         return memory;
     }
@@ -59,10 +59,10 @@ namespace vkhelper {
         };
         VkDeviceMemory memory = nullptr;
         if(vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-            return {ErrorTag::FATAL_ERROR, "Failed to allocate device memory"};
+            return {ErrorTag::fatalError, "Failed to allocate device memory"};
         }
         if(vkBindImageMemory(device, image, memory, 0) != VK_SUCCESS) {
-            return {ErrorTag::FATAL_ERROR, "Failed to bind image memory"};
+            return {ErrorTag::fatalError, "Failed to bind image memory"};
         }
         return memory;
     }

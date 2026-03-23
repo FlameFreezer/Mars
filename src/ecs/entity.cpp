@@ -13,14 +13,14 @@ namespace mars {
     SignatureT implyComponents(Component c) noexcept {
         SignatureT result = componentToBit(c);
         switch(c) {
-        case Component::PHYSICS:
-            result |= implyComponents(Component::TRANSFORM); 
+        case Component::physics:
+            result |= implyComponents(Component::transform); 
             break;
-        case Component::DRAW:
-            result |= implyComponents(Component::TRANSFORM);
+        case Component::draw:
+            result |= implyComponents(Component::transform);
             break;
-        case Component::DYNAMICS:
-            result |= implyComponents(Component::PHYSICS) | implyComponents(Component::COLLIDE);
+        case Component::dynamics:
+            result |= implyComponents(Component::physics) | implyComponents(Component::collide);
             break;
         default: break;
         }

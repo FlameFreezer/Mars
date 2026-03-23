@@ -118,13 +118,13 @@ namespace mars {
         Slice(const std::array<T, size>& array) noexcept : mPtr(array.data()), mSize(size) {}
         static Error<Slice<T>> make(HeapArray<T>& array, std::size_t start) noexcept {
             if(start >= array.size()) {
-                return {ErrorTag::FATAL_ERROR, std::format("Index out of bounds: {} is greater than or equal to array size {}", start, array.size())};
+                return {ErrorTag::fatalError, std::format("Index out of bounds: {} is greater than or equal to array size {}", start, array.size())};
             }
             return Slice{&array[start], array.size() - start};
         }
         static Error<Slice<T>> make(HeapArray<T>& array, std::size_t start, std::size_t count) noexcept {
             if(start + count > array.size()) {
-                return {ErrorTag::FATAL_ERROR, std::format("Array out of bounds: {} + {} = {}, which is greater than or equal to array size {}", start, count, start + count, array.size())};
+                return {ErrorTag::fatalError, std::format("Array out of bounds: {} + {} = {}, which is greater than or equal to array size {}", start, count, start + count, array.size())};
             }
             return Slice{&array[start], count};
         }
@@ -189,13 +189,13 @@ namespace mars {
         ConstSlice(const std::array<T, size>& array) noexcept : mPtr(array.data()), mSize(size) {}
         static Error<ConstSlice<T>> make(const HeapArray<T>& array, std::size_t start) noexcept {
             if(start >= array.size()) {
-                return {ErrorTag::FATAL_ERROR, std::format("Index out of bounds: {} is greater than or equal to array size {}", start, array.size())};
+                return {ErrorTag::fatalError, std::format("Index out of bounds: {} is greater than or equal to array size {}", start, array.size())};
             }
             return ConstSlice{&array[start], array.size() - start};
         }
         static Error<ConstSlice<T>> make(const HeapArray<T>& array, std::size_t start, std::size_t count) noexcept {
             if(start + count > array.size()) {
-                return {ErrorTag::FATAL_ERROR, std::format("Array out of bounds: {} + {} = {}, which is greater than or equal to array size {}", start, count, start + count, array.size())};
+                return {ErrorTag::fatalError, std::format("Array out of bounds: {} + {} = {}, which is greater than or equal to array size {}", start, count, start + count, array.size())};
             }
             return ConstSlice{&array[start], count};
         }
