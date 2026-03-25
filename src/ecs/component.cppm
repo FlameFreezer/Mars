@@ -1,74 +1,42 @@
 module;
 
-#include <vector>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <vulkan/vulkan.h>
-
 export module component;
+export import components;
+export import component_system;
 import types;
 import error;
+import entity;
+
+#define DEFINE_COMPONENT_GETTER(component) const GetComp<Component::component>::Type& component(Entity e) const noexcept{\
+    return system<Component::component>()[e];\
+}\
+GetComp<Component::component>::Type& component(Entity e) noexcept {\
+    return system<Component::component>()[e];\
+}\
+
 
 namespace mars {
-    export using ComponentT = u8;
-    export enum class Component : ComponentT {
-        transform,
-        physics,
-        draw,
-        collide,
-        dynamics,
-        //KEEP THIS AT THE END OF THE ENUM
-        maxComponent
+    export class ComponentManager {
+        ComponentSystemParent* mSystems[numComponents];
+        Signature* mSignatures = new Signature[maxEntities];
+        public:
+        ComponentManager() noexcept;
+        ~ComponentManager() noexcept;
+        void reserveFor(ID id, Signature s) noexcept;
+        void freeFor(ID id) noexcept;
+        Signature getSignature(ID id) const noexcept;
+        template<Component c>
+        ComponentSystem<typename GetComp<c>::Type>& system() noexcept {
+            return *reinterpret_cast<ComponentSystem<typename GetComp<c>::Type>*>(mSystems[static_cast<ComponentT>(c)]);
+        }
+        template<Component c>
+        const ComponentSystem<typename GetComp<c>::Type>& system() const noexcept {
+            return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mSystems[static_cast<ComponentT>(c)]);
+        }
+        DEFINE_COMPONENT_GETTER(transform)
+        DEFINE_COMPONENT_GETTER(physics)
+        DEFINE_COMPONENT_GETTER(draw)
+        DEFINE_COMPONENT_GETTER(collide)
+        DEFINE_COMPONENT_GETTER(dynamics)
     };
-    export constexpr ComponentT numComponents = static_cast<ComponentT>(Component::maxComponent);
-
-    export struct Transform {
-        glm::vec2 position = glm::vec2(0.0f);
-        glm::vec2 scale = glm::vec2(1.0f);
-        float angle = 0;
-        float zLayer = 0;
-    };
-    export struct Physics {
-        glm::vec2 velocity = glm::vec2(0.0f);
-        glm::vec2 gravity = glm::vec2(0.0f, 1.0f);
-    };
-    //TODO: default mesh/texture with ID = 0
-    export struct Draw {
-        ID meshID = 0;
-        ID textureID = 0;
-    };
-    export struct Dynamics {
-        std::vector<ID> collisions;
-        float acceleration;
-        float friction;
-        float drag;
-        float maxSpeed;
-        float jumpSpeed;
-        ID floorID = nullID;
-    };
-    export enum class BoundingShape : ComponentT {
-        rectangle,
-        circle,
-    };
-    export struct Collide {
-        BoundingShape boundingShape = BoundingShape::rectangle;
-        glm::vec2 position = glm::vec2(0.0f);
-        union {
-            //Only valid if shape is a circle
-            float radius;
-            //Only valid if shape is a rectangle
-            glm::vec2 scale = glm::vec2(1.0f);
-        };
-        bool isSolid = false;
-    };
-        
-    //This struct template allows accessing the type of a component at compile time just using the actual component enum member
-    export template<Component c>
-    struct GetComp {};
-    template<> struct GetComp<Component::transform> {using Type = Transform;};
-    template<> struct GetComp<Component::physics> {using Type = Physics;};
-    template<> struct GetComp<Component::draw> {using Type = Draw;};
-    template<> struct GetComp<Component::collide> {using Type = Collide;};
-    template<> struct GetComp<Component::dynamics> {using Type = Dynamics;};
 }

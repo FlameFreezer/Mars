@@ -5,8 +5,8 @@ module;
 #include <vulkan/vulkan.h>
 
 export module component_system;
+import components;
 import entity;
-import component;
 import types;
 import error;
 import gpubuffer;

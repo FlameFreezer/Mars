@@ -63,7 +63,7 @@ namespace mars {
         mFlags(0), 
         mRenderer(nullptr), 
         pixelsPerMeter(defaultPixelsPerMeter),
-        physicsManager(entityManager) {}
+        physicsManager(ecs.componentManager) {}
 
     Game::Game(const std::string& name) noexcept : 
         mWindowName(name), 
@@ -71,7 +71,7 @@ namespace mars {
         mFlags(0), 
         mRenderer(nullptr), 
         pixelsPerMeter(defaultPixelsPerMeter),
-        physicsManager(entityManager) {}
+        physicsManager(ecs.componentManager) {}
 
     Error<noreturn> Game::init() noexcept {
         TRY(initLibrary());
@@ -107,7 +107,8 @@ namespace mars {
     Error<noreturn> Game::draw() noexcept {
         float aspect = 0.0f;
         if(camera.aspect == Camera::autoAspect) {
-            camera.aspect = static_cast<float>(mRenderer->swapchainImageExtent.width) / static_cast<float>(mRenderer->swapchainImageExtent.height);
+            camera.aspect = static_cast<float>(mRenderer->swapchainImageExtent.width) 
+                / static_cast<float>(mRenderer->swapchainImageExtent.height);
             aspect = camera.aspect;
             mRenderer->cameraMatrices.mappedMemory[1 + mRenderer->currentFrame] = camera.loadMatrices();
             camera.aspect = Camera::autoAspect;
@@ -116,10 +117,10 @@ namespace mars {
             mRenderer->cameraMatrices.mappedMemory[1 + mRenderer->currentFrame] = camera.loadMatrices();
             aspect = camera.aspect;
         }
-        Renderer::Systems mRendererSystems;
-        mRendererSystems.transform = &entityManager.system<Component::transform>();
-        mRendererSystems.draw = &entityManager.system<Component::draw>();
-        TRY(mRenderer->drawFrame(camera.fov, aspect, pixelsPerMeter, mRendererSystems));
+        Renderer::Systems rendererSystems{
+            ecs.componentManager.system<Component::transform>(), ecs.componentManager.system<Component::draw>()
+        };
+        TRY(mRenderer->drawFrame(camera.fov, aspect, pixelsPerMeter, rendererSystems));
         return success();
     }
 

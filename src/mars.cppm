@@ -16,6 +16,7 @@ export import flag_bits;
 export import error;
 export import heap_array;
 export import ecs;
+export import physics_manager;
 
 namespace mars {
     export class Time {
@@ -53,7 +54,7 @@ namespace mars {
         std::string mAppName;
         GameFlags mFlags;
         public:
-        EntityManager entityManager;
+        EntityComponentSystem ecs;
         PhysicsManager physicsManager;
         Time time;
         Input input;

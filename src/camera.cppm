@@ -18,9 +18,9 @@ namespace mars {
         glm::vec3 pos;
         glm::vec3 dir;
         glm::vec3 up;
-        float fov;
-        float aspect;
-        Camera() noexcept : aspect(autoAspect), fov(0.0f) {}
+        float fov = 0.0f;
+        float aspect = autoAspect;
+        Camera() = default;
         Camera(const glm::vec3& inPos, const glm::vec3& inDir, glm::vec3 inUp, float inFov, float inAspect) noexcept 
             : pos(inPos), dir(glm::normalize(inDir)), up(glm::normalize(inUp)), fov(inFov), aspect(inAspect) {
                 if(dir.y < -MAX_Y) dir.y = -MAX_Y;

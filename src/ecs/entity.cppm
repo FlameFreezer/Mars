@@ -4,7 +4,7 @@ module;
 #include <limits>
 
 export module entity;
-import component;
+import components;
 import types;
 
 namespace mars {
@@ -34,6 +34,8 @@ namespace mars {
         constexpr Entity(ID id, const Signature& sig) noexcept : mID(id), mSignature(sig) {}
         ID id() const noexcept;
         Signature signature() const noexcept;
+        bool has(const std::initializer_list<Component> comps) const noexcept;
+        bool has(Component comp) const noexcept;
         friend bool operator==(Entity lhs, Entity rhs) noexcept;
         friend bool operator!=(Entity lhs, Entity rhs) noexcept;
     };

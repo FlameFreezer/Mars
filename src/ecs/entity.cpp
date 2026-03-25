@@ -65,6 +65,14 @@ namespace mars {
         return mSignature;
     }
 
+    bool Entity::has(const std::initializer_list<Component> comps) const noexcept {
+        return mSignature.has(comps);
+    }
+
+    bool Entity::has(Component comp) const noexcept {
+        return mSignature.has(comp);
+    }
+
     bool operator==(Entity lhs, Entity rhs) noexcept {
         return lhs.mID == rhs.mID;
     }

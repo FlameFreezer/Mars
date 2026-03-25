@@ -31,7 +31,7 @@ import flag_bits;
 import vkhelper;
 import types;
 import component_system;
-import component;
+import components;
 import renderer_ecs;
 
 namespace mars {
@@ -527,8 +527,8 @@ namespace mars {
         }
 
         struct Systems {
-            const ComponentSystem<Transform>* transform;
-            const ComponentSystem<Draw>* draw;
+            const ComponentSystem<Transform>& transform;
+            const ComponentSystem<Draw>& draw;
         };
 
         struct SurfaceInfo {
@@ -1076,17 +1076,12 @@ namespace mars {
                 vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<u32>(entityManager.sysMesh->size()), entityManager.sysMesh->handles(), offsets.data());
             }
 
-            //Iterate through every transform (the most frequently varying data)
-            for(auto [t, entityID] : *systems.transform) {
-                //Get the ID of the mesh associated with the entity
-                const ID meshID = (*systems.draw)[entityID].meshID;
-                //Get the ID of the texture associated with the entity
-                const ID textureID = (*systems.draw)[entityID].textureID;
-
+            //Iterate through every drawable entity
+            for(auto [d, entityID] : systems.draw) {
                 //Push the descriptor for the texture
                 const VkDescriptorImageInfo materialInfo = {
                     .sampler = sampler,
-                    .imageView = (*entityManager.sysTexture)[textureID].view,
+                    .imageView = (*entityManager.sysTexture)[d.textureID].view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                 };
                 const VkWriteDescriptorSet writeMaterial = {
@@ -1110,6 +1105,9 @@ namespace mars {
                     &writeMaterial
                 );
 
+                //Get the current entity's transform
+                //Since draw implies transform, this is safe to do
+                const Transform& t = systems.transform[entityID];
                 //Create model matrix
                 glm::mat4 modelMatrix(1.0f);
                 modelMatrix[0][0] = t.scale.x * pixelsPerMeter;
@@ -1119,10 +1117,10 @@ namespace mars {
                 vkCmdPushConstants(commandBuffer, pipelineLayout2D, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
 
                 //Get the index for the current mesh within the array of vertex buffers
-                const u64 meshIndex = entityManager.sysMesh->index(meshID);
+                const u64 meshIndex = entityManager.sysMesh->index(d.meshID);
                 //Bind the index buffer at the end of the current mesh
-                vkCmdBindIndexBuffer(commandBuffer, entityManager.sysMesh->handles()[meshIndex], entityManager.sysMesh->getIndexOffset(meshID), VK_INDEX_TYPE_UINT32);
-                vkCmdDrawIndexed(commandBuffer, entityManager.sysMesh->getNumIndices(meshID), 1, 0, meshIndex, 0);
+                vkCmdBindIndexBuffer(commandBuffer, entityManager.sysMesh->handles()[meshIndex], entityManager.sysMesh->getIndexOffset(d.meshID), VK_INDEX_TYPE_UINT32);
+                vkCmdDrawIndexed(commandBuffer, entityManager.sysMesh->getNumIndices(d.meshID), 1, 0, meshIndex, 0);
             }
 
             vkCmdEndRendering(commandBuffer);
@@ -1679,8 +1677,6 @@ namespace mars {
             }
             return {ErrorTag::searchFail, "Physical Device did not support needed extensions!"};
         }
-
-
 
         static Error<PickPhysicalDeviceResult> pickPhysicalDevice(std::vector<VkPhysicalDevice>const& physicalDevices, VkSurfaceKHR surface) noexcept {
             PickPhysicalDeviceResult result{};
