@@ -11,6 +11,7 @@ namespace mars {
         ComponentSystem<Dynamics>& sysDynamics;
         ComponentSystem<Transform>& sysTransform;
         ComponentSystem<Collide>& sysCollide;
+        Position position(ID id) noexcept;
         public:
         PhysicsManager(ComponentManager& cm) noexcept;
         bool checkCollision(ID id1, ID id2) const noexcept;

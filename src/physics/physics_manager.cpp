@@ -10,40 +10,40 @@ namespace mars {
         sysDynamics(cm.system<Component::dynamics>()), 
         sysCollide(cm.system<Component::collide>()), 
         sysTransform(cm.system<Component::transform>()) {}
+
+    Position PhysicsManager::position(ID id) noexcept {
+        return {
+            sysTransform[id].position, sysCollide[id].position
+        };
+    }
+
+    bool doCollisionCheck(const Collide& c1, const Collide& c2) noexcept {
+        bool xWithin = false, yWithin = false;
+        if(c1.boundingShape == BoundingShape::rectangle and c2.boundingShape == BoundingShape::rectangle) { 
+            xWithin = c1.position.x + c1.scale.x > c2.position.x and c2.position.x + c2.scale.x > c1.position.x;
+            yWithin = c1.position.y + c1.scale.y > c2.position.y and c2.position.y + c2.scale.y > c1.position.y;
+        }
+        else if(c1.boundingShape == BoundingShape::rectangle and c2.boundingShape == BoundingShape::circle) {}
+        else if(c1.boundingShape == BoundingShape::circle and c2.boundingShape == BoundingShape::rectangle) {}
+        else {}
+        return xWithin and yWithin;
+    }
     
     bool PhysicsManager::checkCollision(ID id1, ID id2) const noexcept {
         //Entities cannot collide with themselves
         if(id1 == id2) return false;
         //Null entity produces no collisions
         if(id1 == nullID or id2 == nullID) return false;
-        const Collide& s1 = sysCollide[id1];
-        const Collide& s2 = sysCollide[id2];
-        bool xWithin = false, yWithin = false;
-        if(s1.boundingShape == BoundingShape::rectangle and s2.boundingShape == BoundingShape::rectangle) { 
-            xWithin = s1.position.x + s1.scale.x >= s2.position.x and s2.position.x + s2.scale.x >= s1.position.x;
-            yWithin = s1.position.y + s1.scale.y >= s2.position.y and s2.position.y + s2.scale.y >= s1.position.y;
-        }
-        else if(s1.boundingShape == BoundingShape::rectangle and s2.boundingShape == BoundingShape::circle) {}
-        else if(s1.boundingShape == BoundingShape::circle and s2.boundingShape == BoundingShape::rectangle) {}
-        else {}
-        return xWithin and yWithin;
+        const Collide& c1 = sysCollide[id1];
+        const Collide& c2 = sysCollide[id2];
+        return doCollisionCheck(sysCollide[id1], sysCollide[id2]);
     }
     bool PhysicsManager::checkCollision(Entity e1, Entity e2) const noexcept {
         //Entities cannot collide with themselves
         if(e1 == e2) return false;
         //Null entity produces no collisions
         if(e1 == nullEntity or e2 == nullEntity) return false;
-        const Collide& s1 = sysCollide[e1];
-        const Collide& s2 = sysCollide[e2];
-        bool xWithin = false, yWithin = false;
-        if(s1.boundingShape == BoundingShape::rectangle and s2.boundingShape == BoundingShape::rectangle) { 
-            xWithin = s1.position.x + s1.scale.x >= s2.position.x and s2.position.x + s2.scale.x >= s1.position.x;
-            yWithin = s1.position.y + s1.scale.y >= s2.position.y and s2.position.y + s2.scale.y >= s1.position.y;
-        }
-        else if(s1.boundingShape == BoundingShape::rectangle and s2.boundingShape == BoundingShape::circle) {}
-        else if(s1.boundingShape == BoundingShape::circle and s2.boundingShape == BoundingShape::rectangle) {}
-        else {}
-        return xWithin and yWithin;
+        return doCollisionCheck(sysCollide[e1], sysCollide[e2]);
     }
 
     void sortCollidesP(ComponentSystem<Collide>& sysCollide, u64 start, u64 end) noexcept {
@@ -107,11 +107,11 @@ namespace mars {
 
     glm::vec2 getR(const Collide& c1, const Collide& c2) noexcept {
         //Position is the rightmost/bottommost of the left/top edges
-        float xPos = std::max(c1.position.x, c2.position.x);
-        float yPos = std::max(c1.position.y, c2.position.y);
+        const float xPos = std::max(c1.position.x, c2.position.x);
+        const float yPos = std::max(c1.position.y, c2.position.y);
         //Scale comes from the distance to the leftmost/topmost of the right/bottom edges
-        float xScale = std::min(c1.position.x + c1.scale.x, c2.position.x + c2.scale.x) - xPos;
-        float yScale = std::min(c1.position.y + c1.scale.y, c2.position.y + c2.scale.y) - yPos;
+        const float xScale = std::min(c1.position.x + c1.scale.x, c2.position.x + c2.scale.x) - xPos;
+        const float yScale = std::min(c1.position.y + c1.scale.y, c2.position.y + c2.scale.y) - yPos;
         //r comes from the smaller axis of the dimensions of the region, or both if the region is square
         //doing both for squares ensures that corner collisions are always resolved
         glm::vec2 r(0.0f);
@@ -126,8 +126,8 @@ namespace mars {
 
     void PhysicsManager::resolveCollisions() noexcept {
         for(auto [d, eid] : sysDynamics) {
-            //Assume there's no floor. If there is a floor, it will get set later
             d.floorID = nullID;
+            d.wallID = nullID;
             for(ID id : d.collisions) {
                 if(!sysCollide[id].isSolid) continue;
                 glm::vec2 r = getR(sysCollide[eid], sysCollide[id]);
@@ -136,8 +136,7 @@ namespace mars {
                 r.x *= glm::sign(p.velocity.x);
                 r.y *= glm::sign(p.velocity.y);
                 //Subtract r to take the entity out of the wall
-                sysCollide[eid].position -= r;
-                sysTransform[eid].position -= r;
+                position(eid) -= r;
                 //Set the speeds that were into the wall to zero
                 if(r.x != 0.0f) p.velocity.x = 0.0f;
                 if(r.y != 0.0f) p.velocity.y = 0.0f;
@@ -152,5 +151,4 @@ namespace mars {
             }
         }
     }
-
 }

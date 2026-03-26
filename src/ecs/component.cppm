@@ -1,5 +1,7 @@
 module;
 
+#include <glm/glm.hpp>
+
 export module component;
 export import components;
 export import component_system;
@@ -14,8 +16,19 @@ GetComp<Component::component>::Type& component(Entity e) noexcept {\
     return system<Component::component>()[e];\
 }\
 
-
 namespace mars {
+    //Helper class to help programmers keep transforms and collisions aligned
+    export class Position {
+        glm::vec2& mTransform;
+        glm::vec2& mCollide;
+        public:
+        Position(glm::vec2& t, glm::vec2& c) noexcept;
+        Position operator=(glm::vec2 rhs) noexcept;
+        Position operator+=(glm::vec2 rhs) noexcept;
+        Position operator-=(glm::vec2 rhs) noexcept;
+        Position operator*=(float rhs) noexcept;
+        Position operator/=(float rhs) noexcept;
+    };
     export class ComponentManager {
         ComponentSystemParent* mSystems[numComponents];
         Signature* mSignatures = new Signature[maxEntities];
@@ -33,6 +46,7 @@ namespace mars {
         const ComponentSystem<typename GetComp<c>::Type>& system() const noexcept {
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mSystems[static_cast<ComponentT>(c)]);
         }
+        Position position(Entity e) noexcept;
         DEFINE_COMPONENT_GETTER(transform)
         DEFINE_COMPONENT_GETTER(physics)
         DEFINE_COMPONENT_GETTER(draw)
