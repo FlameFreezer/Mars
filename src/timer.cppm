@@ -13,19 +13,15 @@ namespace mars {
         paused,
         stopped
     };
-    export class Timer;
-    void twait(Timer* timer) noexcept;
-    void tresume(Timer* timer) noexcept;
-    class Timer {
-        std::mutex m;
+
+    export class Timer {
+        std::mutex mtx;
         TimerStatus mStatus = TimerStatus::stopped;
         std::thread mThread;
         std::chrono::nanoseconds mTime = std::chrono::nanoseconds(0);
         std::chrono::nanoseconds mTimeLeft = std::chrono::nanoseconds(0);
         std::chrono::steady_clock::time_point mStartTime;
         public:
-        friend void twait(Timer* timer) noexcept;
-        friend void tresume(Timer* timer) noexcept;
         Timer() = default;
         Timer(float waitTimeS) {
             const std::chrono::duration<float, std::chrono::seconds::period> s(waitTimeS);
@@ -39,12 +35,19 @@ namespace mars {
         /// Postconditions:     status() == TimerStatus::running
         /// Returns: void
         void start() noexcept {
-            std::unique_lock<std::mutex> l(m);
+            std::unique_lock<std::mutex> l(mtx);
             mStatus = TimerStatus::running;
             mTimeLeft = mTime;
             l.unlock();
             if(mThread.joinable()) mThread.join();
-            mThread = std::thread(twait, this);
+            mThread = std::thread([this]{
+                std::this_thread::sleep_for(mTime);
+                std::unique_lock<std::mutex> l(mtx);
+                if(mStatus != TimerStatus::paused) {
+                    mStatus = TimerStatus::stopped;
+                    mTimeLeft = std::chrono::nanoseconds(0);
+                }
+            });
             mStartTime = std::chrono::steady_clock::now();
         }
         /// Stops the timer, leaving it in the stopped status with no time left
@@ -53,7 +56,7 @@ namespace mars {
         /// Returns: void
         void stop() noexcept {
             mThread.detach();
-            std::unique_lock<std::mutex> l(m);
+            std::unique_lock<std::mutex> l(mtx);
             //Do nothing if the timer is already stopped
             if(mStatus == TimerStatus::stopped) return;
             mStatus = TimerStatus::stopped;
@@ -61,9 +64,10 @@ namespace mars {
         }
         /// Pauses the timer, leaving it in the paused status
         /// Postconditions: status() == TimerStatus::paused
+        /// Returns: void
         void pause() noexcept {
             mThread.detach();
-            std::unique_lock<std::mutex> l(m);
+            std::unique_lock<std::mutex> l(mtx);
             //If the timer was stopped by the thread before we could pause it, do nothing
             if(mStatus == TimerStatus::stopped) return;
             mStatus = TimerStatus::paused;
@@ -74,11 +78,18 @@ namespace mars {
         /// Postconditions: status() == TimerStatus::running
         /// Returns: void
         void resume() noexcept {
-            std::unique_lock<std::mutex> l(m);
+            std::unique_lock<std::mutex> l(mtx);
             if((mStatus != TimerStatus::paused)) return;
             mStatus = TimerStatus::running;
             l.unlock();
-            mThread = std::thread(tresume, this);
+            mThread = std::thread([this]{
+                std::this_thread::sleep_for(mTimeLeft);
+                std::unique_lock<std::mutex> l(mtx);
+                if(mStatus != TimerStatus::paused) {
+                    mStatus = TimerStatus::stopped;
+                    mTimeLeft = std::chrono::nanoseconds(0);
+                }
+            });
         }
         /// Resets the timer to its initial conditions. Does nothing if the timer is running
         /// Preconditions:  status() != TimerStatus::running
@@ -86,7 +97,7 @@ namespace mars {
         ///                 timeLeft() == waitTime()
         /// Returns: void
         void reset() noexcept {
-            std::unique_lock<std::mutex> l(m);
+            std::unique_lock<std::mutex> l(mtx);
             if(mStatus == TimerStatus::running) return;
             mStatus = TimerStatus::stopped;
             mTimeLeft = mTime;
@@ -114,20 +125,4 @@ namespace mars {
             return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(mTime).count();
         }
     };
-    void twait(Timer* timer) noexcept {
-        std::this_thread::sleep_for(timer->mTime);
-        std::unique_lock<std::mutex> l(timer->m);
-        if(timer->mStatus != TimerStatus::paused) {
-            timer->mStatus = TimerStatus::stopped;
-            timer->mTimeLeft = std::chrono::nanoseconds(0);
-        }
-    }
-    void tresume(Timer* timer) noexcept {
-        std::this_thread::sleep_for(timer->mTimeLeft);
-        std::unique_lock<std::mutex> l(timer->m);
-        if(timer->mStatus != TimerStatus::paused) {
-            timer->mStatus = TimerStatus::stopped;
-            timer->mTimeLeft = std::chrono::nanoseconds(0);
-        }
-    }
 }
