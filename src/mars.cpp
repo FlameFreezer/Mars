@@ -1,5 +1,6 @@
 module;
 
+#include <cstring>
 #include <string>
 #include <chrono>
 
@@ -36,14 +37,29 @@ namespace mars {
         if(numGamepads != 0) {
             gamepad = SDL_OpenGamepad(gamepads[0]);
         }
+        mKeyState = SDL_GetKeyboardState(&mNumKeys);
+        mPrevKeyState = new bool[mNumKeys];
+        for(int i = 0; i < mNumKeys; i++) mPrevKeyState[i] = false;
     }
 
     Input::~Input() noexcept {
         SDL_CloseGamepad(gamepad);
+        delete[] mPrevKeyState;
     }
 
     void Input::update() noexcept {
-        keyState = SDL_GetKeyboardState(nullptr);
+        std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
+        mKeyState = SDL_GetKeyboardState(nullptr);
+    }
+
+    bool Input::isKeyDown(SDL_Scancode scancode) const noexcept {
+        return mKeyState[scancode];
+    }
+    bool Input::isKeyJustPressed(SDL_Scancode scancode) const noexcept {
+        return mKeyState[scancode] and !mPrevKeyState[scancode];
+    }
+    bool Input::isKeyJustReleased(SDL_Scancode scancode) const noexcept {
+        return !mKeyState[scancode] and mPrevKeyState[scancode];
     }
 
     Error<noreturn> initLibrary() noexcept {

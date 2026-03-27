@@ -38,14 +38,19 @@ namespace mars {
     };
 
     export class Input {
+        bool* mPrevKeyState = nullptr;
+        const bool* mKeyState = nullptr;
+        int mNumKeys = 0;
         public:
-        const bool* keyState = nullptr;
         SDL_Gamepad* gamepad = nullptr;
         Input() noexcept;
         ~Input() noexcept;
         /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
         /// Returns: void    Nothing
         void update() noexcept;
+        bool isKeyDown(SDL_Scancode scancode) const noexcept;
+        bool isKeyJustPressed(SDL_Scancode scancode) const noexcept;
+        bool isKeyJustReleased(SDL_Scancode scancode) const noexcept;
     };
 
     export class Game {

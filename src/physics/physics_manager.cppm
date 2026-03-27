@@ -4,6 +4,7 @@ export module physics_manager;
 import types;
 import entity;
 import component;
+import position;
 
 namespace mars {
     export class PhysicsManager {

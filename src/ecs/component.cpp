@@ -5,33 +5,6 @@ module;
 module component;
 
 namespace mars {
-    Position::Position(glm::vec2& t, glm::vec2& c) noexcept : mTransform(t), mCollide(c) {}
-    Position Position::operator=(glm::vec2 rhs) noexcept {
-        mTransform = rhs;
-        mCollide = rhs;
-        return *this;
-    }
-    Position Position::operator+=(glm::vec2 rhs) noexcept {
-        mTransform += rhs;
-        mCollide += rhs;
-        return *this;
-    }
-    Position Position::operator-=(glm::vec2 rhs) noexcept {
-        mTransform -= rhs;
-        mCollide -= rhs;
-        return *this;
-    }
-    Position Position::operator*=(float rhs) noexcept {
-        mTransform *= rhs;
-        mCollide *= rhs;
-        return *this;
-    }
-    Position Position::operator/=(float rhs) noexcept {
-        mTransform /= rhs;
-        mCollide /= rhs;
-        return *this;
-    }
-
     template<ComponentT c>
     void allocSystem(ComponentSystemParent* systems[]) noexcept {
         //Allocate the system
@@ -43,6 +16,7 @@ namespace mars {
     }
     //Base Case: do nothing once all systems have been allocated
     template<> void allocSystem<numComponents>(ComponentSystemParent**) noexcept {}
+
     void allocSystems(ComponentSystemParent* systems[]) noexcept {
         allocSystem<0>(systems);
     }
