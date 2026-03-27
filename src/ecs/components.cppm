@@ -8,6 +8,7 @@ module;
 export module components;
 import types;
 import error;
+import room;
 
 namespace mars {
     export using ComponentT = u8;
@@ -31,6 +32,7 @@ namespace mars {
     export struct Physics {
         glm::vec2 velocity = glm::vec2(0.0f);
         glm::vec2 gravity = glm::vec2(0.0f, 1.0f);
+        const Room* room = nullptr;
     };
     //TODO: default mesh/texture with ID = 0
     export struct Draw {

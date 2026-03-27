@@ -72,6 +72,8 @@ namespace mars {
     void PhysicsManager::applyPhysics(float deltaTime) noexcept {
         //For every physics component
         for(auto [p, id] : sysPhysics) {
+            //Apply physics
+            p.velocity += p.gravity * deltaTime;
             //Get the entity associated with the component
             Transform& t = sysTransform[id];
             //Update its position using the velocity

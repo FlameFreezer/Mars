@@ -43,13 +43,19 @@ namespace mars {
     }
 
     Input::~Input() noexcept {
-        SDL_CloseGamepad(gamepad);
+        if(gamepad != nullptr) {
+            SDL_CloseGamepad(gamepad);
+        }
         delete[] mPrevKeyState;
     }
 
     void Input::update() noexcept {
         std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
         mKeyState = SDL_GetKeyboardState(nullptr);
+        if(!SDL_GamepadConnected(gamepad)) {
+            SDL_CloseGamepad(gamepad);
+            gamepad = nullptr;
+        }
     }
 
     bool Input::isKeyDown(SDL_Scancode scancode) const noexcept {

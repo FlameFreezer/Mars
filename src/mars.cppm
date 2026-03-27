@@ -17,6 +17,8 @@ export import error;
 export import heap_array;
 export import ecs;
 export import physics_manager;
+export import room;
+export import timer;
 
 namespace mars {
     export class Time {
@@ -68,6 +70,7 @@ namespace mars {
         } shapes;
         Camera camera;
         float pixelsPerMeter;
+        Room room = {.gravity = glm::vec2(0.0f, 38.0f)};
         //Constructors - don't do any actual initialization. Call `init` to initialize the game and necessary libraries
         Game() noexcept;
         Game(const std::string& name) noexcept;
