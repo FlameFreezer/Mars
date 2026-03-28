@@ -16,11 +16,11 @@ namespace mars {
 
     export class Timer {
         std::mutex mtx;
-        TimerStatus mStatus = TimerStatus::stopped;
         std::thread mThread;
         std::chrono::nanoseconds mTime = std::chrono::nanoseconds(0);
         std::chrono::nanoseconds mTimeLeft = std::chrono::nanoseconds(0);
         std::chrono::steady_clock::time_point mStartTime;
+        TimerStatus mStatus = TimerStatus::stopped;
         public:
         Timer() = default;
         Timer(float waitTimeS) {
@@ -31,11 +31,13 @@ namespace mars {
         ~Timer() noexcept {
             if(mThread.joinable()) mThread.join();
         }
-        /// Starts the timer from time t = 0
-        /// Postconditions:     status() == TimerStatus::running
+        /// Starts the timer from time t = 0. Does nothing if the timer is already running.
+        /// Preconditions:  status() != TimerStatus::running
+        /// Postconditions: status() == TimerStatus::running
         /// Returns: void
         void start() noexcept {
             std::unique_lock<std::mutex> l(mtx);
+            if(mStatus == TimerStatus::running) return;
             mStatus = TimerStatus::running;
             mTimeLeft = mTime;
             l.unlock();
@@ -43,27 +45,29 @@ namespace mars {
             mThread = std::thread([this]{
                 std::this_thread::sleep_for(mTime);
                 std::unique_lock<std::mutex> l(mtx);
-                if(mStatus != TimerStatus::paused) {
+                //Check if this thread still represents the active timer (i.e. timer wasn't stopped 
+                // or paused)
+                if(std::this_thread::get_id() == mThread.get_id()) {
                     mStatus = TimerStatus::stopped;
                     mTimeLeft = std::chrono::nanoseconds(0);
                 }
             });
             mStartTime = std::chrono::steady_clock::now();
         }
-        /// Stops the timer, leaving it in the stopped status with no time left
+        /// Stops the timer, leaving it in the stopped status with no time left.
         /// Postconditions: timeLeft() == 0.0f
         ///                 status() == TimerStatus::stopped 
         /// Returns: void
         void stop() noexcept {
             mThread.detach();
             std::unique_lock<std::mutex> l(mtx);
-            //Do nothing if the timer is already stopped
-            if(mStatus == TimerStatus::stopped) return;
             mStatus = TimerStatus::stopped;
             mTimeLeft = std::chrono::nanoseconds(0);
         }
-        /// Pauses the timer, leaving it in the paused status
-        /// Postconditions: status() == TimerStatus::paused
+        /// Pauses the timer, leaving it in the paused status. Does nothing if the timer was already stopped.
+        /// Preconditions:  status() != TimerStatus::stopped
+        /// Postconditions: status() == TimerStatus::paused, if timer was running
+        ///                 status() == TimerStatus::stopped, if timer was stopped
         /// Returns: void
         void pause() noexcept {
             mThread.detach();
@@ -85,7 +89,9 @@ namespace mars {
             mThread = std::thread([this]{
                 std::this_thread::sleep_for(mTimeLeft);
                 std::unique_lock<std::mutex> l(mtx);
-                if(mStatus != TimerStatus::paused) {
+                //Check if this thread still represents the active timer (i.e. timer wasn't stopped 
+                // or paused)
+                if(std::this_thread::get_id() == mThread.get_id()) {
                     mStatus = TimerStatus::stopped;
                     mTimeLeft = std::chrono::nanoseconds(0);
                 }
@@ -108,7 +114,7 @@ namespace mars {
         float timeLeft() const noexcept {
             return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(mTimeLeft).count();
         }
-        std::chrono::nanoseconds::rep const timeLeftNanoseconds() noexcept {
+        std::chrono::nanoseconds::rep timeLeftNanoseconds() const noexcept {
             return mTimeLeft.count();
         }
         /// Sets the total wait time to the number of seconds passed. If the timer was paused, this will NOT change the time left on the timer.
@@ -116,6 +122,7 @@ namespace mars {
         /// Returns: void
         void setWaitTime(float waitTime) noexcept {
             const std::chrono::duration<float, std::chrono::seconds::period> s(waitTime);
+            std::unique_lock<std::mutex> l(mtx);
             mTime = std::chrono::duration_cast<std::chrono::nanoseconds>(s);
             if(mStatus == TimerStatus::stopped) {
                 mTimeLeft = mTime;
