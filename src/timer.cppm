@@ -29,7 +29,7 @@ namespace mars {
             mTimeLeft = mTime;
         }
         ~Timer() noexcept {
-            if(mThread.joinable()) mThread.join();
+            if(mThread.joinable()) mThread.detach();
         }
         /// Starts the timer from time t = 0. Does nothing if the timer is already running.
         /// Preconditions:  status() != TimerStatus::running
