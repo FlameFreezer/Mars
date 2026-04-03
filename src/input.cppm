@@ -23,6 +23,9 @@ namespace mars {
     };
 
     export class Input {
+        SDL_Gamepad* mGamepad = nullptr;
+        bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
+        bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
         bool* mPrevKeyState = nullptr;
         const bool* mKeyState = nullptr;
         int mNumKeys = 0;
@@ -30,7 +33,6 @@ namespace mars {
         static std::unordered_map<std::string, SDL_Scancode> strToScancode;
         static std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton;
         public:
-        SDL_Gamepad* gamepad = nullptr;
         Input() noexcept;
         ~Input() noexcept;
         Error<noreturn> loadMappings(const std::string& path) noexcept;
@@ -40,6 +42,9 @@ namespace mars {
         bool isKeyDown(SDL_Scancode scancode) const noexcept;
         bool isKeyJustPressed(SDL_Scancode scancode) const noexcept;
         bool isKeyJustReleased(SDL_Scancode scancode) const noexcept;
+        bool isButtonDown(SDL_GamepadButton button) const noexcept;
+        bool isButtonJustPressed(SDL_GamepadButton button) const noexcept;
+        bool isButtonJustReleased(SDL_GamepadButton button) const noexcept;
         bool isActionDown(const std::string& action) const noexcept;
         bool isActionJustPressed(const std::string& action) const noexcept;
         bool isActionJustReleased(const std::string& action) const noexcept;

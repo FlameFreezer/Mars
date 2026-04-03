@@ -31,6 +31,7 @@ std::unordered_map<std::string, SDL_GamepadButton> initGamepadButtonMap() noexce
     map["west"] = SDL_GAMEPAD_BUTTON_WEST;
     map["dpad right"] = SDL_GAMEPAD_BUTTON_DPAD_RIGHT;
     map["dpad left"] = SDL_GAMEPAD_BUTTON_DPAD_LEFT;
+    map["left shoulder"] = SDL_GAMEPAD_BUTTON_LEFT_SHOULDER;
     return map;
 }
 
@@ -39,7 +40,7 @@ namespace mars {
         int numGamepads;
         SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
         if(numGamepads != 0) {
-            gamepad = SDL_OpenGamepad(gamepads[0]);
+            mGamepad = SDL_OpenGamepad(gamepads[0]);
         }
         mKeyState = SDL_GetKeyboardState(&mNumKeys);
         mPrevKeyState = new bool[mNumKeys];
@@ -47,8 +48,8 @@ namespace mars {
     }
 
     Input::~Input() noexcept {
-        if(gamepad != nullptr) {
-            SDL_CloseGamepad(gamepad);
+        if(mGamepad != nullptr and SDL_GamepadConnected(mGamepad)) {
+            SDL_CloseGamepad(mGamepad);
         }
         delete[] mPrevKeyState;
     }
@@ -159,9 +160,22 @@ namespace mars {
     void Input::update() noexcept {
         std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
         mKeyState = SDL_GetKeyboardState(nullptr);
-        if(!SDL_GamepadConnected(gamepad)) {
-            SDL_CloseGamepad(gamepad);
-            gamepad = nullptr;
+        int numGamepads = 0;
+        SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
+        if(numGamepads != 0 and !SDL_GamepadConnected(mGamepad)) {
+            mGamepad = SDL_OpenGamepad(gamepads[0]);
+        }
+        else if(!SDL_GamepadConnected(mGamepad)) {
+            SDL_CloseGamepad(mGamepad);
+            mGamepad = nullptr;
+            std::memset(mPrevGamepadButtonState, SDL_GAMEPAD_BUTTON_COUNT, false);
+            std::memset(mGamepadButtonState, SDL_GAMEPAD_BUTTON_COUNT, false);
+        }
+        else {
+            for(u64 i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; i++) {
+                mPrevGamepadButtonState[i] = mGamepadButtonState[i];
+                mGamepadButtonState[i] = SDL_GetGamepadButton(mGamepad, static_cast<SDL_GamepadButton>(i));
+            }
         }
     }
 
@@ -175,11 +189,24 @@ namespace mars {
         return !mKeyState[scancode] and mPrevKeyState[scancode];
     }
 
+    bool Input::isButtonDown(SDL_GamepadButton button) const noexcept {
+            return mGamepadButtonState[button];
+    }
+    bool Input::isButtonJustPressed(SDL_GamepadButton button) const noexcept {
+        return mGamepadButtonState[button] and !mPrevGamepadButtonState[button];
+    }
+    bool Input::isButtonJustReleased(SDL_GamepadButton button) const noexcept {
+        return !mGamepadButtonState[button] and mPrevGamepadButtonState[button];
+    }
+
     bool Input::isActionDown(const std::string& action) const noexcept {
         if(!mMappings.contains(action)) return false;
         const Mapping& mapping = mMappings.at(action);
         for(u8 i = 0; i < mapping.numScancodes; i++) {
             if(isKeyDown(mapping.scancodes[i])) return true;
+        }
+        for(u8 i = 0; i < mapping.numGamepadButtons; i++) {
+            if(isButtonDown(mapping.gamepadButtons[i])) return true;
         }
         return false;
     }
@@ -189,6 +216,9 @@ namespace mars {
         for(u8 i = 0; i < mapping.numScancodes; i++) {
             if(isKeyJustPressed(mapping.scancodes[i])) return true;
         }
+        for(u8 i = 0; i < mapping.numGamepadButtons; i++) {
+            if(isButtonJustPressed(mapping.gamepadButtons[i])) return true;
+        }
         return false;
     }
     bool Input::isActionJustReleased(const std::string& action) const noexcept {
@@ -196,6 +226,9 @@ namespace mars {
         const Mapping& mapping = mMappings.at(action);
         for(u8 i = 0; i < mapping.numScancodes; i++) {
             if(isKeyJustReleased(mapping.scancodes[i])) return true;
+        }
+        for(u8 i = 0; i < mapping.numGamepadButtons; i++) {
+            if(isButtonJustReleased(mapping.gamepadButtons[i])) return true;
         }
         return false;
     }
