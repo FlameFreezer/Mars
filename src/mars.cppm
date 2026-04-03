@@ -19,6 +19,7 @@ export import ecs;
 export import physics_manager;
 export import room;
 export import timer;
+export import input;
 
 namespace mars {
     export class Time {
@@ -37,22 +38,6 @@ namespace mars {
         /// Updates the `time` and `deltaTime` private class members to reflect the current frame. Should be called at the start of the current frame.
         /// Returns: void    Nothing
         void update() noexcept;
-    };
-
-    export class Input {
-        bool* mPrevKeyState = nullptr;
-        const bool* mKeyState = nullptr;
-        int mNumKeys = 0;
-        public:
-        SDL_Gamepad* gamepad = nullptr;
-        Input() noexcept;
-        ~Input() noexcept;
-        /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
-        /// Returns: void    Nothing
-        void update() noexcept;
-        bool isKeyDown(SDL_Scancode scancode) const noexcept;
-        bool isKeyJustPressed(SDL_Scancode scancode) const noexcept;
-        bool isKeyJustReleased(SDL_Scancode scancode) const noexcept;
     };
 
     export class Game {

@@ -31,42 +31,6 @@ namespace mars {
         mTime = now;
     }
 
-    Input::Input() noexcept {
-        int numGamepads;
-        SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
-        if(numGamepads != 0) {
-            gamepad = SDL_OpenGamepad(gamepads[0]);
-        }
-        mKeyState = SDL_GetKeyboardState(&mNumKeys);
-        mPrevKeyState = new bool[mNumKeys];
-        for(int i = 0; i < mNumKeys; i++) mPrevKeyState[i] = false;
-    }
-
-    Input::~Input() noexcept {
-        if(gamepad != nullptr) {
-            SDL_CloseGamepad(gamepad);
-        }
-        delete[] mPrevKeyState;
-    }
-
-    void Input::update() noexcept {
-        std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
-        mKeyState = SDL_GetKeyboardState(nullptr);
-        if(!SDL_GamepadConnected(gamepad)) {
-            SDL_CloseGamepad(gamepad);
-            gamepad = nullptr;
-        }
-    }
-
-    bool Input::isKeyDown(SDL_Scancode scancode) const noexcept {
-        return mKeyState[scancode];
-    }
-    bool Input::isKeyJustPressed(SDL_Scancode scancode) const noexcept {
-        return mKeyState[scancode] and !mPrevKeyState[scancode];
-    }
-    bool Input::isKeyJustReleased(SDL_Scancode scancode) const noexcept {
-        return !mKeyState[scancode] and mPrevKeyState[scancode];
-    }
 
     Error<noreturn> initLibrary() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
