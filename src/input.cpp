@@ -35,6 +35,12 @@ std::unordered_map<std::string, SDL_GamepadButton> initGamepadButtonMap() noexce
     return map;
 }
 
+std::unordered_map<std::string, SDL_GamepadAxis> initAxisMap() noexcept {
+    std::unordered_map<std::string, SDL_GamepadAxis> map;
+    map["leftx"] = SDL_GAMEPAD_AXIS_LEFTX;
+    return map;
+}
+
 namespace mars {
     Input::Input() noexcept {
         int numGamepads;
@@ -62,6 +68,7 @@ namespace mars {
     Error<InputMapping> readInputMapping(std::istringstream& block, char* buff, u16 buffSize) noexcept {
         static const std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
         static const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
+        static const std::unordered_map<std::string, SDL_GamepadAxis> strToAxis = initAxisMap();
         InputMapping inputMapping;
         while(!block.eof()) {
             //Ignore up to the first parenthesis of the property
@@ -118,6 +125,27 @@ namespace mars {
                     SDL_GamepadButton button = strToGamepadButton.at(buttonname);
                     inputMapping.mapping.gamepadButtons[inputMapping.mapping.numGamepadButtons++] = button;
                     if(inputMapping.mapping.numGamepadButtons == maxGamepadButtons) break;
+                }
+            }
+            else if(strcmp(buff, "sticks") == 0) {
+                block.ignore(std::numeric_limits<std::streamsize>::max(), '{');
+                block.getline(buff, buffSize, '}');
+                std::istringstream sticks(std::string(buff, block.gcount() - 1));
+                while(true) {
+                    sticks.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+                    if(sticks.eof()) break;
+                    sticks.getline(buff, buffSize, '\"');
+                    const std::string axisname(buff, sticks.gcount() - 1);
+                    if(!strToAxis.contains(axisname)) {
+                        return fatal<InputMapping>(std::format("Invalid axis name \"{}\"", axisname));
+                    }
+                    SDL_GamepadAxis axis = strToAxis.at(axisname);
+                    inputMapping.mapping.axes[inputMapping.mapping.numAxes] = axis;
+                    sticks.ignore(3);
+                    float value;
+                    sticks >> value;
+                    inputMapping.mapping.axisValues[inputMapping.mapping.numAxes++] = value;
+                    if(inputMapping.mapping.numAxes == maxAxes) break;
                 }
             }
         }
@@ -207,6 +235,16 @@ namespace mars {
         }
         for(u8 i = 0; i < mapping.numGamepadButtons; i++) {
             if(isButtonDown(mapping.gamepadButtons[i])) return true;
+        }
+        for(u8 i = 0; i < mapping.numAxes; i++) {
+            static constexpr i16 angleToAxisValue = SDL_JOYSTICK_AXIS_MAX / 90.0f;
+            const i16 val = mapping.axisValues[i] * angleToAxisValue;
+            if(val <= 0) {
+                if(SDL_GetGamepadAxis(mGamepad, mapping.axes[i]) <= val) return true;
+            }
+            else {
+                if(SDL_GetGamepadAxis(mGamepad, mapping.axes[i]) >= val) return true;
+            }
         }
         return false;
     }

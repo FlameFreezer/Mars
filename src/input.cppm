@@ -14,12 +14,16 @@ namespace mars {
 
     export constexpr u8 maxScancodes = 5;
     export constexpr u8 maxGamepadButtons = 5;
+    export constexpr u8 maxAxes = SDL_GAMEPAD_AXIS_COUNT;
 
     struct Mapping {
         SDL_Scancode scancodes[maxScancodes];
         u8 numScancodes = 0;
         SDL_GamepadButton gamepadButtons[maxGamepadButtons];
         u8 numGamepadButtons = 0;
+        SDL_GamepadAxis axes[maxAxes];
+        float axisValues[maxAxes];
+        u8 numAxes = 0;
     };
 
     export class Input {
