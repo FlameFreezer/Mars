@@ -11,7 +11,6 @@ export module mars;
 export import types;
 export import camera;
 export import renderer;
-export import flag_bits;
 export import error;
 export import heap_array;
 export import ecs;
@@ -24,5 +23,4 @@ export import input;
 namespace mars {
     export Error<noreturn> init() noexcept;
     export void quit() noexcept;
-
 };

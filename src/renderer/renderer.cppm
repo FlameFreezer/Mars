@@ -23,11 +23,11 @@ module;
 #include "mars_macros.h"
 
 export module renderer;
+export import :flags;
 import gpubuffer;
 import gpuimage;
 import error;
 import heap_array;
-import flag_bits;
 import vkhelper;
 import types;
 import component_system;
@@ -429,7 +429,7 @@ namespace mars {
                 &imageIndex
             );
             //Recreate the swapchain and try to draw the frame again
-            if(res == VK_ERROR_OUT_OF_DATE_KHR or res == VK_SUBOPTIMAL_KHR or (flags & flagBits::recreateSwapchain)) {
+            if(res == VK_ERROR_OUT_OF_DATE_KHR or res == VK_SUBOPTIMAL_KHR or (flags & rendererFlags::recreateSwapchain)) {
                 TRY(recreateSwapchain());
                 vkDestroySemaphore(device, imageAcquiredSemaphores[currentFrame], nullptr);
                 VkSemaphoreCreateInfo const semaphoreInfo = {
@@ -443,7 +443,7 @@ namespace mars {
                 depthImage2D.destroy(device);
                 depthImage3D.destroy(device);
                 TRY(createDepthImages());
-                flags &= ~flagBits::recreateSwapchain;
+                flags &= ~rendererFlags::recreateSwapchain;
                 return drawFrame(fov, aspect, pixelsPerMeter, sysTransform, sysDraw);
             }
             //Fatal error has occurred
@@ -673,7 +673,7 @@ namespace mars {
             if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
                 return {ErrorTag::fatalError, "Failed to begin single time command buffer"}; 
             }
-            flags |= flagBits::beganTransferOps;
+            flags |= rendererFlags::beganTransferOps;
             return success();
         }
 
@@ -2119,7 +2119,7 @@ namespace mars {
             return success();
         }
         public:
-        RendererFlags flags;
+        rendererFlags::FlagT flags;
         static Error<Renderer*> make(const std::string& name, ID& squareID) noexcept {
             Renderer* r = new Renderer;
             #define RTRY(proc) \
@@ -2128,7 +2128,7 @@ namespace mars {
                 return res.moveError<Renderer*>();\
             } while(false)
             if(auto res = r->createVkInstance(name); !res) {
-                r->flags |= flagBits::instanceInvalid;
+                r->flags |= rendererFlags::instanceInvalid;
                 delete r;
                 return res.moveError<Renderer*>();
             }
@@ -2136,7 +2136,7 @@ namespace mars {
             RTRY(r->createSurface(name));
             SurfaceInfo surfaceInfo{};
             if(Error<noreturn> res = r->createDevice(surfaceInfo); !res) {
-                r->flags |= flagBits::deviceInvalid;
+                r->flags |= rendererFlags::deviceInvalid;
                 delete r;
                 return res.moveError<Renderer*>();
             }
@@ -2172,7 +2172,7 @@ namespace mars {
         }
         //Destructor
         ~Renderer() noexcept {
-            if(!(flags & flagBits::deviceInvalid)) [[likely]] {
+            if(!(flags & rendererFlags::deviceInvalid)) [[likely]] {
                 vkDeviceWaitIdle(device);
                 vkDestroySwapchainKHR(device, swapchain, nullptr);
                 for(VkImageView view : swapchainImageViews) {
@@ -2207,7 +2207,7 @@ namespace mars {
                 cameraMatrices.destroy(device);
                 vkDestroyDevice(device, nullptr);
             }
-            if(!(flags & flagBits::instanceInvalid)) [[likely]] {
+            if(!(flags & rendererFlags::instanceInvalid)) [[likely]] {
                 SDL_Vulkan_DestroySurface(instance, surface, nullptr);
                 SDL_DestroyWindow(window);
                 if constexpr(enableValidationLayers) {
@@ -2260,7 +2260,7 @@ namespace mars {
             std::memcpy(memory, reinterpret_cast<void const*>(indices.data()), indicesSize);
             vkUnmapMemory(device, transferBuffer.memory);
 
-            if(!(flags & flagBits::beganTransferOps)) {
+            if(!(flags & rendererFlags::beganTransferOps)) {
                 Error<noreturn> res = beginTransferOps();
                 if(!res) {
                     vertexBuffer.destroy(device);
@@ -2305,7 +2305,7 @@ namespace mars {
             }
             vkQueueWaitIdle(graphicsQueues[0]);
             vkResetCommandBuffer(commandBuffers.back(), 0);
-            flags &= ~flagBits::beganTransferOps;
+            flags &= ~rendererFlags::beganTransferOps;
             transferBuffer.destroy(device);
 
             return entityManager.insertMesh(vertexBuffer.handle, vertexBuffer.memory, verticesSize, indicesSize / sizeof(u32));
