@@ -10,6 +10,7 @@ module;
 #include <fstream>
 #include <cstring>
 #include <limits>
+#include <queue>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -167,7 +168,6 @@ namespace mars {
     };
 
     export class Renderer {
-
         RendererEntityManager entityManager;
         Cube cube;
         UniformBuffer<glm::mat4> cameraMatrices;
@@ -177,31 +177,33 @@ namespace mars {
         HeapArray<GPUImage> textures2DScene;
         HeapArray<GPUImage> renderTargets3D;
         HeapArray<VkQueue> queues;
+        std::queue<GPUBuffer> transferBuffers;
         Slice<VkQueue> graphicsQueues;
         Slice<VkQueue> presentQueues;
         HeapArray<VkSemaphore> semaphores;
         GPUImage depthImage2D;
         GPUImage depthImage3D;
         //Each frame needs a command buffer for the 2D and 3D scenes, and one reserved for transfer
-    	std::array<VkCommandBuffer, (2 * maxConcurrentFrames) + 1> commandBuffers;
+    	std::array<VkCommandBuffer, (2 * maxConcurrentFrames) + maxConcurrentFrames> commandBuffers;
+        std::array<VkCommandBuffer, maxConcurrentFrames> transferCommandBuffers;
         std::array<VkFence, maxConcurrentFrames> fences;
         std::array<VkPipeline, 2> graphicsPipelines;
-        VkDescriptorSetLayout pushSetLayout;
-        VkInstance instance;
-        SDL_Window* window;
-        VkDebugUtilsMessengerEXT debugMessenger;
-        VkSurfaceKHR surface;
-        VkDevice device;
-        VkPhysicalDevice physicalDevice;
-        VkSwapchainKHR swapchain;
+        VkDescriptorSetLayout pushSetLayout = nullptr;
+        VkInstance instance = nullptr;
+        SDL_Window* window = nullptr;
+        VkDebugUtilsMessengerEXT debugMessenger = nullptr;
+        VkSurfaceKHR surface = nullptr;
+        VkDevice device = nullptr;
+        VkPhysicalDevice physicalDevice = nullptr;
+        VkSwapchainKHR swapchain = nullptr;
         VkExtent2D swapchainImageExtent;
-    	VkCommandPool commandPool;
-        VkPipelineLayout pipelineLayout2D;
-        VkPipelineLayout pipelineLayout3D;
-        VkSampler sampler;
-        u32 currentFrame;
-        u32 graphicsQueueFamilyIndex;
-        u32 presentQueueFamilyIndex;
+    	VkCommandPool commandPool = nullptr;
+        VkPipelineLayout pipelineLayout2D = nullptr;
+        VkPipelineLayout pipelineLayout3D = nullptr;
+        VkSampler sampler = nullptr;
+        u32 currentFrame = 0;
+        u32 graphicsQueueFamilyIndex = 0;
+        u32 presentQueueFamilyIndex = 0;
         VkSampleCountFlagBits msaaSampleCount;
 
         void setup3DMemoryBarriers(u32 imageIndex, std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers3D) noexcept {
@@ -450,7 +452,9 @@ namespace mars {
             else if(res != VK_SUCCESS) {
                 return {ErrorTag::fatalError, "Failed to acquire next swapchain image index"};
             }
-
+            if(flags & rendererFlags::beganTransferOps) {
+                TRY(doTransferOps());
+            }
             if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
                 return {ErrorTag::fatalError, std::format("Failed to reset fence {}", currentFrame)};
             }
@@ -663,6 +667,7 @@ namespace mars {
 
             return success();
         }
+
         Error<noreturn> beginTransferOps() noexcept {
             const VkCommandBufferBeginInfo beginInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 
@@ -670,10 +675,50 @@ namespace mars {
                 .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                 .pInheritanceInfo = nullptr
             };
-            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
+            if(vkBeginCommandBuffer(transferCommandBuffers[currentFrame], &beginInfo) != VK_SUCCESS) {
                 return {ErrorTag::fatalError, "Failed to begin single time command buffer"}; 
             }
             flags |= rendererFlags::beganTransferOps;
+            return success();
+        }
+
+        Error<noreturn> doTransferOps() noexcept {
+            if(vkEndCommandBuffer(transferCommandBuffers[currentFrame]) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to end command buffer while doing transfer ops"};
+            }
+
+            flags &= ~rendererFlags::beganTransferOps;
+            const VkCommandBufferSubmitInfo commandInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .pNext = nullptr,
+                .commandBuffer = transferCommandBuffers[currentFrame],
+                .deviceMask = 0
+            };
+            const VkSubmitInfo2 submitInfo = {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .pNext = nullptr,
+                .flags = 0,
+                .waitSemaphoreInfoCount = 0,
+                .pWaitSemaphoreInfos = nullptr,
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &commandInfo,
+                .signalSemaphoreInfoCount = 0,
+                .pSignalSemaphoreInfos = nullptr
+            };
+            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to submit to queue while doing transfer ops"};
+            }
+            if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to wait for queue while doing transfer ops"};
+            }
+            if(vkResetCommandBuffer(transferCommandBuffers[currentFrame], 0) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to reset command buffer while doing transfer ops"};
+            }
+            while(!transferBuffers.empty()) {
+                auto tb = transferBuffers.front();
+                transferBuffers.pop();
+                tb.destroy(device);
+            }
             return success();
         }
 
@@ -714,51 +759,21 @@ namespace mars {
             std::memcpy(memory, reinterpret_cast<void const*>(Cube::indices.data()), indicesSize);
             vkUnmapMemory(device, transferBuffer.data().memory);
 
-            const VkCommandBufferBeginInfo beginInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-                .pNext = nullptr,
-                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-                .pInheritanceInfo = nullptr
-            };
-            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
-                transferBuffer.data().destroy(device);
-                return {ErrorTag::fatalError, "Failed to begin single time command buffer"};
+            if(!(flags & rendererFlags::beganTransferOps)) {
+                if(auto res = beginTransferOps(); !res) {
+                    transferBuffer.data().destroy(device);
+                    cube.buffer.destroy(device);
+                    return res;
+                }
             }
+            transferBuffers.push(transferBuffer.data());
 
             const VkBufferCopy region = {
                 .srcOffset = 0, 
                 .dstOffset = 0, 
                 .size = verticesSize + indicesSize
             };
-            vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.data().handle, cube.buffer.handle, 1, &region);
-            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
-                transferBuffer.data().destroy(device);
-                return {ErrorTag::fatalError, "Failed to end transfer command buffer"};
-            }
-            const VkCommandBufferSubmitInfo commandBufferInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, 
-                .pNext = nullptr,
-                .commandBuffer = commandBuffers.back(),
-                .deviceMask = 0
-            };
-            const VkSubmitInfo2 submitInfo = {
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-                .pNext = nullptr,
-                .flags = 0,
-                .waitSemaphoreInfoCount = 0,
-                .pWaitSemaphoreInfos = nullptr,
-                .commandBufferInfoCount = 1,
-                .pCommandBufferInfos = &commandBufferInfo,
-                .signalSemaphoreInfoCount = 0,
-                .pSignalSemaphoreInfos = nullptr
-            };
-            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
-                transferBuffer.data().destroy(device);
-                return {ErrorTag::fatalError, "Failed to submit to transfer queue while creating vertex buffer"};
-            }
-            vkQueueWaitIdle(graphicsQueues[0]);
-            vkResetCommandBuffer(commandBuffers.back(), 0);
-            transferBuffer.data().destroy(device);
+            vkCmdCopyBuffer(transferCommandBuffers[currentFrame], transferBuffer.data().handle, cube.buffer.handle, 1, &region);
 
             cube.matrix = glm::mat4(1.0f);
             cube.dim = std::max(swapchainImageExtent.width, swapchainImageExtent.height);
@@ -1590,6 +1605,10 @@ namespace mars {
             if(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
                 return {ErrorTag::fatalError, "Failed to allocate command vertexBuffers!"};
             }
+            for(u32 i = 0; i < maxConcurrentFrames; i++) {
+                transferCommandBuffers[i] = commandBuffers[commandBuffers.size() - 1 - i]; 
+            }
+            
             return success();
         }
         Error<VkExtent2D> chooseImageExtent(VkSurfaceCapabilitiesKHR const& capabilities) noexcept {
@@ -2119,7 +2138,7 @@ namespace mars {
             return success();
         }
         public:
-        rendererFlags::FlagT flags;
+        rendererFlags::FlagT flags = 0;
         static Error<Renderer*> make(const std::string& name, ID& squareID) noexcept {
             Renderer* r = new Renderer;
             #define RTRY(proc) \
@@ -2166,7 +2185,6 @@ namespace mars {
             else squareID = sq;
 
             r->currentFrame = 0;
-            r->flags = {};
             return r;
             #undef RTRY
         }
@@ -2229,12 +2247,14 @@ namespace mars {
             const VkDeviceSize verticesSize = vertices.size() * sizeof(Vertex);
             const VkDeviceSize indicesSize = indices.size() * sizeof(u32);
             const VkDeviceSize size = verticesSize + indicesSize;
+            //Initialize destination buffer
             Error<GPUBuffer> buffer = GPUBuffer::make(device, physicalDevice, size, 
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             if(!buffer) return buffer.moveError<std::size_t>();
             GPUBuffer vertexBuffer = buffer.moveData();
             
+            //Initialize transfer buffer
             buffer = GPUBuffer::make(device, physicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
             if(!buffer) {
@@ -2243,6 +2263,7 @@ namespace mars {
             }
             GPUBuffer transferBuffer = buffer.moveData();
 
+            //Copy vertex and index data to transfer buffer
             void* memory;
             if(vkMapMemory(device, transferBuffer.memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
                 vertexBuffer.destroy(device);
@@ -2274,39 +2295,8 @@ namespace mars {
                 .dstOffset = 0, 
                 .size = size
             };
-            vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
-
-            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
-                vertexBuffer.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to end transfer command buffer"};
-            }
-            const VkCommandBufferSubmitInfo commandBufferInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, 
-                .pNext = nullptr,
-                .commandBuffer = commandBuffers.back(),
-                .deviceMask = 0
-            };
-            const VkSubmitInfo2 submitInfo = {
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-                .pNext = nullptr,
-                .flags = 0,
-                .waitSemaphoreInfoCount = 0,
-                .pWaitSemaphoreInfos = nullptr,
-                .commandBufferInfoCount = 1,
-                .pCommandBufferInfos = &commandBufferInfo,
-                .signalSemaphoreInfoCount = 0,
-                .pSignalSemaphoreInfos = nullptr
-            };
-            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
-                vertexBuffer.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to submit to transfer queue while creating vertex buffer"};
-            }
-            vkQueueWaitIdle(graphicsQueues[0]);
-            vkResetCommandBuffer(commandBuffers.back(), 0);
-            flags &= ~rendererFlags::beganTransferOps;
-            transferBuffer.destroy(device);
+            vkCmdCopyBuffer(transferCommandBuffers[currentFrame], transferBuffer.handle, vertexBuffer.handle, 1, &region);
+            transferBuffers.push(transferBuffer);
 
             return entityManager.insertMesh(vertexBuffer.handle, vertexBuffer.memory, verticesSize, indicesSize / sizeof(u32));
         }
@@ -2321,6 +2311,7 @@ namespace mars {
             const VkDeviceSize imageSize = texWidth * texHeight * STBI_rgb_alpha; 
             GPUImage textureImage;
 
+            //Initialize destination image
             if(Error<GPUImage> image = GPUImage::make(
                     device, physicalDevice, 
                     {static_cast<u32>(texWidth), static_cast<u32>(texHeight), 1},
@@ -2334,6 +2325,7 @@ namespace mars {
             }
             else textureImage = image;
 
+            //Initialize transfer buffer
             GPUBuffer transferBuffer;
             if(Error<GPUBuffer> tb = GPUBuffer::make(
                     device, 
@@ -2344,7 +2336,7 @@ namespace mars {
                 ); !tb) {
                 stbi_image_free(pixels);
                 textureImage.destroy(device);
-                return tb.moveError<std::size_t>();
+                return tb.moveError<ID>();
             }
             else transferBuffer = tb;
 
@@ -2360,17 +2352,15 @@ namespace mars {
 
             stbi_image_free(pixels);
 
-            const VkCommandBufferBeginInfo beginInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-                .pNext = nullptr,
-                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-                .pInheritanceInfo = nullptr
-            };
-            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to begin single time command buffer"};
+            if(!(flags & rendererFlags::beganTransferOps)) {
+                auto res = beginTransferOps();
+                if(!res) {
+                    textureImage.destroy(device);
+                    transferBuffer.destroy(device);
+                    return res.moveError<ID>();
+                }
             }
+            transferBuffers.push(transferBuffer);
 
             const VkImageMemoryBarrier2 firstTransition = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -2403,7 +2393,7 @@ namespace mars {
                 .imageMemoryBarrierCount = 1,
                 .pImageMemoryBarriers = &firstTransition
             };
-            vkCmdPipelineBarrier2(commandBuffers.back(), &dep1);
+            vkCmdPipelineBarrier2(transferCommandBuffers[currentFrame], &dep1);
 
             const VkBufferImageCopy2 copyRegion = {
                 .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
@@ -2429,7 +2419,7 @@ namespace mars {
                 .regionCount = 1,
                 .pRegions = &copyRegion
             };
-            vkCmdCopyBufferToImage2(commandBuffers.back(), &bufferToImageInfo);
+            vkCmdCopyBufferToImage2(transferCommandBuffers[currentFrame], &bufferToImageInfo);
 
             const VkImageMemoryBarrier2 preShaderRead = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -2462,53 +2452,16 @@ namespace mars {
                 .imageMemoryBarrierCount = 1,
                 .pImageMemoryBarriers = &preShaderRead
             };
-            vkCmdPipelineBarrier2(commandBuffers.back(), &dep2);
+            vkCmdPipelineBarrier2(transferCommandBuffers[currentFrame], &dep2);
 
-            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to end command buffer while creating texture image"};
-            }
-
-            const VkCommandBufferSubmitInfo commandInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-                .pNext = nullptr,
-                .commandBuffer = commandBuffers.back(),
-                .deviceMask = 0
-            };
-            const VkSubmitInfo2 submitInfo = {
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-                .pNext = nullptr,
-                .flags = 0,
-                .waitSemaphoreInfoCount = 0,
-                .pWaitSemaphoreInfos = nullptr,
-                .commandBufferInfoCount = 1,
-                .pCommandBufferInfos = &commandInfo,
-                .signalSemaphoreInfoCount = 0,
-                .pSignalSemaphoreInfos = nullptr
-            };
-            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to submit to queue while creating texture image"};
-            }
-            if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to wait for queue while creating texture image"};
-            }
-            if(vkResetCommandBuffer(commandBuffers.back(), 0) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to reset command buffer while creating texture image"};
-            }
-
-            transferBuffer.destroy(device);
             Texture t;
             t.handle = textureImage.handle;
             t.memory = textureImage.memory;
             t.view = textureImage.view;
             return entityManager.insertTexture(t);
         }
+
     };
 }
+
+

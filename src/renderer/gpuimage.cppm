@@ -27,7 +27,8 @@ namespace mars {
                 VkMemoryPropertyFlags memProperties,
                 VkFormat format,
                 VkImageAspectFlags aspect
-            ) noexcept {
+            ) noexcept 
+        {
             GPUImage result{};
             const VkImageCreateInfo imageInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
