@@ -8,9 +8,6 @@ module;
 export module vkhelper;
 import error;
 
-using mars::Error;
-using mars::ErrorTag;
-
 namespace vkhelper {
     Error<std::uint32_t> findPhysicalDeviceMemoryTypeIndex(VkPhysicalDevice physicalDevice, std::uint32_t availableTypes, VkMemoryPropertyFlags memProperties) noexcept {
         VkPhysicalDeviceMemoryProperties2 deviceMemProperties{};

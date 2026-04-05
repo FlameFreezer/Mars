@@ -24,6 +24,7 @@ namespace mars {
         public:
         ComponentManager() noexcept;
         ~ComponentManager() noexcept;
+        ComponentManager(ComponentManager&& other) noexcept;
         void reserveFor(ID id, Signature s) noexcept;
         void freeFor(ID id) noexcept;
         Signature getSignature(ID id) const noexcept;

@@ -26,9 +26,17 @@ namespace mars {
     }
     ComponentManager::~ComponentManager() noexcept {
         for(ComponentT i = 0; i < numComponents; i++) {
-            delete mSystems[i];
+            if(mSystems[i]) delete mSystems[i];
         }
-        delete[] mSignatures;
+        if(mSignatures) delete[] mSignatures;
+    }
+
+    ComponentManager::ComponentManager(ComponentManager&& other) noexcept : mSignatures(other.mSignatures) {
+        for(ComponentT i = 0; i < numComponents; i++) {
+            mSystems[i] = other.mSystems[i];
+            other.mSystems[i] = nullptr;
+        }
+        other.mSignatures = nullptr;
     }
 
     void ComponentManager::reserveFor(ID id, Signature s) noexcept {

@@ -22,7 +22,7 @@ module;
 
 #include "mars_macros.h"
 
-export module mars:renderer;
+export module renderer;
 import gpubuffer;
 import gpuimage;
 import error;
@@ -33,6 +33,7 @@ import types;
 import component_system;
 import components;
 import renderer_ecs;
+import camera;
 
 namespace mars {
     constexpr std::array<const char*, 3> neededDeviceExtensions = {
@@ -166,7 +167,7 @@ namespace mars {
     };
 
     export class Renderer {
-        friend class Game;
+
         RendererEntityManager entityManager;
         Cube cube;
         UniformBuffer<glm::mat4> cameraMatrices;
@@ -202,8 +203,138 @@ namespace mars {
         u32 graphicsQueueFamilyIndex;
         u32 presentQueueFamilyIndex;
         VkSampleCountFlagBits msaaSampleCount;
-        RendererFlags flags;
 
+        void setup3DMemoryBarriers(u32 imageIndex, std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers3D) noexcept {
+            //Transition image layout for color writing
+            imageMemoryBarriers3D[0] = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = renderTargets3D[currentFrame].handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            //Transition image layout for depth buffering
+            imageMemoryBarriers3D[1] = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = depthImage3D.handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            //Transition image layout for the 2D scene
+            imageMemoryBarriers3D[2] = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = textures2DScene[currentFrame].handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+        }
+
+        void setup2DMemoryBarriers(std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers2D) noexcept {
+            //Transition image layout for color writing
+            imageMemoryBarriers2D[0] = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = renderTargets2D[currentFrame].handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            //Transition image layout for depth buffering
+            imageMemoryBarriers2D[1] = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = depthImage2D.handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            //Transition image layout for 2D scene texture
+            imageMemoryBarriers2D[2] = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = textures2DScene[currentFrame].handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+        }
         void updateCamera() noexcept {
             glm::mat4 constexpr identity = glm::mat4(1.0f);
             //Calculate size of overscan (region of the cube not visible)
@@ -241,295 +372,6 @@ namespace mars {
             return success();
         }
 
-        Error<ID> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept {
-            const VkDeviceSize verticesSize = vertices.size() * sizeof(Vertex);
-            const VkDeviceSize indicesSize = indices.size() * sizeof(u32);
-            const VkDeviceSize size = verticesSize + indicesSize;
-            Error<GPUBuffer> buffer = GPUBuffer::make(device, physicalDevice, size, 
-                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            if(!buffer) return buffer.moveError<std::size_t>();
-            GPUBuffer vertexBuffer = buffer.moveData();
-            
-            buffer = GPUBuffer::make(device, physicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            if(!buffer) {
-                vertexBuffer.destroy(device);
-                return buffer.moveError<std::size_t>();
-            }
-            GPUBuffer transferBuffer = buffer.moveData();
-
-            void* memory;
-            if(vkMapMemory(device, transferBuffer.memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
-                vertexBuffer.destroy(device);
-                transferBuffer.destroy(device);
-                return fatal<std::size_t>("Failed to map device memory");
-            }
-            std::memcpy(memory, reinterpret_cast<void const*>(vertices.data()), verticesSize);
-            vkUnmapMemory(device, transferBuffer.memory);
-
-            if(vkMapMemory(device, transferBuffer.memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
-                vertexBuffer.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to map device memory"};
-            }
-            std::memcpy(memory, reinterpret_cast<void const*>(indices.data()), indicesSize);
-            vkUnmapMemory(device, transferBuffer.memory);
-
-            if(!(flags & flagBits::beganTransferOps)) {
-                Error<noreturn> res = beginTransferOps();
-                if(!res) {
-                    vertexBuffer.destroy(device);
-                    transferBuffer.destroy(device);
-                    return res.moveError<std::size_t>();
-                }
-            }
-
-            const VkBufferCopy region = {
-                .srcOffset = 0, 
-                .dstOffset = 0, 
-                .size = size
-            };
-            vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
-            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
-                vertexBuffer.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to end transfer command buffer"};
-            }
-            const VkCommandBufferSubmitInfo commandBufferInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, 
-                .pNext = nullptr,
-                .commandBuffer = commandBuffers.back(),
-                .deviceMask = 0
-            };
-            const VkSubmitInfo2 submitInfo = {
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-                .pNext = nullptr,
-                .flags = 0,
-                .waitSemaphoreInfoCount = 0,
-                .pWaitSemaphoreInfos = nullptr,
-                .commandBufferInfoCount = 1,
-                .pCommandBufferInfos = &commandBufferInfo,
-                .signalSemaphoreInfoCount = 0,
-                .pSignalSemaphoreInfos = nullptr
-            };
-            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
-                vertexBuffer.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to submit to transfer queue while creating vertex buffer"};
-            }
-            vkQueueWaitIdle(graphicsQueues[0]);
-            vkResetCommandBuffer(commandBuffers.back(), 0);
-            flags &= ~flagBits::beganTransferOps;
-            transferBuffer.destroy(device);
-
-            return entityManager.insertMesh(vertexBuffer.handle, vertexBuffer.memory, verticesSize, indicesSize / sizeof(u32));
-        }
-
-        Error<ID> makeTexture(std::string const& texturePath) noexcept {
-            int texWidth, texHeight, texChannels;
-            stbi_uc* pixels = nullptr;
-            pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-            if(pixels == nullptr) {
-                return {ErrorTag::fatalError, "Failed to find/load texture file"};
-            }
-            const VkDeviceSize imageSize = texWidth * texHeight * STBI_rgb_alpha; 
-            GPUImage textureImage;
-
-            if(Error<GPUImage> image = GPUImage::make(
-                    device, physicalDevice, 
-                    {static_cast<u32>(texWidth), static_cast<u32>(texHeight), 1},
-                    VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, 
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT
-                ); !image) {
-                stbi_image_free(pixels);
-                return image.moveError<std::size_t>();
-            }
-            else textureImage = image;
-
-            GPUBuffer transferBuffer;
-            if(Error<GPUBuffer> tb = GPUBuffer::make(
-                    device, 
-                    physicalDevice, 
-                    imageSize, 
-                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                ); !tb) {
-                stbi_image_free(pixels);
-                textureImage.destroy(device);
-                return tb.moveError<std::size_t>();
-            }
-            else transferBuffer = tb;
-
-            void* memory;
-            if(vkMapMemory(device, transferBuffer.memory, 0, imageSize, 0, &memory) != VK_SUCCESS) {
-                stbi_image_free(pixels);
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to map buffer memory to the host"};
-            }
-            std::memcpy(memory, pixels, imageSize);
-            vkUnmapMemory(device, transferBuffer.memory);
-
-            stbi_image_free(pixels);
-
-            const VkCommandBufferBeginInfo beginInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-                .pNext = nullptr,
-                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-                .pInheritanceInfo = nullptr
-            };
-            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to begin single time command buffer"};
-            }
-
-            const VkImageMemoryBarrier2 firstTransition = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                .srcAccessMask = VK_ACCESS_2_NONE,
-                .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = textureImage.handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            const VkDependencyInfo dep1 = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = nullptr,
-                .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &firstTransition
-            };
-            vkCmdPipelineBarrier2(commandBuffers.back(), &dep1);
-
-            const VkBufferImageCopy2 copyRegion = {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
-                .pNext = nullptr,
-                .bufferOffset = 0,
-                .bufferRowLength = 0,
-                .bufferImageHeight = 0,
-                .imageSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .mipLevel = 0,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                },
-                .imageOffset = {0,0,0},
-                .imageExtent = {static_cast<u32>(texWidth), static_cast<u32>(texHeight), 1}
-            };
-            const VkCopyBufferToImageInfo2 bufferToImageInfo = {
-                .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
-                .pNext = nullptr,
-                .srcBuffer = transferBuffer.handle,
-                .dstImage = textureImage.handle,
-                .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .regionCount = 1,
-                .pRegions = &copyRegion
-            };
-            vkCmdCopyBufferToImage2(commandBuffers.back(), &bufferToImageInfo);
-
-            const VkImageMemoryBarrier2 preShaderRead = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = textureImage.handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            const VkDependencyInfo dep2 = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = nullptr,
-                .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &preShaderRead
-            };
-            vkCmdPipelineBarrier2(commandBuffers.back(), &dep2);
-
-            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to end command buffer while creating texture image"};
-            }
-
-            const VkCommandBufferSubmitInfo commandInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-                .pNext = nullptr,
-                .commandBuffer = commandBuffers.back(),
-                .deviceMask = 0
-            };
-            const VkSubmitInfo2 submitInfo = {
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-                .pNext = nullptr,
-                .flags = 0,
-                .waitSemaphoreInfoCount = 0,
-                .pWaitSemaphoreInfos = nullptr,
-                .commandBufferInfoCount = 1,
-                .pCommandBufferInfos = &commandInfo,
-                .signalSemaphoreInfoCount = 0,
-                .pSignalSemaphoreInfos = nullptr
-            };
-            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to submit to queue while creating texture image"};
-            }
-            if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to wait for queue while creating texture image"};
-            }
-            if(vkResetCommandBuffer(commandBuffers.back(), 0) != VK_SUCCESS) {
-                textureImage.destroy(device);
-                transferBuffer.destroy(device);
-                return {ErrorTag::fatalError, "Failed to reset command buffer while creating texture image"};
-            }
-
-            transferBuffer.destroy(device);
-            Texture t;
-            t.handle = textureImage.handle;
-            t.memory = textureImage.memory;
-            t.view = textureImage.view;
-            return entityManager.insertTexture(t);
-        }
-
-        struct Systems {
-            const ComponentSystem<Transform>& transform;
-            const ComponentSystem<Draw>& draw;
-        };
 
         struct SurfaceInfo {
             VkSurfaceCapabilitiesKHR capabilities;
@@ -549,7 +391,278 @@ namespace mars {
             PickQueueFamilyIndexResult queueFamilyInfo;
             SurfaceInfo surfaceInfo;
         };
+        Error<noreturn> drawFrame(float fov, float aspect, float pixelsPerMeter, const ComponentSystem<Transform>& sysTransform, const ComponentSystem<Draw>& sysDraw) noexcept {
+            //Fix the cube - only if any of the viewport details changed
+            if(fov != cube.fov or aspect != cube.aspect) {
+                float halfd = glm::tan(fov / 2.0f);
+                if(aspect > 1.0f) halfd *= aspect;
+                glm::vec3 const pos(-halfd, -halfd, 0.0f);
+                glm::vec3 const scale(2.0f * halfd);
+                cube.matrix = glm::translate(glm::mat4(1.0f), pos) * glm::scale(glm::mat4(1.0f), scale) ;
+                cube.fov = fov;
+                cube.aspect = aspect;
+            };
 
+            if(vkWaitForFences(
+                    device, 
+                    1, 
+                    &fences[currentFrame], 
+                    VK_TRUE, 
+                    std::numeric_limits<u64>::max()
+                ) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, std::format("Something went from while waiting on fence {}", currentFrame)};
+            }
+            //These semaphores indicate that we have successfully acquired an image on this frame
+            Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames);
+            //These semaphores indicate that we have finished rendering a 2D scene on this frame
+            Slice<VkSemaphore> scene2DReadySemaphores = Slice<VkSemaphore>::make(semaphores, maxConcurrentFrames, 2);
+            //These semaphores indicate that the image acquired is ready to present
+            Slice<VkSemaphore> presentReadySemaphores = Slice<VkSemaphore>::make(semaphores, 2 * maxConcurrentFrames);
+
+            u32 imageIndex;
+            VkResult res = vkAcquireNextImageKHR(
+                device, 
+                swapchain, 
+                std::numeric_limits<u64>::max(), 
+                imageAcquiredSemaphores[currentFrame], 
+                nullptr, 
+                &imageIndex
+            );
+            //Recreate the swapchain and try to draw the frame again
+            if(res == VK_ERROR_OUT_OF_DATE_KHR or res == VK_SUBOPTIMAL_KHR or (flags & flagBits::recreateSwapchain)) {
+                TRY(recreateSwapchain());
+                vkDestroySemaphore(device, imageAcquiredSemaphores[currentFrame], nullptr);
+                VkSemaphoreCreateInfo const semaphoreInfo = {
+                    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0
+                };
+                if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAcquiredSemaphores[currentFrame]) != VK_SUCCESS) {
+                    return {ErrorTag::fatalError, "Failed to recreate semaphore while recreating swapchain during draw"};
+                }
+                depthImage2D.destroy(device);
+                depthImage3D.destroy(device);
+                TRY(createDepthImages());
+                flags &= ~flagBits::recreateSwapchain;
+                return drawFrame(fov, aspect, pixelsPerMeter, sysTransform, sysDraw);
+            }
+            //Fatal error has occurred
+            else if(res != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to acquire next swapchain image index"};
+            }
+
+            if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, std::format("Failed to reset fence {}", currentFrame)};
+            }
+
+            //Acquire the command buffers to use for this frame
+            VkCommandBuffer commandBuffer2D = commandBuffers[currentFrame];
+            VkCommandBuffer commandBuffer3D = commandBuffers[2 + currentFrame];
+
+            //Reset command buffers for the current frame, both for the 2D and 3D scene
+            if(vkResetCommandBuffer(commandBuffer2D, 0) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to reset command buffer"};
+            }
+            if(vkResetCommandBuffer(commandBuffer3D, 0) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to reset command buffer"};
+            }
+
+            //Render 2D scene
+            VkCommandBufferBeginInfo const beginInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .pNext = nullptr,
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                .pInheritanceInfo = nullptr
+            };
+            if(vkBeginCommandBuffer(commandBuffer2D, &beginInfo) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, std::format("Failed to begin command buffer {}", currentFrame)};
+            }
+
+            std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers2D;
+            setup2DMemoryBarriers(imageMemoryBarriers2D);
+
+            VkDependencyInfo const colorWriteDependency2D = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = 0,
+                .imageMemoryBarrierCount = imageMemoryBarriers2D.max_size(),
+                .pImageMemoryBarriers = imageMemoryBarriers2D.data()
+            };
+
+            vkCmdPipelineBarrier2(commandBuffer2D, &colorWriteDependency2D);
+
+            renderPass2D(cube.dim, pixelsPerMeter, commandBuffer2D, sysTransform, sysDraw);
+
+            //Submit to create 2D scene
+            if(vkEndCommandBuffer(commandBuffer2D) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, std::format("Failed to end command buffer {}", currentFrame)};
+            }
+
+            VkCommandBufferSubmitInfo const commandBufferInfo2D = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .pNext = nullptr,
+                .commandBuffer = commandBuffer2D,
+                .deviceMask = 0
+            };
+            VkSemaphoreSubmitInfo const scene2DReady = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .semaphore = scene2DReadySemaphores[currentFrame],
+                .value = 0,
+                .stageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .deviceIndex = 0
+            };
+            VkSubmitInfo2 const submitInfo2D = {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .pNext = nullptr,
+                .flags = 0,
+                .waitSemaphoreInfoCount = 0,
+                .pWaitSemaphoreInfos = nullptr,
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &commandBufferInfo2D,
+                .signalSemaphoreInfoCount = 1,
+                .pSignalSemaphoreInfos = &scene2DReady
+            };
+
+            u32 const graphicsQueueIndex = currentFrame % graphicsQueues.size();
+            if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo2D, nullptr) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to submit draw commands to queue"};
+            }
+
+            //Render 3D Scene
+            if(vkBeginCommandBuffer(commandBuffer3D, &beginInfo) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, std::format("Failed to begin command buffer {}", 2 + currentFrame)};
+            }
+
+            std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D;
+            setup3DMemoryBarriers(imageIndex, imageMemoryBarriers3D);
+
+            VkDependencyInfo const colorWriteDependency3D = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = 0,
+                .imageMemoryBarrierCount = imageMemoryBarriers3D.max_size(),
+                .pImageMemoryBarriers = imageMemoryBarriers3D.data()
+            };
+
+            vkCmdPipelineBarrier2(commandBuffer3D, &colorWriteDependency3D);
+
+            renderPass3D(imageIndex, commandBuffer3D);
+
+            //Transition image layout for presentation
+            VkImageMemoryBarrier2 const presentSrcBarrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+                .dstAccessMask = VK_ACCESS_2_NONE,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = swapchainImages[imageIndex],
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            VkDependencyInfo const presentDependency = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = 0,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &presentSrcBarrier
+            };
+            vkCmdPipelineBarrier2(commandBuffer3D, &presentDependency);
+
+            if(vkEndCommandBuffer(commandBuffer3D) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, std::format("Failed to end command buffer {}", currentFrame)};
+            }
+
+            std::array<VkSemaphoreSubmitInfo, 2> waitSemaphores;
+            //Make sure we've acquired a swapchain image
+            waitSemaphores[0] = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .semaphore = imageAcquiredSemaphores[currentFrame],
+                .value = 0,
+                .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .deviceIndex = 0
+            };
+            //Make sure the 2D scene is actually ready
+            waitSemaphores[1] = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .semaphore = scene2DReadySemaphores[currentFrame],
+                .value = 0,
+                .stageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .deviceIndex = 0
+            };
+            VkCommandBufferSubmitInfo const commandBufferInfo3D = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .pNext = nullptr,
+                .commandBuffer = commandBuffer3D,
+                .deviceMask = 0
+            };
+            VkSemaphoreSubmitInfo const presentationReady = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .semaphore = presentReadySemaphores[imageIndex],
+                .value = 0,
+                .stageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .deviceIndex = 0
+            };
+            VkSubmitInfo2 const submitInfo3D = {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+                .pNext = nullptr,
+                .flags = 0,
+                .waitSemaphoreInfoCount = waitSemaphores.max_size(),
+                .pWaitSemaphoreInfos = waitSemaphores.data(),
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &commandBufferInfo3D,
+                .signalSemaphoreInfoCount = 1,
+                .pSignalSemaphoreInfos = &presentationReady
+            };
+
+            if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo3D, fences[currentFrame]) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to submit draw commands to queue"};
+            }
+
+            VkPresentInfoKHR const presentInfo = {
+                .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = &presentReadySemaphores[imageIndex],
+                .swapchainCount = 1,
+                .pSwapchains = &swapchain,
+                .pImageIndices = &imageIndex,
+                .pResults = nullptr
+            };
+            u32 const presentQueueIndex = currentFrame % presentQueues.size();
+            if(vkQueuePresentKHR(presentQueues[presentQueueIndex], &presentInfo) != VK_SUCCESS) {
+                return {ErrorTag::fatalError, "Failed to present graphics queue"};
+            }
+
+            currentFrame = (currentFrame + 1) % maxConcurrentFrames;
+
+            return success();
+        }
         Error<noreturn> beginTransferOps() noexcept {
             const VkCommandBufferBeginInfo beginInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 
@@ -981,7 +1094,7 @@ namespace mars {
             vkCmdEndRendering(commandBuffer);
         }
 
-        void renderPass2D(u32 d, float pixelsPerMeter, VkCommandBuffer commandBuffer, Systems systems) noexcept {
+        void renderPass2D(u32 d, float pixelsPerMeter, VkCommandBuffer commandBuffer, const ComponentSystem<Transform>& sysTransform, const ComponentSystem<Draw>& sysDraw) noexcept {
             //Render to the 2D render target, resolve to the 2D scene texture image
             //The texture image will be used as the texture for the cube
             const VkRenderingAttachmentInfo renderAttachment = {
@@ -1077,7 +1190,7 @@ namespace mars {
             }
 
             //Iterate through every drawable entity
-            for(auto [d, entityID] : systems.draw) {
+            for(auto [d, entityID] : sysDraw) {
                 //Push the descriptor for the texture
                 const VkDescriptorImageInfo materialInfo = {
                     .sampler = sampler,
@@ -1107,7 +1220,7 @@ namespace mars {
 
                 //Get the current entity's transform
                 //Since draw implies transform, this is safe to do
-                const Transform& t = systems.transform[entityID];
+                const Transform& t = sysTransform[entityID];
                 //Create model matrix
                 glm::mat4 modelMatrix(1.0f);
                 modelMatrix[0][0] = t.scale.x * pixelsPerMeter;
@@ -1916,7 +2029,7 @@ namespace mars {
             return success();
         }
 
-        Error<noreturn> createInstance(const std::string& appName) noexcept {
+        Error<noreturn> createVkInstance(const std::string& appName) noexcept {
             if constexpr(enableValidationLayers) {
                 u32 layerPropertyCount = 0;
                 if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
@@ -2006,46 +2119,60 @@ namespace mars {
             return success();
         }
         public:
-        Error<noreturn> init(std::string const& name, ID& squareID) noexcept {
-            if(Error<noreturn> res = createInstance(name); !res) {
-                flags |= flagBits::instanceInvalid;
-                return res;
+        RendererFlags flags;
+        static Error<Renderer*> make(const std::string& name, ID& squareID) noexcept {
+            Renderer* r = new Renderer;
+            #define RTRY(proc) \
+            if(auto res = proc; !res) do{\
+                delete r;\
+                return res.moveError<Renderer*>();\
+            } while(false)
+            if(auto res = r->createVkInstance(name); !res) {
+                r->flags |= flagBits::instanceInvalid;
+                delete r;
+                return res.moveError<Renderer*>();
             }
-            if constexpr(enableValidationLayers) TRY(createDebugUtilsMessenger());
-            TRY(createSurface(name));
+            if constexpr(enableValidationLayers) RTRY(r->createDebugUtilsMessenger());
+            RTRY(r->createSurface(name));
             SurfaceInfo surfaceInfo{};
-            if(Error<noreturn> res = createDevice(surfaceInfo); !res) {
-                flags |= flagBits::deviceInvalid;
-                return res;
+            if(Error<noreturn> res = r->createDevice(surfaceInfo); !res) {
+                r->flags |= flagBits::deviceInvalid;
+                delete r;
+                return res.moveError<Renderer*>();
             }
-            TRY(createSwapchain(surfaceInfo));
-            TRY(getSwapchainImages(surfaceInfo.format.format));
-            TRY(createCommandBuffers());
-            TRY(createCube());
-            TRY(createSampler());
-            TRY(createRenderTargets(surfaceInfo.format.format));
-            TRY(createDepthImages());
-            TRY(createSyncObjects());
-            TRY(createDescriptorSetLayouts());
-            TRY(createGraphicsPipeline());
-            TRY(createCamera());
-            if(!SDL_ShowWindow(window)) {
+            RTRY(r->createSwapchain(surfaceInfo));
+            RTRY(r->getSwapchainImages(surfaceInfo.format.format));
+            RTRY(r->createCommandBuffers());
+            RTRY(r->createCube());
+            RTRY(r->createSampler());
+            RTRY(r->createRenderTargets(surfaceInfo.format.format));
+            RTRY(r->createDepthImages());
+            RTRY(r->createSyncObjects());
+            RTRY(r->createDescriptorSetLayouts());
+            RTRY(r->createGraphicsPipeline());
+            RTRY(r->createCamera());
+            if(!SDL_ShowWindow(r->window)) {
+                delete r;
                 return {ErrorTag::fatalError, "Failed to show window"};
             }
 
             //Create square mesh
-            auto sq = makeMesh(Square::vertices, Square::indices);
-            if(!sq) return sq.moveError();
+            auto sq = r->makeMesh(Square::vertices, Square::indices);
+            if(!sq) {
+                delete r;
+                return sq.moveError<Renderer*>();
+            }
             //Give ID number of square mesh back to the game
             else squareID = sq;
 
-            currentFrame = 0;
-            flags = {};
-            return success();
+            r->currentFrame = 0;
+            r->flags = {};
+            return r;
+            #undef RTRY
         }
         //Destructor
         ~Renderer() noexcept {
-            if((flags & flagBits::deviceInvalid) == 0) [[likely]] {
+            if(!(flags & flagBits::deviceInvalid)) [[likely]] {
                 vkDeviceWaitIdle(device);
                 vkDestroySwapchainKHR(device, swapchain, nullptr);
                 for(VkImageView view : swapchainImageViews) {
@@ -2080,7 +2207,7 @@ namespace mars {
                 cameraMatrices.destroy(device);
                 vkDestroyDevice(device, nullptr);
             }
-            if((flags & flagBits::instanceInvalid) == 0) [[likely]] {
+            if(!(flags & flagBits::instanceInvalid)) [[likely]] {
                 SDL_Vulkan_DestroySurface(instance, surface, nullptr);
                 SDL_DestroyWindow(window);
                 if constexpr(enableValidationLayers) {
@@ -2090,317 +2217,173 @@ namespace mars {
             }
         }
 
-        void setup3DMemoryBarriers(u32 imageIndex, std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers3D) noexcept {
-            //Transition image layout for color writing
-            imageMemoryBarriers3D[0] = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                .srcAccessMask = VK_ACCESS_2_NONE,
-                .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = renderTargets3D[currentFrame].handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            //Transition image layout for depth buffering
-            imageMemoryBarriers3D[1] = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = depthImage3D.handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            //Transition image layout for the 2D scene
-            imageMemoryBarriers3D[2] = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                .srcAccessMask = VK_ACCESS_2_NONE,
-                .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                .dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = textures2DScene[currentFrame].handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
+        Error<noreturn> draw(Camera camera, float pixelsPerMeter, const ComponentSystem<Transform>& sysTransform, const ComponentSystem<Draw>& sysDraw) noexcept {
+            if(camera.aspect == Camera::autoAspect) {
+                camera.aspect = static_cast<float>(swapchainImageExtent.width) / swapchainImageExtent.height;
+            }
+            cameraMatrices.mappedMemory[1 + currentFrame] = camera.loadMatrices();
+            return drawFrame(camera.fov, camera.aspect, pixelsPerMeter, sysTransform, sysDraw);
         }
 
-        void setup2DMemoryBarriers(std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers2D) noexcept {
-            //Transition image layout for color writing
-            imageMemoryBarriers2D[0] = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                .srcAccessMask = VK_ACCESS_2_NONE,
-                .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = renderTargets2D[currentFrame].handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
+        Error<ID> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept {
+            const VkDeviceSize verticesSize = vertices.size() * sizeof(Vertex);
+            const VkDeviceSize indicesSize = indices.size() * sizeof(u32);
+            const VkDeviceSize size = verticesSize + indicesSize;
+            Error<GPUBuffer> buffer = GPUBuffer::make(device, physicalDevice, size, 
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            if(!buffer) return buffer.moveError<std::size_t>();
+            GPUBuffer vertexBuffer = buffer.moveData();
+            
+            buffer = GPUBuffer::make(device, physicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+            if(!buffer) {
+                vertexBuffer.destroy(device);
+                return buffer.moveError<std::size_t>();
+            }
+            GPUBuffer transferBuffer = buffer.moveData();
+
+            void* memory;
+            if(vkMapMemory(device, transferBuffer.memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
+                vertexBuffer.destroy(device);
+                transferBuffer.destroy(device);
+                return fatal<std::size_t>("Failed to map device memory");
+            }
+            std::memcpy(memory, reinterpret_cast<void const*>(vertices.data()), verticesSize);
+            vkUnmapMemory(device, transferBuffer.memory);
+
+            if(vkMapMemory(device, transferBuffer.memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
+                vertexBuffer.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to map device memory"};
+            }
+            std::memcpy(memory, reinterpret_cast<void const*>(indices.data()), indicesSize);
+            vkUnmapMemory(device, transferBuffer.memory);
+
+            if(!(flags & flagBits::beganTransferOps)) {
+                Error<noreturn> res = beginTransferOps();
+                if(!res) {
+                    vertexBuffer.destroy(device);
+                    transferBuffer.destroy(device);
+                    return res.moveError<std::size_t>();
                 }
+            }
+
+            const VkBufferCopy region = {
+                .srcOffset = 0, 
+                .dstOffset = 0, 
+                .size = size
             };
-            //Transition image layout for depth buffering
-            imageMemoryBarriers2D[1] = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            vkCmdCopyBuffer(commandBuffers.back(), transferBuffer.handle, vertexBuffer.handle, 1, &region);
+
+            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
+                vertexBuffer.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to end transfer command buffer"};
+            }
+            const VkCommandBufferSubmitInfo commandBufferInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, 
                 .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = depthImage2D.handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            //Transition image layout for 2D scene texture
-            imageMemoryBarriers2D[2] = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                .srcAccessMask = VK_ACCESS_2_NONE,
-                .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = textures2DScene[currentFrame].handle,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-        }
-
-        Error<noreturn> drawFrame(float fov, float aspect, float pixelsPerMeter, Systems systems) noexcept {
-            //Fix the cube - only if any of the viewport details changed
-            if(fov != cube.fov or aspect != cube.aspect) {
-                float halfd = glm::tan(fov / 2.0f);
-                if(aspect > 1.0f) halfd *= aspect;
-                glm::vec3 const pos(-halfd, -halfd, 0.0f);
-                glm::vec3 const scale(2.0f * halfd);
-                cube.matrix = glm::translate(glm::mat4(1.0f), pos) * glm::scale(glm::mat4(1.0f), scale) ;
-                cube.fov = fov;
-                cube.aspect = aspect;
-            };
-
-            if(vkWaitForFences(
-                    device, 
-                    1, 
-                    &fences[currentFrame], 
-                    VK_TRUE, 
-                    std::numeric_limits<u64>::max()
-                ) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Something went from while waiting on fence {}", currentFrame)};
-            }
-            //These semaphores indicate that we have successfully acquired an image on this frame
-            Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames);
-            //These semaphores indicate that we have finished rendering a 2D scene on this frame
-            Slice<VkSemaphore> scene2DReadySemaphores = Slice<VkSemaphore>::make(semaphores, maxConcurrentFrames, 2);
-            //These semaphores indicate that the image acquired is ready to present
-            Slice<VkSemaphore> presentReadySemaphores = Slice<VkSemaphore>::make(semaphores, 2 * maxConcurrentFrames);
-
-            u32 imageIndex;
-            VkResult res = vkAcquireNextImageKHR(
-                device, 
-                swapchain, 
-                std::numeric_limits<u64>::max(), 
-                imageAcquiredSemaphores[currentFrame], 
-                nullptr, 
-                &imageIndex
-            );
-            //Recreate the swapchain and try to draw the frame again
-            if(res == VK_ERROR_OUT_OF_DATE_KHR or res == VK_SUBOPTIMAL_KHR or (flags & flagBits::recreateSwapchain)) {
-                TRY(recreateSwapchain());
-                vkDestroySemaphore(device, imageAcquiredSemaphores[currentFrame], nullptr);
-                VkSemaphoreCreateInfo const semaphoreInfo = {
-                    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-                    .pNext = nullptr,
-                    .flags = 0
-                };
-                if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAcquiredSemaphores[currentFrame]) != VK_SUCCESS) {
-                    return {ErrorTag::fatalError, "Failed to recreate semaphore while recreating swapchain during draw"};
-                }
-                depthImage2D.destroy(device);
-                depthImage3D.destroy(device);
-                TRY(createDepthImages());
-                flags &= ~flagBits::recreateSwapchain;
-                return drawFrame(fov, aspect, pixelsPerMeter, systems);
-            }
-            //Fatal error has occurred
-            else if(res != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to acquire next swapchain image index"};
-            }
-
-            if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to reset fence {}", currentFrame)};
-            }
-
-            //Acquire the command buffers to use for this frame
-            VkCommandBuffer commandBuffer2D = commandBuffers[currentFrame];
-            VkCommandBuffer commandBuffer3D = commandBuffers[2 + currentFrame];
-
-            //Reset command buffers for the current frame, both for the 2D and 3D scene
-            if(vkResetCommandBuffer(commandBuffer2D, 0) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to reset command buffer"};
-            }
-            if(vkResetCommandBuffer(commandBuffer3D, 0) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to reset command buffer"};
-            }
-
-            //Render 2D scene
-            VkCommandBufferBeginInfo const beginInfo = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-                .pNext = nullptr,
-                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-                .pInheritanceInfo = nullptr
-            };
-            if(vkBeginCommandBuffer(commandBuffer2D, &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to begin command buffer {}", currentFrame)};
-            }
-
-            std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers2D;
-            setup2DMemoryBarriers(imageMemoryBarriers2D);
-
-            VkDependencyInfo const colorWriteDependency2D = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = 0,
-                .imageMemoryBarrierCount = imageMemoryBarriers2D.max_size(),
-                .pImageMemoryBarriers = imageMemoryBarriers2D.data()
-            };
-
-            vkCmdPipelineBarrier2(commandBuffer2D, &colorWriteDependency2D);
-
-            renderPass2D(cube.dim, pixelsPerMeter, commandBuffer2D, systems);
-
-            //Submit to create 2D scene
-            if(vkEndCommandBuffer(commandBuffer2D) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to end command buffer {}", currentFrame)};
-            }
-
-            VkCommandBufferSubmitInfo const commandBufferInfo2D = {
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-                .pNext = nullptr,
-                .commandBuffer = commandBuffer2D,
+                .commandBuffer = commandBuffers.back(),
                 .deviceMask = 0
             };
-            VkSemaphoreSubmitInfo const scene2DReady = {
-                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-                .pNext = nullptr,
-                .semaphore = scene2DReadySemaphores[currentFrame],
-                .value = 0,
-                .stageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                .deviceIndex = 0
-            };
-            VkSubmitInfo2 const submitInfo2D = {
+            const VkSubmitInfo2 submitInfo = {
                 .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
                 .pNext = nullptr,
                 .flags = 0,
                 .waitSemaphoreInfoCount = 0,
                 .pWaitSemaphoreInfos = nullptr,
                 .commandBufferInfoCount = 1,
-                .pCommandBufferInfos = &commandBufferInfo2D,
-                .signalSemaphoreInfoCount = 1,
-                .pSignalSemaphoreInfos = &scene2DReady
+                .pCommandBufferInfos = &commandBufferInfo,
+                .signalSemaphoreInfoCount = 0,
+                .pSignalSemaphoreInfos = nullptr
             };
-
-            u32 const graphicsQueueIndex = currentFrame % graphicsQueues.size();
-            if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo2D, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to submit draw commands to queue"};
+            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+                vertexBuffer.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to submit to transfer queue while creating vertex buffer"};
             }
+            vkQueueWaitIdle(graphicsQueues[0]);
+            vkResetCommandBuffer(commandBuffers.back(), 0);
+            flags &= ~flagBits::beganTransferOps;
+            transferBuffer.destroy(device);
 
-            //Render 3D Scene
-            if(vkBeginCommandBuffer(commandBuffer3D, &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to begin command buffer {}", 2 + currentFrame)};
+            return entityManager.insertMesh(vertexBuffer.handle, vertexBuffer.memory, verticesSize, indicesSize / sizeof(u32));
+        }
+
+        Error<ID> makeTexture(std::string const& texturePath) noexcept {
+            int texWidth, texHeight, texChannels;
+            stbi_uc* pixels = nullptr;
+            pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+            if(pixels == nullptr) {
+                return {ErrorTag::fatalError, "Failed to find/load texture file"};
             }
+            const VkDeviceSize imageSize = texWidth * texHeight * STBI_rgb_alpha; 
+            GPUImage textureImage;
 
-            std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D;
-            setup3DMemoryBarriers(imageIndex, imageMemoryBarriers3D);
+            if(Error<GPUImage> image = GPUImage::make(
+                    device, physicalDevice, 
+                    {static_cast<u32>(texWidth), static_cast<u32>(texHeight), 1},
+                    VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, 
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT
+                ); !image) {
+                stbi_image_free(pixels);
+                return image.moveError<std::size_t>();
+            }
+            else textureImage = image;
 
-            VkDependencyInfo const colorWriteDependency3D = {
-                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            GPUBuffer transferBuffer;
+            if(Error<GPUBuffer> tb = GPUBuffer::make(
+                    device, 
+                    physicalDevice, 
+                    imageSize, 
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                ); !tb) {
+                stbi_image_free(pixels);
+                textureImage.destroy(device);
+                return tb.moveError<std::size_t>();
+            }
+            else transferBuffer = tb;
+
+            void* memory;
+            if(vkMapMemory(device, transferBuffer.memory, 0, imageSize, 0, &memory) != VK_SUCCESS) {
+                stbi_image_free(pixels);
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to map buffer memory to the host"};
+            }
+            std::memcpy(memory, pixels, imageSize);
+            vkUnmapMemory(device, transferBuffer.memory);
+
+            stbi_image_free(pixels);
+
+            const VkCommandBufferBeginInfo beginInfo = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                 .pNext = nullptr,
-                .dependencyFlags = 0,
-                .memoryBarrierCount = 0,
-                .pMemoryBarriers = nullptr,
-                .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = 0,
-                .imageMemoryBarrierCount = imageMemoryBarriers3D.max_size(),
-                .pImageMemoryBarriers = imageMemoryBarriers3D.data()
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                .pInheritanceInfo = nullptr
             };
+            if(vkBeginCommandBuffer(commandBuffers.back(), &beginInfo) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to begin single time command buffer"};
+            }
 
-            vkCmdPipelineBarrier2(commandBuffer3D, &colorWriteDependency3D);
-
-            renderPass3D(imageIndex, commandBuffer3D);
-
-            //Transition image layout for presentation
-            VkImageMemoryBarrier2 const presentSrcBarrier = {
+            const VkImageMemoryBarrier2 firstTransition = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
                 .pNext = nullptr,
-                .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
-                .dstAccessMask = VK_ACCESS_2_NONE,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
                 .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = swapchainImages[imageIndex],
+                .image = textureImage.handle,
                 .subresourceRange = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel = 0,
@@ -2409,90 +2392,123 @@ namespace mars {
                     .layerCount = 1
                 }
             };
-            VkDependencyInfo const presentDependency = {
+            const VkDependencyInfo dep1 = {
                 .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
                 .pNext = nullptr,
-                .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+                .dependencyFlags = 0,
                 .memoryBarrierCount = 0,
                 .pMemoryBarriers = nullptr,
                 .bufferMemoryBarrierCount = 0,
-                .pBufferMemoryBarriers = 0,
+                .pBufferMemoryBarriers = nullptr,
                 .imageMemoryBarrierCount = 1,
-                .pImageMemoryBarriers = &presentSrcBarrier
+                .pImageMemoryBarriers = &firstTransition
             };
-            vkCmdPipelineBarrier2(commandBuffer3D, &presentDependency);
+            vkCmdPipelineBarrier2(commandBuffers.back(), &dep1);
 
-            if(vkEndCommandBuffer(commandBuffer3D) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to end command buffer {}", currentFrame)};
+            const VkBufferImageCopy2 copyRegion = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+                .pNext = nullptr,
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                },
+                .imageOffset = {0,0,0},
+                .imageExtent = {static_cast<u32>(texWidth), static_cast<u32>(texHeight), 1}
+            };
+            const VkCopyBufferToImageInfo2 bufferToImageInfo = {
+                .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+                .pNext = nullptr,
+                .srcBuffer = transferBuffer.handle,
+                .dstImage = textureImage.handle,
+                .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .regionCount = 1,
+                .pRegions = &copyRegion
+            };
+            vkCmdCopyBufferToImage2(commandBuffers.back(), &bufferToImageInfo);
+
+            const VkImageMemoryBarrier2 preShaderRead = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .pNext = nullptr,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = textureImage.handle,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+                }
+            };
+            const VkDependencyInfo dep2 = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .pNext = nullptr,
+                .dependencyFlags = 0,
+                .memoryBarrierCount = 0,
+                .pMemoryBarriers = nullptr,
+                .bufferMemoryBarrierCount = 0,
+                .pBufferMemoryBarriers = nullptr,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &preShaderRead
+            };
+            vkCmdPipelineBarrier2(commandBuffers.back(), &dep2);
+
+            if(vkEndCommandBuffer(commandBuffers.back()) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to end command buffer while creating texture image"};
             }
 
-            std::array<VkSemaphoreSubmitInfo, 2> waitSemaphores;
-            //Make sure we've acquired a swapchain image
-            waitSemaphores[0] = {
-                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-                .pNext = nullptr,
-                .semaphore = imageAcquiredSemaphores[currentFrame],
-                .value = 0,
-                .stageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                .deviceIndex = 0
-            };
-            //Make sure the 2D scene is actually ready
-            waitSemaphores[1] = {
-                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-                .pNext = nullptr,
-                .semaphore = scene2DReadySemaphores[currentFrame],
-                .value = 0,
-                .stageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                .deviceIndex = 0
-            };
-            VkCommandBufferSubmitInfo const commandBufferInfo3D = {
+            const VkCommandBufferSubmitInfo commandInfo = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
                 .pNext = nullptr,
-                .commandBuffer = commandBuffer3D,
+                .commandBuffer = commandBuffers.back(),
                 .deviceMask = 0
             };
-            VkSemaphoreSubmitInfo const presentationReady = {
-                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-                .pNext = nullptr,
-                .semaphore = presentReadySemaphores[imageIndex],
-                .value = 0,
-                .stageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                .deviceIndex = 0
-            };
-            VkSubmitInfo2 const submitInfo3D = {
+            const VkSubmitInfo2 submitInfo = {
                 .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
                 .pNext = nullptr,
                 .flags = 0,
-                .waitSemaphoreInfoCount = waitSemaphores.max_size(),
-                .pWaitSemaphoreInfos = waitSemaphores.data(),
+                .waitSemaphoreInfoCount = 0,
+                .pWaitSemaphoreInfos = nullptr,
                 .commandBufferInfoCount = 1,
-                .pCommandBufferInfos = &commandBufferInfo3D,
-                .signalSemaphoreInfoCount = 1,
-                .pSignalSemaphoreInfos = &presentationReady
+                .pCommandBufferInfos = &commandInfo,
+                .signalSemaphoreInfoCount = 0,
+                .pSignalSemaphoreInfos = nullptr
             };
-
-            if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo3D, fences[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to submit draw commands to queue"};
+            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to submit to queue while creating texture image"};
+            }
+            if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to wait for queue while creating texture image"};
+            }
+            if(vkResetCommandBuffer(commandBuffers.back(), 0) != VK_SUCCESS) {
+                textureImage.destroy(device);
+                transferBuffer.destroy(device);
+                return {ErrorTag::fatalError, "Failed to reset command buffer while creating texture image"};
             }
 
-            VkPresentInfoKHR const presentInfo = {
-                .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-                .pNext = nullptr,
-                .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &presentReadySemaphores[imageIndex],
-                .swapchainCount = 1,
-                .pSwapchains = &swapchain,
-                .pImageIndices = &imageIndex,
-                .pResults = nullptr
-            };
-            u32 const presentQueueIndex = currentFrame % presentQueues.size();
-            if(vkQueuePresentKHR(presentQueues[presentQueueIndex], &presentInfo) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to present graphics queue"};
-            }
-
-            currentFrame = (currentFrame + 1) % maxConcurrentFrames;
-
-            return success();
+            transferBuffer.destroy(device);
+            Texture t;
+            t.handle = textureImage.handle;
+            t.memory = textureImage.memory;
+            t.view = textureImage.view;
+            return entityManager.insertTexture(t);
         }
     };
 }

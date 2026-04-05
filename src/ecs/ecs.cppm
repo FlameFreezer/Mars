@@ -10,6 +10,8 @@ import error;
 namespace mars {
     export class EntityComponentSystem {
         public:
+        EntityComponentSystem() noexcept = default;
+        EntityComponentSystem(EntityComponentSystem&& other) noexcept;
         EntityManager entityManager;
         ComponentManager componentManager;
         Error<Entity> createEntity(Signature s) noexcept;
