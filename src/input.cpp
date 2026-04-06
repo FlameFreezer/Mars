@@ -21,6 +21,8 @@ std::unordered_map<std::string, SDL_Scancode> initScancodeMap() noexcept {
     map["d"] = SDL_SCANCODE_D;
     map["l"] = SDL_SCANCODE_L;
     map["p"] = SDL_SCANCODE_P;
+    map["w"] = SDL_SCANCODE_W;
+    map["s"] = SDL_SCANCODE_S;
     return map;
 }
 std::unordered_map<std::string, SDL_GamepadButton> initGamepadButtonMap() noexcept {
@@ -31,6 +33,8 @@ std::unordered_map<std::string, SDL_GamepadButton> initGamepadButtonMap() noexce
     map["west"] = SDL_GAMEPAD_BUTTON_WEST;
     map["dpad right"] = SDL_GAMEPAD_BUTTON_DPAD_RIGHT;
     map["dpad left"] = SDL_GAMEPAD_BUTTON_DPAD_LEFT;
+    map["dpad up"] = SDL_GAMEPAD_BUTTON_DPAD_UP;
+    map["dpad down"] = SDL_GAMEPAD_BUTTON_DPAD_DOWN;
     map["left shoulder"] = SDL_GAMEPAD_BUTTON_LEFT_SHOULDER;
     return map;
 }
@@ -38,6 +42,7 @@ std::unordered_map<std::string, SDL_GamepadButton> initGamepadButtonMap() noexce
 std::unordered_map<std::string, SDL_GamepadAxis> initAxisMap() noexcept {
     std::unordered_map<std::string, SDL_GamepadAxis> map;
     map["leftx"] = SDL_GAMEPAD_AXIS_LEFTX;
+    map["lefty"] = SDL_GAMEPAD_AXIS_LEFTY;
     return map;
 }
 
