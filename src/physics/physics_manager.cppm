@@ -8,13 +8,12 @@ import position;
 
 namespace mars {
     export class PhysicsManager {
-        ComponentSystem<Physics>& sysPhysics;
-        ComponentSystem<Dynamics>& sysDynamics;
-        ComponentSystem<Transform>& sysTransform;
-        ComponentSystem<Collide>& sysCollide;
         Position position(ID id) noexcept;
+        PhysicsManager() = default;
+        PhysicsManager(const PhysicsManager& other) = delete;
+        PhysicsManager(PhysicsManager&& other) = delete;
         public:
-        PhysicsManager(ComponentManager& cm) noexcept;
+        static PhysicsManager& get() noexcept;
         bool checkCollision(ID id1, ID id2) const noexcept;
         bool checkCollision(Entity e1, Entity e2) const noexcept;
         void applyPhysics(float deltaTime) noexcept;

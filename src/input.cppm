@@ -34,10 +34,12 @@ namespace mars {
         const bool* mKeyState = nullptr;
         int mNumKeys = 0;
         std::unordered_map<std::string, Mapping> mMappings;
-        public:
         Input() noexcept;
-        Input(Input&& other) noexcept;
         ~Input() noexcept;
+        Input(const Input& other) = delete;
+        Input(Input&& other) = delete;
+        public:
+        static Input& get() noexcept;
         Error<noreturn> loadMappings(const std::string& path) noexcept;
         /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
         /// Returns: void    Nothing

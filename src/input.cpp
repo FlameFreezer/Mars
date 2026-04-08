@@ -58,27 +58,16 @@ namespace mars {
         for(int i = 0; i < mNumKeys; i++) mPrevKeyState[i] = false;
     }
 
-    Input::Input(Input&& other) noexcept : 
-        mGamepad(other.mGamepad), 
-        mKeyState(other.mKeyState), 
-        mPrevKeyState(other.mPrevKeyState), 
-        mNumKeys(other.mNumKeys) 
-    {
-        other.mGamepad = nullptr;
-        other.mKeyState = nullptr;
-        other.mPrevKeyState = nullptr;
-        for(int i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; i++) {
-            mGamepadButtonState[i] = other.mGamepadButtonState[i];
-            mPrevGamepadButtonState[i] = other.mPrevGamepadButtonState[i];
-        }
-    }
-
-
     Input::~Input() noexcept {
         if(mGamepad != nullptr and SDL_GamepadConnected(mGamepad)) {
             SDL_CloseGamepad(mGamepad);
         }
         if(mPrevKeyState) delete[] mPrevKeyState;
+    }
+
+    Input& Input::get() noexcept {
+        static Input instance;
+        return instance;
     }
 
     struct InputMapping {

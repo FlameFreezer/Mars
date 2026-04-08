@@ -10,7 +10,6 @@ module;
 export module error;
 import types;
 
-
 export enum class ErrorTag : u8 {
     allOkay = 0,
     searchFail,

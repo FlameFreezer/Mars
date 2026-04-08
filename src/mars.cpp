@@ -1,18 +1,10 @@
 module;
 
-#include <string>
-#include <chrono>
-
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_vulkan.h>
-#include <vulkan/vulkan.h>
-#include <glm/glm.hpp>
 
 #include "mars_macros.h"
 
 module mars;
-
-constexpr float defaultPixelsPerMeter = 64.0f;
 
 namespace mars {
 

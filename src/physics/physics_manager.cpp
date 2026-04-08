@@ -3,13 +3,18 @@ module;
 #include <glm/glm.hpp>
 
 module physics_manager;
+import ecs;
 
 namespace mars {
-    PhysicsManager::PhysicsManager(ComponentManager& cm) noexcept : 
-        sysPhysics(cm.system<Component::physics>()), 
-        sysDynamics(cm.system<Component::dynamics>()), 
-        sysCollide(cm.system<Component::collide>()), 
-        sysTransform(cm.system<Component::transform>()) {}
+    ComponentSystem<Physics>& sysPhysics        = ECS::get().componentManager.system<Component::physics>();
+    ComponentSystem<Dynamics>& sysDynamics      = ECS::get().componentManager.system<Component::dynamics>();
+    ComponentSystem<Transform>& sysTransform    = ECS::get().componentManager.system<Component::transform>();
+    ComponentSystem<Collide>& sysCollide        = ECS::get().componentManager.system<Component::collide>();
+
+    PhysicsManager& PhysicsManager::get() noexcept {
+        static PhysicsManager instance;
+        return instance;
+    }
 
     Position PhysicsManager::position(ID id) noexcept {
         return {

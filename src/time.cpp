@@ -5,6 +5,10 @@ module;
 module time;
 
 namespace mars {
+    Time& Time::get() noexcept {
+        static Time instance;
+        return instance;
+    }
     std::chrono::steady_clock::time_point Time::frameTime() const noexcept {
         return mTime;
     }

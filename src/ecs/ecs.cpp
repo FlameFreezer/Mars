@@ -1,15 +1,14 @@
 module;
 
-#include <utility>
-
 #include <glm/glm.hpp>
 
 module ecs;
 
 namespace mars {
-    EntityComponentSystem::EntityComponentSystem(EntityComponentSystem&& other) noexcept :
-        componentManager(std::move(other.componentManager)), entityManager(std::move(other.entityManager)) {}
-
+    EntityComponentSystem& EntityComponentSystem::get() noexcept {
+        static EntityComponentSystem instance;
+        return instance;
+    }
     Error<Entity> EntityComponentSystem::createEntity(Signature s) noexcept {
         ID id = entityManager.createEntity();
         if(id == nullID) {

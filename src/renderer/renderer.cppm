@@ -37,6 +37,9 @@ import renderer_ecs;
 import camera;
 
 namespace mars {
+    #define TRY_VK(proc, msg) do{\
+        if((proc) != VK_SUCCESS) return {ErrorTag::fatalError, (msg)};\
+    } while(false)
     constexpr std::array<const char*, 3> neededDeviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
@@ -405,15 +408,10 @@ namespace mars {
                 cube.aspect = aspect;
             };
 
-            if(vkWaitForFences(
-                    device, 
-                    1, 
-                    &fences[currentFrame], 
-                    VK_TRUE, 
-                    std::numeric_limits<u64>::max()
-                ) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Something went from while waiting on fence {}", currentFrame)};
-            }
+            TRY_VK(
+                vkWaitForFences(device, 1, &fences[currentFrame], VK_TRUE, std::numeric_limits<u64>::max()),
+                std::format("Something went from while waiting on fence {}", currentFrame)
+            );
             //These semaphores indicate that we have successfully acquired an image on this frame
             Slice<VkSemaphore> imageAcquiredSemaphores = Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames);
             //These semaphores indicate that we have finished rendering a 2D scene on this frame
@@ -439,9 +437,10 @@ namespace mars {
                     .pNext = nullptr,
                     .flags = 0
                 };
-                if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAcquiredSemaphores[currentFrame]) != VK_SUCCESS) {
-                    return {ErrorTag::fatalError, "Failed to recreate semaphore while recreating swapchain during draw"};
-                }
+                TRY_VK(
+                    vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAcquiredSemaphores[currentFrame]),
+                    "Failed to recreate semaphore while recreating swapchain during draw"
+                );
                 depthImage2D.destroy(device);
                 depthImage3D.destroy(device);
                 TRY(createDepthImages());
@@ -455,21 +454,15 @@ namespace mars {
             if(flags & rendererFlags::beganTransferOps) {
                 TRY(doTransferOps());
             }
-            if(vkResetFences(device, 1, &fences[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to reset fence {}", currentFrame)};
-            }
+            TRY_VK(vkResetFences(device, 1, &fences[currentFrame]), std::format("Failed to reset fence {}", currentFrame));
 
             //Acquire the command buffers to use for this frame
             VkCommandBuffer commandBuffer2D = commandBuffers[currentFrame];
             VkCommandBuffer commandBuffer3D = commandBuffers[2 + currentFrame];
 
             //Reset command buffers for the current frame, both for the 2D and 3D scene
-            if(vkResetCommandBuffer(commandBuffer2D, 0) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to reset command buffer"};
-            }
-            if(vkResetCommandBuffer(commandBuffer3D, 0) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to reset command buffer"};
-            }
+            TRY_VK(vkResetCommandBuffer(commandBuffer2D, 0), "Failed to reset command buffer");
+            TRY_VK(vkResetCommandBuffer(commandBuffer3D, 0), "Failed to reset command buffer");
 
             //Render 2D scene
             VkCommandBufferBeginInfo const beginInfo = {
@@ -478,9 +471,7 @@ namespace mars {
                 .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                 .pInheritanceInfo = nullptr
             };
-            if(vkBeginCommandBuffer(commandBuffer2D, &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to begin command buffer {}", currentFrame)};
-            }
+            TRY_VK(vkBeginCommandBuffer(commandBuffer2D, &beginInfo), "Failed to begin command buffer {}");
 
             std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers2D;
             setup2DMemoryBarriers(imageMemoryBarriers2D);
@@ -502,9 +493,7 @@ namespace mars {
             renderPass2D(cube.dim, pixelsPerMeter, commandBuffer2D, sysTransform, sysDraw);
 
             //Submit to create 2D scene
-            if(vkEndCommandBuffer(commandBuffer2D) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to end command buffer {}", currentFrame)};
-            }
+            TRY_VK(vkEndCommandBuffer(commandBuffer2D), std::format("Failed to end command buffer {}", currentFrame));
 
             VkCommandBufferSubmitInfo const commandBufferInfo2D = {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -533,14 +522,10 @@ namespace mars {
             };
 
             u32 const graphicsQueueIndex = currentFrame % graphicsQueues.size();
-            if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo2D, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to submit draw commands to queue"};
-            }
+            TRY_VK(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo2D, nullptr), "Failed to submit draw commands to queue");
 
             //Render 3D Scene
-            if(vkBeginCommandBuffer(commandBuffer3D, &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to begin command buffer {}", 2 + currentFrame)};
-            }
+            TRY_VK(vkBeginCommandBuffer(commandBuffer3D, &beginInfo), std::format("Failed to begin command buffer {}", 2 + currentFrame));
 
             std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D;
             setup3DMemoryBarriers(imageIndex, imageMemoryBarriers3D);
@@ -595,9 +580,7 @@ namespace mars {
             };
             vkCmdPipelineBarrier2(commandBuffer3D, &presentDependency);
 
-            if(vkEndCommandBuffer(commandBuffer3D) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to end command buffer {}", currentFrame)};
-            }
+            TRY_VK(vkEndCommandBuffer(commandBuffer3D), std::format("Failed to end command buffer {}", currentFrame));
 
             std::array<VkSemaphoreSubmitInfo, 2> waitSemaphores;
             //Make sure we've acquired a swapchain image
@@ -644,9 +627,7 @@ namespace mars {
                 .pSignalSemaphoreInfos = &presentationReady
             };
 
-            if(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo3D, fences[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to submit draw commands to queue"};
-            }
+            TRY_VK(vkQueueSubmit2(graphicsQueues[graphicsQueueIndex], 1, &submitInfo3D, fences[currentFrame]), "Failed to submit draw commands to queue");
 
             VkPresentInfoKHR const presentInfo = {
                 .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -659,9 +640,7 @@ namespace mars {
                 .pResults = nullptr
             };
             u32 const presentQueueIndex = currentFrame % presentQueues.size();
-            if(vkQueuePresentKHR(presentQueues[presentQueueIndex], &presentInfo) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to present graphics queue"};
-            }
+            TRY_VK(vkQueuePresentKHR(presentQueues[presentQueueIndex], &presentInfo), "Failed to present graphics queue");
 
             currentFrame = (currentFrame + 1) % maxConcurrentFrames;
 
@@ -675,17 +654,13 @@ namespace mars {
                 .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                 .pInheritanceInfo = nullptr
             };
-            if(vkBeginCommandBuffer(transferCommandBuffers[currentFrame], &beginInfo) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to begin single time command buffer"}; 
-            }
+            TRY_VK(vkBeginCommandBuffer(transferCommandBuffers[currentFrame], &beginInfo), "Failed to begin single time command buffer");
             flags |= rendererFlags::beganTransferOps;
             return success();
         }
 
         Error<noreturn> doTransferOps() noexcept {
-            if(vkEndCommandBuffer(transferCommandBuffers[currentFrame]) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to end command buffer while doing transfer ops"};
-            }
+            TRY_VK(vkEndCommandBuffer(transferCommandBuffers[currentFrame]), "Failed to end command buffer while doing transfer ops");
 
             flags &= ~rendererFlags::beganTransferOps;
             const VkCommandBufferSubmitInfo commandInfo = {
@@ -705,15 +680,9 @@ namespace mars {
                 .signalSemaphoreInfoCount = 0,
                 .pSignalSemaphoreInfos = nullptr
             };
-            if(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to submit to queue while doing transfer ops"};
-            }
-            if(vkQueueWaitIdle(graphicsQueues[0]) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to wait for queue while doing transfer ops"};
-            }
-            if(vkResetCommandBuffer(transferCommandBuffers[currentFrame], 0) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to reset command buffer while doing transfer ops"};
-            }
+            TRY_VK(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, nullptr), "Failed to submit to queue while doing transfer ops");
+            TRY_VK(vkQueueWaitIdle(graphicsQueues[0]), "Failed to wait for queue while doing transfer ops");
+            TRY_VK(vkResetCommandBuffer(transferCommandBuffers[currentFrame], 0), "Failed to reset command buffer while doing transfer ops");
             while(!transferBuffers.empty()) {
                 auto tb = transferBuffers.front();
                 transferBuffers.pop();
@@ -892,9 +861,7 @@ namespace mars {
                 .bindingCount = pushBindings.max_size(),
                 .pBindings = pushBindings.data()
             };
-            if(vkCreateDescriptorSetLayout(device, &pushLayout, nullptr, &pushSetLayout) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to create descriptor set layout"};
-            }
+            TRY_VK(vkCreateDescriptorSetLayout(device, &pushLayout, nullptr, &pushSetLayout), "Failed to create descriptor set layout");
             return success();
         }
 
@@ -922,9 +889,7 @@ namespace mars {
                 .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
                 .unnormalizedCoordinates = VK_FALSE
             };
-            if(vkCreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to create texture sampler"};
-            }
+            TRY_VK(vkCreateSampler(device, &samplerInfo, nullptr, &sampler), "Failed to create texture sampler");
             return success();
         }
 
@@ -935,9 +900,7 @@ namespace mars {
             if(!presentMode) return presentMode.moveError();
 
             VkSurfaceCapabilitiesKHR surfaceCapabilities{};
-            if(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to get physical device surface capabilities while recreating the swapchain"};
-            }
+            TRY_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities), "Failed to get physical device surface capabilities while recreating the swapchain");
 
             Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevice, surface);
             if(!surfaceFormat) return surfaceFormat.moveError();
@@ -970,9 +933,7 @@ namespace mars {
                 .clipped = VK_TRUE,
                 .oldSwapchain = swapchain
             };
-            if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &newSwapchain) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to recreate swapchain"};
-            }
+            TRY_VK(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &newSwapchain), "Failed to recreate swapchain");
             vkDestroySwapchainKHR(device, swapchain, nullptr);
             swapchain = newSwapchain;
 
@@ -1264,9 +1225,7 @@ namespace mars {
                 .flags = 0
             };
             for(VkSemaphore& semaphore : semaphores) {
-                if(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS) {
-                    return {ErrorTag::fatalError, "Failed to create semaphores"};
-                }
+                TRY_VK(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &semaphore), "Failed to create semaphores");
             }
             const VkFenceCreateInfo fenceInfo = {
                 .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -1274,9 +1233,7 @@ namespace mars {
                 .flags = VK_FENCE_CREATE_SIGNALED_BIT
             };
             for(VkFence& fence : fences) {
-                if(vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS) {
-                    return {ErrorTag::fatalError, "Failed to create fences!"};
-                }
+                TRY_VK(vkCreateFence(device, &fenceInfo, nullptr, &fence), "Failed to create fences!");
             }
             return success();
         }
@@ -1304,9 +1261,7 @@ namespace mars {
                 .pCode = reinterpret_cast<const u32*>(shader.data().data())
             };
             VkShaderModule mod;
-            if(vkCreateShaderModule(device, &moduleInfo, nullptr, &mod) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to create shader module"};
-            }
+            TRY_VK(vkCreateShaderModule(device, &moduleInfo, nullptr, &mod), "Failed to create shader module");
             return mod;
         }
 
@@ -1481,9 +1436,7 @@ namespace mars {
                 .pushConstantRangeCount = 1,
                 .pPushConstantRanges = pushConstantRanges2D
             };
-            if(vkCreatePipelineLayout(device, &pipelineLayoutInfo2D, nullptr, &pipelineLayout2D) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to create graphics pipeline layout!"};
-            }
+            TRY_VK(vkCreatePipelineLayout(device, &pipelineLayoutInfo2D, nullptr, &pipelineLayout2D), "Failed to create graphics pipeline layout!");
             const VkPushConstantRange pushConstantRanges3D[] = {
                 //Model Matrix for the cube
                 {
@@ -1504,9 +1457,7 @@ namespace mars {
                 .pushConstantRangeCount = 1,
                 .pPushConstantRanges = pushConstantRanges3D
             };
-            if(vkCreatePipelineLayout(device, &pipelineLayoutInfo3D, nullptr, &pipelineLayout3D) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to create graphics pipeline layout!"};
-            }
+            TRY_VK(vkCreatePipelineLayout(device, &pipelineLayoutInfo3D, nullptr, &pipelineLayout3D), "Failed to create graphics pipeline layout!");
              
             std::array<VkGraphicsPipelineCreateInfo, 2> graphicsPipelineInfos;
             //2D Pipeline Info
@@ -1536,10 +1487,10 @@ namespace mars {
             graphicsPipelineInfos[1].stageCount = shaderStageInfos3D.max_size();
             graphicsPipelineInfos[1].pStages = shaderStageInfos3D.data();
             graphicsPipelineInfos[1].layout = pipelineLayout3D;
-
-            if(vkCreateGraphicsPipelines(device, nullptr, graphicsPipelineInfos.max_size(), graphicsPipelineInfos.data(), nullptr, graphicsPipelines.data()) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to create graphics pipeline!"};
-            }
+            TRY_VK(
+                vkCreateGraphicsPipelines(device, nullptr, graphicsPipelineInfos.max_size(), graphicsPipelineInfos.data(), nullptr, graphicsPipelines.data()),
+                "Failed to create graphics pipeline!"
+            );
             vkDestroyShaderModule(device, shaderMod2D, nullptr);
             vkDestroyShaderModule(device, shaderMod3D, nullptr);
 
@@ -1547,13 +1498,9 @@ namespace mars {
         }
         Error<noreturn> getSwapchainImages(VkFormat format) noexcept {
             u32 imageCount;
-            if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to get swapchain images!"};
-            }
+            TRY_VK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr), "Failed to get swapchain images!");
             swapchainImages.resize(imageCount);
-            if(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to get swapchain images!"};
-            }
+            TRY_VK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data()), "Failed to get swapchain images!");
             swapchainImageViews.resize(imageCount);
 
             VkImageViewCreateInfo imageViewInfo = {
