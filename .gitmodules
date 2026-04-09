@@ -1,6 +1,6 @@
-[submodule "libraries/SDL"]
-	path = libraries/SDL
-	url = https://github.com/libsdl-org/SDL.git
-[submodule "libraries/glm"]
-	path = libraries/glm
+[submodule "vendored/glm"]
+	path = vendored/glm
 	url = https://github.com/g-truc/glm.git
+[submodule "vendored/SDL"]
+	path = vendored/SDL
+	url = https://github.com/libsdl-org/SDL.git

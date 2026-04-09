@@ -13,8 +13,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 # Add libraries to build
 set(SDL_STATIC True)
 set(SDL_SHARED False)
-add_subdirectory(libraries/SDL EXCLUDE_FROM_ALL)
-add_subdirectory(libraries/glm EXCLUDE_FROM_ALL)
+add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
+add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 
 # Shader Compilation
 set(MARS_SHADER_PATH "${PROJECT_SOURCE_DIR}/shaders")
@@ -83,10 +83,10 @@ endif()
 #endif()
 
 target_include_directories(Mars PUBLIC 
-    "${PROJECT_SOURCE_DIR}/libraries/SDL/include" 
-    "${PROJECT_SOURCE_DIR}/libraries/glm"
-    "${PROJECT_SOURCE_DIR}/libraries/stb"
-    "${PROJECT_SOURCE_DIR}/libraries/vulkan"
+    "${PROJECT_SOURCE_DIR}/vendored/SDL/include" 
+    "${PROJECT_SOURCE_DIR}/vendored/glm"
+    "${PROJECT_SOURCE_DIR}/thirdparty/stb"
+    "${PROJECT_SOURCE_DIR}/thirdparty/vulkan"
     #"$ENV{VULKAN_SDK}/include" 
     "${PROJECT_SOURCE_DIR}/include"
 )
