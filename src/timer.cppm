@@ -21,22 +21,7 @@ namespace mars {
         std::chrono::nanoseconds mTimeLeft = std::chrono::nanoseconds(0);
         std::chrono::steady_clock::time_point mStartTime;
         TimerStatus mStatus = TimerStatus::stopped;
-        public:
-        Timer() = default;
-        Timer(float waitTimeS) {
-            const std::chrono::duration<float, std::chrono::seconds::period> s(waitTimeS);
-            mTime = std::chrono::duration_cast<std::chrono::nanoseconds>(s);
-            mTimeLeft = mTime;
-        }
-        ~Timer() noexcept {
-            if(mThread.joinable()) mThread.detach();
-        }
-        /// Starts the timer from time t = 0. Does nothing if the timer is already running.
-        /// Preconditions:  status() != TimerStatus::running
-        /// Postconditions: status() == TimerStatus::running
-        /// Returns: void
-        void start() noexcept {
-            std::unique_lock<std::mutex> l(mtx);
+        void startInternal(std::unique_lock<std::mutex>&& l) noexcept {
             if(mStatus == TimerStatus::running) return;
             mStatus = TimerStatus::running;
             mTimeLeft = mTime;
@@ -53,6 +38,37 @@ namespace mars {
                 }
             });
             mStartTime = std::chrono::steady_clock::now();
+        }
+        public:
+        Timer() = default;
+        Timer(float waitTimeS) {
+            const std::chrono::duration<float, std::chrono::seconds::period> s(waitTimeS);
+            mTime = std::chrono::duration_cast<std::chrono::nanoseconds>(s);
+            mTimeLeft = mTime;
+        }
+        ~Timer() noexcept {
+            if(mThread.joinable()) mThread.detach();
+        }
+        /// Starts the timer from time t = 0. Does nothing if the timer is already running.
+        /// Preconditions:  status() != TimerStatus::running
+        /// Postconditions: status() == TimerStatus::running
+        /// Returns: void
+        void start() noexcept {
+            std::unique_lock<std::mutex> l(mtx);
+            startInternal(std::move(l));
+        }
+        /// Starts the timer from time t = 0 and sets the wait time to the value provided (in seconds). Does nothing if the timer is already running.
+        /// Preconditions:  status() != TimerStatus::running
+        /// Postconditions: status() == TimerStatus::running
+        /// Arguments:      waitTimeS   The amount of time to wait for, in seconds 
+        /// Returns: void
+        void start(float waitTimeS) noexcept {
+            const std::chrono::duration<float, std::chrono::seconds::period> s(waitTimeS);
+            std::unique_lock<std::mutex> l(mtx);
+            if(mStatus == TimerStatus::running) return;
+            mTime = std::chrono::duration_cast<std::chrono::nanoseconds>(s);
+            mTimeLeft = mTime;
+            startInternal(std::move(l));
         }
         /// Stops the timer, leaving it in the stopped status with no time left.
         /// Postconditions: timeLeft() == 0.0f
