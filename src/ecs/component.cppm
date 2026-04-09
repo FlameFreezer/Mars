@@ -16,6 +16,12 @@ import position;
 GetComp<Component::component>::Type& component(Entity e) noexcept {\
     return system<Component::component>()[e];\
 }\
+const GetComp<Component::component>::Type& component(ID id) const noexcept{\
+    return system<Component::component>()[id];\
+}\
+GetComp<Component::component>::Type& component(ID id) noexcept {\
+    return system<Component::component>()[id];\
+}
 
 namespace mars {
     export class ComponentManager {

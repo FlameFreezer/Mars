@@ -46,8 +46,10 @@ namespace mars {
         float drag;
         float maxSpeed;
         float jumpSpeed;
+        float ledgeGrabRange;
         ID floorID = nullID;
         ID wallID = nullID;
+        ID ledgeID = nullID;
     };
     export enum class BoundingShape : u8 {
         rectangle,

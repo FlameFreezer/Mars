@@ -95,11 +95,15 @@ namespace mars {
         //Clear out all collision lists before going on to refill them
         for(auto [d, id] : sysDynamics) {
             d.collisions.clear();
+            d.ledgeID = nullID;
+            d.wallID = nullID;
+            d.floorID = nullID;
         }
         //For every dynamic entity
         for(auto [d1, id1] : sysDynamics) {
             //For every entity with collision
             for(auto [c2, id2] : sysCollide) {
+                //Report collisions
                 if(checkCollision(id1, id2)) {
                     d1.collisions.push_back(id2);
                     //Add e1 to the collision list of e2 if it has Dynamics
@@ -108,6 +112,22 @@ namespace mars {
                         d2.collisions.push_back(id1);
                     }
                 }
+                //Report ledges
+                auto& p = sysPhysics[id1];
+                auto& c = sysCollide[id1];
+                glm::vec2 oldpos = c.position;
+                //TODO change to add to horizontal
+                c.position.x += d1.ledgeGrabRange * glm::sign(p.velocity.x);
+                //Must be moving downwards
+                if(glm::dot(p.velocity, p.gravity) <= 0) goto end;            
+                else if(!checkCollision(id1, id2)) goto end;
+                else if(c2.position.y <= c.position.y) goto end;
+                //Ledge candidate
+                if(d1.ledgeID == nullID or c2.position.y < sysCollide[d1.ledgeID].position.y) {
+                    d1.ledgeID = id2;
+                }
+                end:
+                c.position = oldpos;
             }
         }
     }
@@ -133,8 +153,6 @@ namespace mars {
 
     void PhysicsManager::resolveCollisions() noexcept {
         for(auto [d, eid] : sysDynamics) {
-            d.floorID = nullID;
-            d.wallID = nullID;
             for(ID id : d.collisions) {
                 if(!sysCollide[id].isSolid) continue;
                 glm::vec2 r = getR(sysCollide[eid], sysCollide[id]);
@@ -144,9 +162,10 @@ namespace mars {
                 r.y *= glm::sign(p.velocity.y);
                 //Subtract r to take the entity out of the wall
                 position(eid) -= r;
-                //Set the speeds that were into the wall to zero
-                if(r.x != 0.0f) p.velocity.x = 0.0f;
-                if(r.y != 0.0f) p.velocity.y = 0.0f;
+                //Unreport the ledge if we were moving away from the ledge
+                if(d.ledgeID == id and glm::sign(r.x) == glm::sign(p.velocity.x)) {
+                    d.ledgeID = nullID;
+                }
                 //Report the floor
                 if(glm::sign(r.y) == glm::sign(p.gravity.y)) {
                     d.floorID = id;
@@ -155,6 +174,9 @@ namespace mars {
                 if(r != glm::vec2(0.0f) and glm::dot(r, p.gravity) == 0.0f) {
                     d.wallID = id;
                 }
+                //Set the speeds that were into the wall to zero
+                if(r.x != 0.0f) p.velocity.x = 0.0f;
+                if(r.y != 0.0f) p.velocity.y = 0.0f;
             }
         }
     }
