@@ -78,20 +78,21 @@ else()
     target_link_libraries(Mars PRIVATE vulkan)
 endif()
 
-if(NOT DEFINED ENV{VULKAN_SDK})
-    message(FATAL_ERROR "Environment variable \"VULKAN_SDK\" not defined! Set this to the path to the Vulkan SDK installed on your system.")
-endif()
+#if(NOT DEFINED ENV{VULKAN_SDK})
+    #message(FATAL_ERROR "Environment variable \"VULKAN_SDK\" not defined! Set this to the path to the Vulkan SDK installed on your system.")
+#endif()
 
 target_include_directories(Mars PUBLIC 
     "${PROJECT_SOURCE_DIR}/libraries/SDL/include" 
     "${PROJECT_SOURCE_DIR}/libraries/glm"
     "${PROJECT_SOURCE_DIR}/libraries/stb"
-    "$ENV{VULKAN_SDK}/include" 
+    "${PROJECT_SOURCE_DIR}/libraries/vulkan"
+    #"$ENV{VULKAN_SDK}/include" 
     "${PROJECT_SOURCE_DIR}/include"
 )
-target_link_directories(Mars INTERFACE
-    "$ENV{VULKAN_SDK}/lib"
-)
+#target_link_directories(Mars INTERFACE
+#    "$ENV{VULKAN_SDK}/lib"
+#)
 
 # Build for Debug Symbols
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
