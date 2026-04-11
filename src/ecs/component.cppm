@@ -48,5 +48,6 @@ namespace mars {
         DEFINE_COMPONENT_GETTER(draw)
         DEFINE_COMPONENT_GETTER(collide)
         DEFINE_COMPONENT_GETTER(dynamics)
+        DEFINE_COMPONENT_GETTER(ledgeGrab)
     };
 }

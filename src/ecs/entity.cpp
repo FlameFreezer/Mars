@@ -10,26 +10,31 @@ namespace mars {
         return 1 << static_cast<SignatureT>(c);
     }
 
-    SignatureT implyComponents(Component c) noexcept {
-        SignatureT result = componentToBit(c);
+    void implyComponents(Component c, SignatureT& bits) noexcept {
+        //If we already have this component (and thus all of its implied components), exit
+        if(bits & componentToBit(c)) return;
+        bits |= componentToBit(c);
         switch(c) {
         case Component::physics:
-            result |= implyComponents(Component::transform); 
+            implyComponents(Component::transform, bits); 
             break;
         case Component::draw:
-            result |= implyComponents(Component::transform);
+            implyComponents(Component::transform, bits);
             break;
         case Component::dynamics:
-            result |= implyComponents(Component::physics) | implyComponents(Component::collide);
+            implyComponents(Component::physics, bits); 
+            implyComponents(Component::collide, bits);
+            break;
+        case Component::ledgeGrab:
+            implyComponents(Component::dynamics, bits);
             break;
         default: break;
         }
-        return result;
     }
 
     Signature::Signature(std::initializer_list<Component> comps) noexcept : mBits(0) {
         for(Component c : comps) {
-            mBits |= implyComponents(c);
+            implyComponents(c, mBits);
         }
     }
 

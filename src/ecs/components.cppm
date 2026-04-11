@@ -18,6 +18,7 @@ namespace mars {
         draw,
         collide,
         dynamics,
+        ledgeGrab,
         //KEEP THIS AT THE END OF THE ENUM
         maxComponent
     };
@@ -46,10 +47,14 @@ namespace mars {
         float drag;
         float maxSpeed;
         float jumpSpeed;
-        float ledgeGrabRange;
         ID floorID = nullID;
         ID wallID = nullID;
+    };
+    export struct LedgeGrab {
         ID ledgeID = nullID;
+        float ledgeGrabRange = 0.5f;
+        float shoulderHeight = 0.25f;
+        float waistHeight = 0.75f;
     };
     export enum class BoundingShape : u8 {
         rectangle,
@@ -75,4 +80,5 @@ namespace mars {
     template<> struct GetComp<Component::draw> {using Type = Draw;};
     template<> struct GetComp<Component::collide> {using Type = Collide;};
     template<> struct GetComp<Component::dynamics> {using Type = Dynamics;};
+    template<> struct GetComp<Component::ledgeGrab> {using Type = LedgeGrab;};
 }

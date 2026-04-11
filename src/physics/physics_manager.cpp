@@ -10,6 +10,7 @@ namespace mars {
     ComponentSystem<Dynamics>& sysDynamics      = ECS::get().componentManager.system<Component::dynamics>();
     ComponentSystem<Transform>& sysTransform    = ECS::get().componentManager.system<Component::transform>();
     ComponentSystem<Collide>& sysCollide        = ECS::get().componentManager.system<Component::collide>();
+    ComponentSystem<LedgeGrab>& sysLedgeGrab    = ECS::get().componentManager.system<Component::ledgeGrab>();
 
     PhysicsManager& PhysicsManager::get() noexcept {
         static PhysicsManager instance;
@@ -88,19 +89,35 @@ namespace mars {
                 Collide& c = sysCollide[id];
                 c.position += p.velocity * deltaTime;
             }
+            static constexpr float delta = 0.02f;
+            if(std::abs(p.velocity.x) <= delta) p.velocity.x = 0.0f;
+            if(std::abs(p.velocity.y) <= delta) p.velocity.y = 0.0f;
         }
+    }
+
+    static glm::vec2 getHorizontal(const glm::vec2& g) noexcept {
+        static constexpr glm::vec3 z(0.0f, 0.0f, 1.0f);
+        const glm::vec3 gFixed(std::abs(g.x), std::abs(g.y), 0.0f);
+        const glm::vec3 h = glm::cross(gFixed, z);
+        return glm::normalize(glm::vec2(h.x, h.y));
     }
 
     void PhysicsManager::getCollisions() noexcept {
         //Clear out all collision lists before going on to refill them
         for(auto [d, id] : sysDynamics) {
             d.collisions.clear();
-            d.ledgeID = nullID;
             d.wallID = nullID;
             d.floorID = nullID;
+            if(sysLedgeGrab.has(id)) sysLedgeGrab[id].ledgeID = nullID;
         }
         //For every dynamic entity
         for(auto [d1, id1] : sysDynamics) {
+            auto& p = sysPhysics[id1];
+            auto& c = sysCollide[id1];
+            auto& l = sysLedgeGrab[id1];
+            //Ledge grabbing disabled if gravity isn't in a cardinal direction
+            const bool gravCardinal = p.gravity.x == 0.0f or p.gravity.y == 0.0f;
+            const bool canGrabLedges = sysLedgeGrab.has(id1) and gravCardinal;
             //For every entity with collision
             for(auto [c2, id2] : sysCollide) {
                 //Report collisions
@@ -113,19 +130,26 @@ namespace mars {
                     }
                 }
                 //Report ledges
-                auto& p = sysPhysics[id1];
-                auto& c = sysCollide[id1];
-                glm::vec2 oldpos = c.position;
-                //TODO change to add to horizontal
-                c.position.x += d1.ledgeGrabRange * glm::sign(p.velocity.x);
+                if(!canGrabLedges) continue;
+                const glm::vec2 oldpos = c.position;
+                const glm::vec2 h = getHorizontal(p.gravity);
+                //Project distance vector onto the vertical
+                const float vDifference = glm::dot((c2.position - c.position), glm::normalize(p.gravity));
+                c.position += h * l.ledgeGrabRange * glm::sign(glm::dot(p.velocity, h));
                 //Must be moving downwards
                 if(glm::dot(p.velocity, p.gravity) <= 0) goto end;            
-                else if(!checkCollision(id1, id2)) goto end;
-                else if(c2.position.y <= c.position.y) goto end;
+                //Candidate must be in range (collides after moving to range)
+                if(!checkCollision(id1, id2)) goto end;
+                //Candidate's top must be within our collision box
+                if(p.gravity.y > 0.0f and (c2.position.y < c.position.y or c2.position.y > c.position.y + c.scale.y)) goto end;
+                if(p.gravity.y < 0.0f and (c2.position.y + c2.scale.y > c.position.y + c.scale.y or c2.position.y + c2.scale.y < c.position.y)) goto end;
+                if(p.gravity.x > 0.0f and (c2.position.x < c.position.x or c2.position.x > c.position.x + c.scale.x)) goto end;
+                if(p.gravity.x < 0.0f and (c2.position.x + c2.scale.x > c.position.x + c.scale.x or c2.position.x + c2.scale.x < c.position.x)) goto end;
                 //Ledge candidate
-                if(d1.ledgeID == nullID or c2.position.y < sysCollide[d1.ledgeID].position.y) {
-                    d1.ledgeID = id2;
+                if(l.ledgeID == nullID) {
+                    l.ledgeID = id2;
                 }
+                //TODO: pick best ledge (optional? may prevent this through design)
                 end:
                 c.position = oldpos;
             }
@@ -163,8 +187,12 @@ namespace mars {
                 //Subtract r to take the entity out of the wall
                 position(eid) -= r;
                 //Unreport the ledge if we were moving away from the ledge
-                if(d.ledgeID == id and glm::sign(r.x) == glm::sign(p.velocity.x)) {
-                    d.ledgeID = nullID;
+                if(sysLedgeGrab.has(eid)) {
+                    auto& l = sysLedgeGrab[eid];
+                    const glm::vec2 h = getHorizontal(p.gravity);
+                    if(l.ledgeID == id and glm::dot(h, r) > 0.0f) {
+                        l.ledgeID = nullID;
+                    }
                 }
                 //Report the floor
                 if(glm::sign(r.y) == glm::sign(p.gravity.y)) {

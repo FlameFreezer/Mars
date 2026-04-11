@@ -15,6 +15,7 @@ namespace mars {
     export constexpr u8 maxScancodes = 5;
     export constexpr u8 maxGamepadButtons = 5;
     export constexpr u8 maxAxes = SDL_GAMEPAD_AXIS_COUNT;
+    export constexpr i16 angleToAxisValue = SDL_JOYSTICK_AXIS_MAX / 90.0f;
 
     struct Mapping {
         SDL_Scancode scancodes[maxScancodes];
@@ -27,17 +28,21 @@ namespace mars {
     };
 
     export class Input {
-        SDL_Gamepad* mGamepad = nullptr;
+        std::unordered_map<std::string, Mapping> mMappings;
         bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
         bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
+        i16 mPrevAxisState[SDL_GAMEPAD_AXIS_COUNT] = {0};
+        i16 mAxisState[SDL_GAMEPAD_AXIS_COUNT] = {0};
+        SDL_Gamepad* mGamepad = nullptr;
         bool* mPrevKeyState = nullptr;
         const bool* mKeyState = nullptr;
         int mNumKeys = 0;
-        std::unordered_map<std::string, Mapping> mMappings;
+
         Input() noexcept;
         ~Input() noexcept;
         Input(const Input& other) = delete;
         Input(Input&& other) = delete;
+
         public:
         static Input& get() noexcept;
         Error<noreturn> loadMappings(const std::string& path) noexcept;

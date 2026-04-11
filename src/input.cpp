@@ -214,6 +214,10 @@ namespace mars {
                 mPrevGamepadButtonState[i] = mGamepadButtonState[i];
                 mGamepadButtonState[i] = SDL_GetGamepadButton(mGamepad, static_cast<SDL_GamepadButton>(i));
             }
+            for(u64 i = 0; i < SDL_GAMEPAD_AXIS_COUNT; i++) {
+                mPrevAxisState[i] = mAxisState[i];
+                mAxisState[i] = SDL_GetGamepadAxis(mGamepad, static_cast<SDL_GamepadAxis>(i));
+            }
         }
     }
 
@@ -247,13 +251,12 @@ namespace mars {
             if(isButtonDown(mapping.gamepadButtons[i])) return true;
         }
         for(u8 i = 0; i < mapping.numAxes; i++) {
-            static constexpr i16 angleToAxisValue = SDL_JOYSTICK_AXIS_MAX / 90.0f;
             const i16 val = mapping.axisValues[i] * angleToAxisValue;
             if(val <= 0) {
-                if(SDL_GetGamepadAxis(mGamepad, mapping.axes[i]) <= val) return true;
+                if(mAxisState[mapping.axes[i]] <= val) return true;
             }
             else {
-                if(SDL_GetGamepadAxis(mGamepad, mapping.axes[i]) >= val) return true;
+                if(mAxisState[mapping.axes[i]] >= val) return true;
             }
         }
         return false;
@@ -267,6 +270,15 @@ namespace mars {
         for(u8 i = 0; i < mapping.numGamepadButtons; i++) {
             if(isButtonJustPressed(mapping.gamepadButtons[i])) return true;
         }
+        for(u8 i = 0; i < mapping.numAxes; i++) {
+            const i16 val = mapping.axisValues[i] * angleToAxisValue;
+            if(val <= 0) {
+                if(mAxisState[mapping.axes[i]] <= val and mPrevAxisState[mapping.axes[i]] > val) return true;
+            }
+            else {
+                if(mAxisState[mapping.axes[i]] >= val and mPrevAxisState[mapping.axes[i]] < val) return true;
+            }
+        }
         return false;
     }
     bool Input::isActionJustReleased(const std::string& action) const noexcept {
@@ -278,6 +290,16 @@ namespace mars {
         for(u8 i = 0; i < mapping.numGamepadButtons; i++) {
             if(isButtonJustReleased(mapping.gamepadButtons[i])) return true;
         }
+        for(u8 i = 0; i < mapping.numAxes; i++) {
+            const i16 val = mapping.axisValues[i] * angleToAxisValue;
+            if(val <= 0) {
+                if(mAxisState[mapping.axes[i]] > val and mPrevAxisState[mapping.axes[i]] <= val) return true;
+            }
+            else {
+                if(mAxisState[mapping.axes[i]] < val and mPrevAxisState[mapping.axes[i]] >= val) return true;
+            }
+        }
+
         return false;
     }
 }
