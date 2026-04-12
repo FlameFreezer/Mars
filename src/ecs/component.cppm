@@ -1,7 +1,5 @@
 module;
 
-#include <glm/glm.hpp>
-
 export module component;
 export import components;
 export import component_system;
@@ -10,10 +8,10 @@ import error;
 import entity;
 import position;
 
-#define DEFINE_COMPONENT_GETTER(component) const GetComp<Component::component>::Type& component(Entity e) const noexcept{\
+#define DEFINE_COMPONENT_GETTER(component) const GetComp<Component::component>::Type& component(const Entity& e) const noexcept{\
     return system<Component::component>()[e];\
 }\
-GetComp<Component::component>::Type& component(Entity e) noexcept {\
+GetComp<Component::component>::Type& component(const Entity& e) noexcept {\
     return system<Component::component>()[e];\
 }\
 const GetComp<Component::component>::Type& component(ID id) const noexcept{\
@@ -30,7 +28,8 @@ namespace mars {
         public:
         ComponentManager() noexcept;
         ~ComponentManager() noexcept;
-        ComponentManager(ComponentManager&& other) noexcept;
+        ComponentManager(const ComponentManager&) = delete;
+        ComponentManager(ComponentManager&&) = delete;
         void reserveFor(ID id, Signature s) noexcept;
         void freeFor(ID id) noexcept;
         Signature getSignature(ID id) const noexcept;
@@ -42,7 +41,7 @@ namespace mars {
         const ComponentSystem<typename GetComp<c>::Type>& system() const noexcept {
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mSystems[static_cast<ComponentT>(c)]);
         }
-        Position position(Entity e) noexcept;
+        Position position(const Entity& e) noexcept;
         DEFINE_COMPONENT_GETTER(transform)
         DEFINE_COMPONENT_GETTER(physics)
         DEFINE_COMPONENT_GETTER(draw)

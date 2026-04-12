@@ -23,6 +23,7 @@ namespace mars {
         maxComponent
     };
     export constexpr ComponentT numComponents = static_cast<ComponentT>(Component::maxComponent);
+    static_assert(numComponents < 1U << 31);
 
     export struct Transform {
         glm::vec2 position = glm::vec2(0.0f);

@@ -44,7 +44,7 @@ namespace mars {
         const Collide& c2 = sysCollide[id2];
         return doCollisionCheck(sysCollide[id1], sysCollide[id2]);
     }
-    bool PhysicsManager::checkCollision(Entity e1, Entity e2) const noexcept {
+    bool PhysicsManager::checkCollision(const Entity& e1, const Entity& e2) const noexcept {
         //Entities cannot collide with themselves
         if(e1 == e2) return false;
         //Null entity produces no collisions

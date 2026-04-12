@@ -1,7 +1,5 @@
 module;
 
-#include <glm/glm.hpp>
-
 module ecs;
 
 namespace mars {
@@ -18,7 +16,7 @@ namespace mars {
         return Entity(id, s);
     }
 
-    void EntityComponentSystem::destroyEntity(Entity e) noexcept {
+    void EntityComponentSystem::destroyEntity(const Entity& e) noexcept {
         if(e == nullEntity) return;
         componentManager.freeFor(e.id());
         entityManager.destroyEntity(e.id());

@@ -31,14 +31,6 @@ namespace mars {
         if(mSignatures) delete[] mSignatures;
     }
 
-    ComponentManager::ComponentManager(ComponentManager&& other) noexcept : mSignatures(other.mSignatures) {
-        for(ComponentT i = 0; i < numComponents; i++) {
-            mSystems[i] = other.mSystems[i];
-            other.mSystems[i] = nullptr;
-        }
-        other.mSignatures = nullptr;
-    }
-
     void ComponentManager::reserveFor(ID id, Signature s) noexcept {
         SignatureT bits = s.getBits();
         ComponentT bitNum = 0;
@@ -68,7 +60,7 @@ namespace mars {
         return mSignatures[id];
     }
 
-    Position ComponentManager::position(Entity e) noexcept {
+    Position ComponentManager::position(const Entity& e) noexcept {
         return {
             transform(e).position, collide(e).position
         };

@@ -78,11 +78,11 @@ namespace mars {
         return mSignature.has(comp);
     }
 
-    bool operator==(Entity lhs, Entity rhs) noexcept {
+    bool operator==(const Entity& lhs, const Entity& rhs) noexcept {
         return lhs.mID == rhs.mID;
     }
 
-    bool operator!=(Entity lhs, Entity rhs) noexcept {
+    bool operator!=(const Entity& lhs, const Entity& rhs) noexcept {
         return lhs.mID != rhs.mID;
     }
 }
