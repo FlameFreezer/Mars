@@ -83,10 +83,10 @@ namespace mars {
         C& operator[](ID id) noexcept {
             return mData[mIndices[id]];
         }
-        const C& operator[](const Entity& e) const noexcept {
+        const C& operator[](Entity e) const noexcept {
             return mData[mIndices[e.id()]];
         }
-        C& operator[](const Entity& e) noexcept {
+        C& operator[](Entity e) noexcept {
             return mData[mIndices[e.id()]];
         }
         //Getter for internal data array

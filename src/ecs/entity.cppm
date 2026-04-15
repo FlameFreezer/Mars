@@ -36,8 +36,8 @@ namespace mars {
         Signature signature() const noexcept;
         bool has(const std::initializer_list<Component> comps) const noexcept;
         bool has(Component comp) const noexcept;
-        friend bool operator==(const Entity& lhs, const Entity& rhs) noexcept;
-        friend bool operator!=(const Entity& lhs, const Entity& rhs) noexcept;
+        friend bool operator==(Entity lhs, Entity rhs) noexcept;
+        friend bool operator!=(Entity lhs, Entity rhs) noexcept;
     };
 
     export constexpr Entity nullEntity;

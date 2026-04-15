@@ -5,6 +5,19 @@ module;
 module physics_manager;
 import ecs;
 
+bool gravityVertical(const glm::vec2& g) noexcept {
+    return g.x == 0.0f;
+}
+
+float& h(glm::vec2& vec, bool gravVert) noexcept {
+    if(gravVert) return vec.x;
+    else return vec.y;
+    }
+
+float& v(glm::vec2& vec, bool gravVert) noexcept {
+    return h(vec, !gravVert);
+}
+
 namespace mars {
     ComponentSystem<Physics>& sysPhysics        = ECS::get().componentManager.system<Component::physics>();
     ComponentSystem<Dynamics>& sysDynamics      = ECS::get().componentManager.system<Component::dynamics>();
@@ -44,7 +57,7 @@ namespace mars {
         const Collide& c2 = sysCollide[id2];
         return doCollisionCheck(sysCollide[id1], sysCollide[id2]);
     }
-    bool PhysicsManager::checkCollision(const Entity& e1, const Entity& e2) const noexcept {
+    bool PhysicsManager::checkCollision(Entity e1, Entity e2) const noexcept {
         //Entities cannot collide with themselves
         if(e1 == e2) return false;
         //Null entity produces no collisions
@@ -112,9 +125,9 @@ namespace mars {
         }
         //For every dynamic entity
         for(auto [d1, id1] : sysDynamics) {
-            auto& p = sysPhysics[id1];
-            auto& c = sysCollide[id1];
-            auto& l = sysLedgeGrab[id1];
+            Physics& p = sysPhysics[id1];
+            Collide& c = sysCollide[id1];
+            LedgeGrab& l = sysLedgeGrab[id1];
             //Ledge grabbing disabled if gravity isn't in a cardinal direction
             const bool gravCardinal = p.gravity.x == 0.0f or p.gravity.y == 0.0f;
             const bool canGrabLedges = sysLedgeGrab.has(id1) and gravCardinal;
@@ -132,10 +145,10 @@ namespace mars {
                 //Report ledges
                 if(!canGrabLedges) continue;
                 const glm::vec2 oldpos = c.position;
-                const glm::vec2 h = getHorizontal(p.gravity);
+                const glm::vec2 horizontal = getHorizontal(p.gravity);
                 //Project distance vector onto the vertical
                 const float vDifference = glm::dot((c2.position - c.position), glm::normalize(p.gravity));
-                c.position += h * l.ledgeGrabRange * glm::sign(glm::dot(p.velocity, h));
+                c.position += horizontal * l.ledgeGrabRange * glm::sign(glm::dot(p.velocity, horizontal));
                 //Must be moving downwards
                 if(glm::dot(p.velocity, p.gravity) <= 0) goto end;            
                 //Candidate must be in range (collides after moving to range)
@@ -175,6 +188,7 @@ namespace mars {
         return r;
     }
 
+
     void PhysicsManager::resolveCollisions() noexcept {
         for(auto [d, eid] : sysDynamics) {
             for(ID id : d.collisions) {
@@ -189,13 +203,13 @@ namespace mars {
                 //Unreport the ledge if we were moving away from the ledge
                 if(sysLedgeGrab.has(eid)) {
                     auto& l = sysLedgeGrab[eid];
-                    const glm::vec2 h = getHorizontal(p.gravity);
-                    if(l.ledgeID == id and glm::dot(h, r) > 0.0f) {
+                    const glm::vec2 horizontal = getHorizontal(p.gravity);
+                    if(l.ledgeID == id and glm::dot(horizontal, r) > 0.0f) {
                         l.ledgeID = nullID;
                     }
                 }
                 //Report the floor
-                if(glm::sign(r.y) == glm::sign(p.gravity.y)) {
+                if(glm::sign(v(r, gravityVertical(p.gravity))) == glm::sign(v(p.gravity, gravityVertical(p.gravity)))) {
                     d.floorID = id;
                 }
                 //Report the wall

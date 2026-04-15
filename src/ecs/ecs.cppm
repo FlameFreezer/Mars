@@ -17,7 +17,7 @@ namespace mars {
         ComponentManager componentManager;
         static EntityComponentSystem& get() noexcept;
         Error<Entity> createEntity(Signature s) noexcept;
-        void destroyEntity(const Entity& e) noexcept;
+        void destroyEntity(Entity e) noexcept;
         Entity entity(ID id) const noexcept;
     };
     export using ECS = EntityComponentSystem;

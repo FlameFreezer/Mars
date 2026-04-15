@@ -1,6 +1,7 @@
 module;
 
 #include <vector>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
@@ -22,7 +23,7 @@ namespace mars {
         //KEEP THIS AT THE END OF THE ENUM
         maxComponent
     };
-    export constexpr ComponentT numComponents = static_cast<ComponentT>(Component::maxComponent);
+    export constexpr ComponentT numComponents = std::to_underlying(Component::maxComponent);
     static_assert(numComponents < 1U << 31);
 
     export struct Transform {

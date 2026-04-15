@@ -15,7 +15,7 @@ namespace mars {
         public:
         static PhysicsManager& get() noexcept;
         bool checkCollision(ID id1, ID id2) const noexcept;
-        bool checkCollision(const Entity& e1, const Entity& e2) const noexcept;
+        bool checkCollision(Entity e1, Entity e2) const noexcept;
         void applyPhysics(float deltaTime) noexcept;
         void getCollisions() noexcept;
         void resolveCollisions() noexcept;

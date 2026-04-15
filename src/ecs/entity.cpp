@@ -1,13 +1,14 @@
 module;
 
 #include <initializer_list>
+#include <utility>
 
 module entity;
 
 namespace mars {
 
     constexpr SignatureT componentToBit(Component c) noexcept {
-        return 1 << static_cast<SignatureT>(c);
+        return 1 << std::to_underlying(c);
     }
 
     void implyComponents(Component c, SignatureT& bits) noexcept {
@@ -78,11 +79,11 @@ namespace mars {
         return mSignature.has(comp);
     }
 
-    bool operator==(const Entity& lhs, const Entity& rhs) noexcept {
+    bool operator==(Entity lhs, Entity rhs) noexcept {
         return lhs.mID == rhs.mID;
     }
 
-    bool operator!=(const Entity& lhs, const Entity& rhs) noexcept {
+    bool operator!=(Entity lhs, Entity rhs) noexcept {
         return lhs.mID != rhs.mID;
     }
 }
