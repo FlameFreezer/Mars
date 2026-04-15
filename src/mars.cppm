@@ -7,7 +7,6 @@ export import renderer;
 export import error;
 export import heap_array;
 export import ecs;
-export import physics_manager;
 export import room;
 export import time;
 export import timer;

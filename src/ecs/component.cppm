@@ -8,7 +8,6 @@ export import component_system;
 import types;
 import error;
 import entity;
-import position;
 
 #define DEFINE_COMPONENT_GETTER(component) const GetComp<Component::component>::Type& component(Entity e) const noexcept{\
     return system<Component::component>()[e];\

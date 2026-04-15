@@ -83,4 +83,37 @@ namespace mars {
     template<> struct GetComp<Component::collide> {using Type = Collide;};
     template<> struct GetComp<Component::dynamics> {using Type = Dynamics;};
     template<> struct GetComp<Component::ledgeGrab> {using Type = LedgeGrab;};
+
+    //Helper class to help programmers keep transforms and collisions aligned
+    export class Position {
+        glm::vec2& mTransform;
+        glm::vec2& mCollide;
+        public:
+        Position(glm::vec2& t, glm::vec2& c) noexcept : mTransform(t), mCollide(c) {}
+        Position operator=(glm::vec2 rhs) noexcept {
+            mTransform = rhs;
+            mCollide = rhs;
+            return *this;
+        }
+        Position operator+=(glm::vec2 rhs) noexcept {
+            mTransform += rhs;
+            mCollide += rhs;
+            return *this;
+        }
+        Position operator-=(glm::vec2 rhs) noexcept {
+            mTransform -= rhs;
+            mCollide -= rhs;
+            return *this;
+        }
+        Position operator*=(float rhs) noexcept {
+            mTransform *= rhs;
+            mCollide *= rhs;
+            return *this;
+        }
+        Position operator/=(float rhs) noexcept {
+            mTransform /= rhs;
+            mCollide /= rhs;
+            return *this;
+        }
+    };
 }
