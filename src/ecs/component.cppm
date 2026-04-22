@@ -43,9 +43,7 @@ namespace mars {
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mSystems[std::to_underlying(c)]);
         }
         Position position(Entity e) noexcept;
-        DEFINE_COMPONENT_GETTER(transform)
         DEFINE_COMPONENT_GETTER(physics)
-        DEFINE_COMPONENT_GETTER(draw)
         DEFINE_COMPONENT_GETTER(collide)
         DEFINE_COMPONENT_GETTER(dynamics)
         DEFINE_COMPONENT_GETTER(ledgeGrab)

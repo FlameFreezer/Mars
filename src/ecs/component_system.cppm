@@ -1,8 +1,7 @@
 module;
 
-#include <format>
-
 #include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
 
 export module component_system;
 import components;
@@ -52,7 +51,7 @@ namespace mars {
         }
         //Tells whether the ID has this component
         bool has(ID id) noexcept {
-            return mIDs[mIndices[id]] == id;
+            return mIDs[index(id)] == id;
         }
         //Abstract function which should swap the data at id with the data at the end, then calls
         // swapErase
@@ -63,19 +62,6 @@ namespace mars {
     class ComponentSystem : public ComponentSystemParent {
         C mData[maxEntities];
         public:
-        //Safety checked random access of data
-        Error<const C*> at(ID id) const noexcept {
-            if(id >= maxEntities) {
-                return {ErrorTag::fatalError, std::format("Invalid ID {} passed to function \"at\"", id)};
-            }
-            return &mData[mIndices[id]];
-        }
-        Error<C*> at(ID id) noexcept {
-            if(id >= maxEntities) {
-                return {ErrorTag::fatalError, std::format("Invalid ID {} passed to function \"at\"", id)};
-            }
-            return &mData[mIndices[id]];
-        }
         //Unchecked random access of data
         const C& operator[](ID id) const noexcept {
             return mData[mIndices[id]];
@@ -210,6 +196,127 @@ namespace mars {
         }
         CIterator end() const noexcept {
             return {mSize, *this};
+        }
+    };
+    export template<>
+    class ComponentSystem<Draw> : public ComponentSystemParent {
+        glm::vec2 mPositions[maxEntities];
+        glm::vec2 mScales[maxEntities];
+        float mAngles[maxEntities];
+        float mZLayers[maxEntities];
+        ID mMeshIDs[maxEntities];
+        ID mTextureIDs[maxEntities];
+        public:
+        glm::vec2& position(ID id) noexcept {
+            return mPositions[index(id)];
+        }
+        const glm::vec2& position(ID id) const noexcept {
+            return mPositions[index(id)];
+        }
+        glm::vec2& scale(ID id) noexcept {
+            return mScales[index(id)];
+        }
+        const glm::vec2& scale(ID id) const noexcept {
+            return mScales[index(id)];
+        }
+        float& angle(ID id) noexcept {
+            return mAngles[index(id)];
+        }
+        const float& angle(ID id) const noexcept {
+            return mAngles[index(id)];
+        }
+        float& zLayer(ID id) noexcept {
+            return mZLayers[index(id)];
+        }
+        const float& zLayer(ID id) const noexcept {
+            return mZLayers[index(id)];
+        }
+        ID& meshID(ID id) noexcept {
+            return mMeshIDs[index(id)];
+        }
+        const ID& meshID(ID id) const noexcept {
+            return mMeshIDs[index(id)];
+        } 
+        ID& textureID(ID id) noexcept {
+            return mTextureIDs[index(id)];
+        }
+        const ID& textureID(ID id) const noexcept {
+            return mTextureIDs[index(id)];
+        }
+        glm::vec2* positions() noexcept {
+            return mPositions;
+        }
+        const glm::vec2* positions() const noexcept {
+            return mPositions;
+        }
+        glm::vec2* scales() noexcept {
+            return mScales;
+        }
+        const glm::vec2* scales() const noexcept {
+            return mScales;
+        }
+        float* zLayers() noexcept {
+            return mZLayers;
+        }
+        const float* zLayers() const noexcept {
+            return mZLayers;
+        }
+        ID* meshIDs() noexcept {
+            return mMeshIDs;
+        }
+        const ID* meshIDs() const noexcept {
+            return mMeshIDs;
+        }
+        ID* textureIDs() noexcept {
+            return mTextureIDs;
+        }
+        const ID* textureIDs() const noexcept {
+            return mTextureIDs;
+        }
+        void erase(ID id) noexcept {
+            //Refuse to erase the null entity
+            if(id == nullID) return;
+            //Swap the data at id for the data at the end
+            const u64 index = mIndices[id];
+            mPositions[index] = mPositions[mSize];
+            mScales[index] = mScales[mSize];
+            mAngles[index] = mAngles[mSize];
+            mZLayers[index] = mZLayers[mSize];
+            mMeshIDs[index] = mMeshIDs[mSize];
+            mTextureIDs[index] = mTextureIDs[mSize]; 
+            swapErase(id);
+        }
+        class PositionIterator {
+            u64 mIndex;
+            ComponentSystem<Draw>* mParent;
+            PositionIterator(u64 index, ComponentSystem<Draw>* parent) noexcept : mIndex(index), mParent(parent) {}
+            public:
+            friend class ComponentSystem<Draw>;
+            PositionIterator() noexcept = default;
+            PositionIterator(const PositionIterator& other) noexcept : mIndex(other.mIndex), mParent(other.mParent) {}
+            glm::vec2& operator*() noexcept {
+                return mParent->mPositions[mIndex];
+            }
+            PositionIterator& operator++(int) noexcept {
+                mIndex++;
+                return *this;
+            }
+            PositionIterator operator++() noexcept {
+                return {mIndex++, mParent};
+            }
+            bool operator==(PositionIterator rhs) const noexcept {
+                return mParent == rhs.mParent and mIndex == rhs.mIndex;
+            }
+            bool operator!=(PositionIterator rhs) const noexcept {
+                return mParent != rhs.mParent or mIndex != rhs.mIndex;
+            }
+        };
+        PositionIterator begin() noexcept {
+            //Start at 1 to skip the null entity
+            return {1, this};
+        }
+        PositionIterator end() noexcept {
+            return {mSize, this};
         }
     };
 }

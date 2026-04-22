@@ -16,12 +16,6 @@ namespace mars {
         if(bits & componentToBit(c)) return;
         bits |= componentToBit(c);
         switch(c) {
-        case Component::physics:
-            implyComponents(Component::transform, bits); 
-            break;
-        case Component::draw:
-            implyComponents(Component::transform, bits);
-            break;
         case Component::dynamics:
             implyComponents(Component::physics, bits); 
             implyComponents(Component::collide, bits);

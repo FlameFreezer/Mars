@@ -59,10 +59,4 @@ namespace mars {
     Signature ComponentManager::getSignature(ID id) const noexcept {
         return mSignatures[id];
     }
-
-    Position ComponentManager::position(Entity e) noexcept {
-        return {
-            transform(e).position, collide(e).position
-        };
-    }
 }

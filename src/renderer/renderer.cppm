@@ -40,6 +40,7 @@ namespace mars {
     #define TRY_VK(proc, msg) do{\
         if((proc) != VK_SUCCESS) return {ErrorTag::fatalError, (msg)};\
     } while(false)
+
     constexpr std::array<const char*, 3> neededDeviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
@@ -168,6 +169,13 @@ namespace mars {
             16, 17, 18, 16, 18, 19, //TOP FACE
             20, 21, 22, 20, 22, 23 //BOTTOM FACE
         };
+    };
+
+    export struct RendererEntities {
+        const glm::mat4* modelMatrices;
+        const ID* meshIDs;
+        const ID* textureIDs;
+        u64 size;
     };
 
     export class Renderer {
@@ -396,7 +404,7 @@ namespace mars {
             PickQueueFamilyIndexResult queueFamilyInfo;
             SurfaceInfo surfaceInfo;
         };
-        Error<noreturn> drawFrame(float fov, float aspect, float pixelsPerMeter, const ComponentSystem<Transform>& sysTransform, const ComponentSystem<Draw>& sysDraw) noexcept {
+        Error<noreturn> drawFrame(float fov, float aspect, RendererEntities entities) noexcept {
             //Fix the cube - only if any of the viewport details changed
             if(fov != cube.fov or aspect != cube.aspect) {
                 float halfd = glm::tan(fov / 2.0f);
@@ -445,7 +453,7 @@ namespace mars {
                 depthImage3D.destroy(device);
                 TRY(createDepthImages());
                 flags &= ~rendererFlags::recreateSwapchain;
-                return drawFrame(fov, aspect, pixelsPerMeter, sysTransform, sysDraw);
+                return drawFrame(fov, aspect, entities);
             }
             //Fatal error has occurred
             else if(res != VK_SUCCESS) {
@@ -490,7 +498,7 @@ namespace mars {
 
             vkCmdPipelineBarrier2(commandBuffer2D, &colorWriteDependency2D);
 
-            renderPass2D(cube.dim, pixelsPerMeter, commandBuffer2D, sysTransform, sysDraw);
+            renderPass2D(cube.dim, commandBuffer2D, entities);
 
             //Submit to create 2D scene
             TRY_VK(vkEndCommandBuffer(commandBuffer2D), std::format("Failed to end command buffer {}", currentFrame));
@@ -1070,7 +1078,7 @@ namespace mars {
             vkCmdEndRendering(commandBuffer);
         }
 
-        void renderPass2D(u32 d, float pixelsPerMeter, VkCommandBuffer commandBuffer, const ComponentSystem<Transform>& sysTransform, const ComponentSystem<Draw>& sysDraw) noexcept {
+        void renderPass2D(u32 d, VkCommandBuffer commandBuffer, RendererEntities entities) noexcept {
             //Render to the 2D render target, resolve to the 2D scene texture image
             //The texture image will be used as the texture for the cube
             const VkRenderingAttachmentInfo renderAttachment = {
@@ -1166,11 +1174,11 @@ namespace mars {
             }
 
             //Iterate through every drawable entity
-            for(auto [d, entityID] : sysDraw) {
+            for(u64 i = 0; i < entities.size; i++) {
                 //Push the descriptor for the texture
                 const VkDescriptorImageInfo materialInfo = {
                     .sampler = sampler,
-                    .imageView = (*entityManager.sysTexture)[d.textureID].view,
+                    .imageView = (*entityManager.sysTexture)[entities.textureIDs[i]].view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                 };
                 const VkWriteDescriptorSet writeMaterial = {
@@ -1194,22 +1202,31 @@ namespace mars {
                     &writeMaterial
                 );
 
-                //Get the current entity's transform
-                //Since draw implies transform, this is safe to do
-                const Transform& t = sysTransform[entityID];
-                //Create model matrix
-                glm::mat4 modelMatrix(1.0f);
-                modelMatrix[0][0] = t.scale.x * pixelsPerMeter;
-                modelMatrix[1][1] = t.scale.y * pixelsPerMeter;
-                modelMatrix[3] = glm::vec4(t.position * pixelsPerMeter, t.zLayer, 1.0f);
                 //Push the model matrix to the shader
-                vkCmdPushConstants(commandBuffer, pipelineLayout2D, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrix);
+                vkCmdPushConstants(
+                    commandBuffer, 
+                    pipelineLayout2D, 
+                    VK_SHADER_STAGE_VERTEX_BIT, 
+                    0, 
+                    sizeof(glm::mat4), 
+                    &entities.modelMatrices[i]);
 
                 //Get the index for the current mesh within the array of vertex buffers
-                const u64 meshIndex = entityManager.sysMesh->index(d.meshID);
+                const u64 meshIndex = entityManager.sysMesh->index(entities.meshIDs[i]);
+                const u64 meshID = entities.meshIDs[i];
                 //Bind the index buffer at the end of the current mesh
-                vkCmdBindIndexBuffer(commandBuffer, entityManager.sysMesh->handles()[meshIndex], entityManager.sysMesh->getIndexOffset(d.meshID), VK_INDEX_TYPE_UINT32);
-                vkCmdDrawIndexed(commandBuffer, entityManager.sysMesh->getNumIndices(d.meshID), 1, 0, meshIndex, 0);
+                vkCmdBindIndexBuffer(
+                    commandBuffer, 
+                    entityManager.sysMesh->handles()[meshIndex], 
+                    entityManager.sysMesh->getIndexOffset(meshID), 
+                    VK_INDEX_TYPE_UINT32);
+                vkCmdDrawIndexed(
+                    commandBuffer, 
+                    entityManager.sysMesh->getNumIndices(meshID), 
+                    1, 
+                    0, 
+                    meshIndex, 
+                    0);
             }
 
             vkCmdEndRendering(commandBuffer);
@@ -2182,12 +2199,13 @@ namespace mars {
             }
         }
 
-        Error<noreturn> draw(Camera camera, float pixelsPerMeter, const ComponentSystem<Transform>& sysTransform, const ComponentSystem<Draw>& sysDraw) noexcept {
+
+        Error<noreturn> draw(Camera camera, RendererEntities entities) noexcept {
             if(camera.aspect == Camera::autoAspect) {
                 camera.aspect = static_cast<float>(swapchainImageExtent.width) / swapchainImageExtent.height;
             }
             cameraMatrices.mappedMemory[1 + currentFrame] = camera.loadMatrices();
-            return drawFrame(camera.fov, camera.aspect, pixelsPerMeter, sysTransform, sysDraw);
+            return drawFrame(camera.fov, camera.aspect, entities);
         }
 
         Error<ID> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept {
