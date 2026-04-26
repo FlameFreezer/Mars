@@ -11,6 +11,7 @@ export import room;
 export import time;
 export import timer;
 export import input;
+export import json;
 
 namespace mars {
     export Error<noreturn> init() noexcept;

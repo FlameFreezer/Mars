@@ -13,6 +13,7 @@ module;
 #include "mars_macros.h"
 
 module input;
+import heap_array;
 
 std::unordered_map<std::string, SDL_Scancode> initScancodeMap() noexcept {
     std::unordered_map<std::string, SDL_Scancode> map;
@@ -75,123 +76,50 @@ namespace mars {
         Mapping mapping;
     };
 
-    Error<InputMapping> readInputMapping(std::istringstream& block, char* buff, u16 buffSize) noexcept {
-        static const std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
-        static const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
-        static const std::unordered_map<std::string, SDL_GamepadAxis> strToAxis = initAxisMap();
-        InputMapping inputMapping;
-        while(!block.eof()) {
-            //Ignore up to the first parenthesis of the property
-            block.ignore(std::numeric_limits<std::streamsize>::max(), '\"');  
-            if(block.eof()) break;
-            //Read in the whole property name into the buffer
-            block.getline(buff, buffSize, '\"');
-            if(strcmp(buff, "tag") == 0) {
-                //Ignore until the name of the tag
-                block.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-                //Read in the tag name
-                block.getline(buff, buffSize, '\"');
-                inputMapping.tag = std::string(buff, block.gcount() - 1);
-            }
-            else if(strcmp(buff, "scancodes") == 0) {
-                //Ignore until the start of the array
-                block.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-                //Read in the whole array
-                block.getline(buff, buffSize, ']');
-                //Put the array into a string stream
-                std::istringstream array(std::string(buff, block.gcount() - 1));
-                while(true) {
-                    //Ignore until the start of the next scancode name
-                    array.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-                    //If there isn't another scancode name, this safely quits
-                    if(array.eof()) break;
-                    //Read in the name, discarding the close quote
-                    array.getline(buff, buffSize, '\"');
-                    const std::string codename(buff, array.gcount() - 1);
-                    if(!strToScancode.contains(codename)) {
-                        return fatal<InputMapping>(std::format("Invalid scancode name \"{}\"", codename));
-                    }
-                    SDL_Scancode scancode = strToScancode.at(codename);
-                    inputMapping.mapping.scancodes[inputMapping.mapping.numScancodes++] = scancode;
-                    if(inputMapping.mapping.numScancodes == maxScancodes) break;
-                }
-            }
-            else if(strcmp(buff, "buttons") == 0) {
-                block.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-                //Read in the whole array
-                block.getline(buff, buffSize, ']');
-                std::istringstream array(std::string(buff, block.gcount() - 1));
-                while(true) {
-                    //Ignore until the next button name
-                    array.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-                    //If there isn't another button name, this safely quits
-                    if(array.eof()) break;
-                    //Read in the name, discarding the close quote
-                    array.getline(buff, buffSize, '\"');
-                    const std::string buttonname(buff, array.gcount() - 1);
-                    if(!strToGamepadButton.contains(buttonname)) {
-                        return fatal<InputMapping>(std::format("Invalid gamepad button name \"{}\"", buttonname));
-                    }
-                    SDL_GamepadButton button = strToGamepadButton.at(buttonname);
-                    inputMapping.mapping.gamepadButtons[inputMapping.mapping.numGamepadButtons++] = button;
-                    if(inputMapping.mapping.numGamepadButtons == maxGamepadButtons) break;
-                }
-            }
-            else if(strcmp(buff, "sticks") == 0) {
-                block.ignore(std::numeric_limits<std::streamsize>::max(), '{');
-                block.getline(buff, buffSize, '}');
-                std::istringstream sticks(std::string(buff, block.gcount() - 1));
-                while(true) {
-                    sticks.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-                    if(sticks.eof()) break;
-                    sticks.getline(buff, buffSize, '\"');
-                    const std::string axisname(buff, sticks.gcount() - 1);
-                    if(!strToAxis.contains(axisname)) {
-                        return fatal<InputMapping>(std::format("Invalid axis name \"{}\"", axisname));
-                    }
-                    SDL_GamepadAxis axis = strToAxis.at(axisname);
-                    inputMapping.mapping.axes[inputMapping.mapping.numAxes] = axis;
-                    sticks.ignore(3);
-                    float value;
-                    sticks >> value;
-                    inputMapping.mapping.axisValues[inputMapping.mapping.numAxes++] = value;
-                    if(inputMapping.mapping.numAxes == maxAxes) break;
-                }
-            }
-        }
-        return inputMapping;
-    }
-
     Error<noreturn> Input::loadMappings(const std::string& path) noexcept {
-        std::ifstream input(path);
+        static std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
+        static std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
+        static std::unordered_map<std::string, SDL_GamepadAxis> strToAxis = initAxisMap();
+        std::ifstream input(path, std::ios::ate);
         if(!input.is_open()) {
             return fatal(std::format("Couldn't find an input mappings file at \"{}\"", path));
         }
-        const u16 buffSize = 1024;
-        char buff[buffSize];
-        char c;
-        input >> c;
-        if(c != '[') {
-            return fatal(std::format("Expected \'[\' at start of input mappings file, got \'{}\'", c));
-        }
-        bool end = false;
-        while(!end) {
-            input >> c;
-            if(input.eof()) break;
-            switch(c) {
-            case ']':
-                end = true;
-                break;
-            case '{':
-                //Read in whole block
-                input.getline(buff, buffSize, '}');
-                std::istringstream block(std::string(buff, input.gcount() - 1));
-                TRY_INIT(InputMapping, inputMapping, readInputMapping(block, buff, buffSize), noreturn); 
-                mMappings[inputMapping.tag] = inputMapping.mapping;
-                break;
-            }
-        }
+        const size_t bufflen = input.tellg();
+        char* buff = new char[bufflen];
+        input.seekg(0, std::ios::beg);
+        input.read(buff, bufflen);
         input.close();
+        JSON::Value mappings = JSON::parse(std::string(buff, bufflen));
+        if(mappings.getTag() != JSON::ValueTag::jarray) {
+            return fatal("Input mappings file should start with an array");
+        }
+        for(JSON::Value* jmapping : mappings.getData().array) {
+            Mapping resultMapping;
+            JSON::Object& mapping = jmapping->getData().object;
+            if(mapping.contains("scancodes")) {
+                for(JSON::Value* scancodeName : mapping["scancodes"]->getData().array) {
+                    resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode[scancodeName->getData().str];
+                }
+            }
+            if(mapping.contains("buttons")) {
+                for(JSON::Value* buttonName : mapping["buttons"]->getData().array) {
+                    resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton[buttonName->getData().str];
+                }
+            }
+            if(mapping.contains("sticks")) {
+                for(auto [stickName, stickValue] : mapping["sticks"]->getData().object) {
+                    resultMapping.axes[resultMapping.numAxes] = strToAxis[stickName];
+                    if(stickValue->getTag() == JSON::ValueTag::jint)  {
+                        resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().integer;
+                    }
+                    else if(stickValue->getTag() == JSON::ValueTag::jfloat) {
+                        resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().floating;
+                    }
+                    resultMapping.numAxes++;
+                }
+            }
+            mMappings[mapping["tag"]->getData().str] = resultMapping;
+        }
         return success();
     }
 

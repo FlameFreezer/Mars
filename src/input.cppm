@@ -9,6 +9,7 @@ export module input;
 import heap_array;
 import error;
 import types;
+import json;
 
 namespace mars {
 
