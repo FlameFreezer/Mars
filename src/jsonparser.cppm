@@ -1,5 +1,6 @@
 module;
 
+#include <cstring>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -17,8 +18,7 @@ export namespace JSON {
         jnull,
         jtrue,
         jfalse,
-        jint,
-        jfloat,
+        jnumber,
         jstring,
         jarray,
         jobject
@@ -26,15 +26,13 @@ export namespace JSON {
 
     union ValueUnion {
         bool boolean;
-        int integer;
-        double floating;
+        double number;
         std::string str;
         Array array;
         Object object;
         ValueUnion() : boolean(false) {}
         ValueUnion(bool b) : boolean(b) {}
-        ValueUnion(int i) : integer(i) {}
-        ValueUnion(double f) : floating(f) {}
+        ValueUnion(double f) : number(f) {}
         ValueUnion(std::string&& str) : str(std::forward<std::string>(str)) {}
         ValueUnion(Array&& a) : array(std::forward<Array>(a)) {}
         ValueUnion(Object&& o) : object(std::forward<Object>(o)) {}
@@ -50,23 +48,38 @@ export namespace JSON {
             if(b) mTag = ValueTag::jtrue;
             else mTag = ValueTag::jfalse;
         }
-        explicit Value(int i) noexcept : mTag(ValueTag::jint), mData(i) {}
-        explicit Value(double f) noexcept : mTag(ValueTag::jfloat), mData(f) {}
+        explicit Value(int i) noexcept : mTag(ValueTag::jnumber), mData(static_cast<double>(i)) {}
+        explicit Value(double f) noexcept : mTag(ValueTag::jnumber), mData(f) {}
         explicit Value(std::string&& str) noexcept : mTag(ValueTag::jstring), mData(std::forward<std::string>(str)) {}
         explicit Value(Array&& a) noexcept : mTag(ValueTag::jarray), mData(std::forward<Array>(a)) {}
         explicit Value(Object&& o) noexcept : mTag(ValueTag::jobject), mData(std::forward<Object>(o)) {}
         Value(Value&& other) noexcept : mTag(other.mTag) {
+            std::memset(reinterpret_cast<void*>(&mData), 0, sizeof(ValueUnion));
             switch(mTag) {
                 case ValueTag::jnull: break;
                 case ValueTag::jfalse: mData.boolean = false; break;
                 case ValueTag::jtrue: mData.boolean = true; break;
-                case ValueTag::jint: mData.integer = other.mData.integer; break;
-                case ValueTag::jfloat: mData.floating = other.mData.floating; break;
+                case ValueTag::jnumber: mData.number = other.mData.number; break;
                 case ValueTag::jstring: mData.str = std::move(other.mData.str); break;
                 case ValueTag::jarray: mData.array = std::move(other.mData.array); break;
                 case ValueTag::jobject: mData.object = std::move(other.mData.object); break;
             }
             other.mTag = ValueTag::jnull;
+        }
+        Value& operator=(Value&& rhs) noexcept {
+            std::memset(reinterpret_cast<void*>(&mData), 0, sizeof(ValueUnion));
+            mTag = rhs.mTag;
+            switch(mTag) {
+                case ValueTag::jnull: break;
+                case ValueTag::jfalse: mData.boolean = false; break;
+                case ValueTag::jtrue: mData.boolean = true; break;
+                case ValueTag::jnumber: mData.number = rhs.mData.number; break;
+                case ValueTag::jstring: mData.str = std::move(rhs.mData.str); break;
+                case ValueTag::jarray: mData.array = std::move(rhs.mData.array); break;
+                case ValueTag::jobject: mData.object = std::move(rhs.mData.object); break;
+            }
+            rhs.mTag = ValueTag::jnull;
+            return *this;
         }
         ~Value() noexcept {
             switch(mTag) {

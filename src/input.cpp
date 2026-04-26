@@ -84,12 +84,11 @@ namespace mars {
         if(!input.is_open()) {
             return fatal(std::format("Couldn't find an input mappings file at \"{}\"", path));
         }
-        const size_t bufflen = input.tellg();
-        char* buff = new char[bufflen];
+        HeapArray<char> buff(input.tellg());
         input.seekg(0, std::ios::beg);
-        input.read(buff, bufflen);
+        input.read(buff.data(), buff.size());
         input.close();
-        JSON::Value mappings = JSON::parse(std::string(buff, bufflen));
+        JSON::Value mappings = JSON::parse(std::string(buff.data(), buff.size()));
         if(mappings.getTag() != JSON::ValueTag::jarray) {
             return fatal("Input mappings file should start with an array");
         }
@@ -109,12 +108,7 @@ namespace mars {
             if(mapping.contains("sticks")) {
                 for(auto [stickName, stickValue] : mapping["sticks"]->getData().object) {
                     resultMapping.axes[resultMapping.numAxes] = strToAxis[stickName];
-                    if(stickValue->getTag() == JSON::ValueTag::jint)  {
-                        resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().integer;
-                    }
-                    else if(stickValue->getTag() == JSON::ValueTag::jfloat) {
-                        resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().floating;
-                    }
+                    resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().number;
                     resultMapping.numAxes++;
                 }
             }

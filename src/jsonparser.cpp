@@ -216,9 +216,6 @@ namespace JSON {
         }
         EndParseNumber:
         parseWhitespace(txt);
-        if(part == 0) {
-            return Value{sign * whole};
-        }
         return Value{sign * (whole + static_cast<double>(part) / partPlace)};
     }
 
@@ -241,11 +238,8 @@ namespace JSON {
         case ValueTag::jtrue:
             str << "true";
             break;
-        case ValueTag::jint:
-            str << std::to_string(v.getData().integer);
-            break;
-        case ValueTag::jfloat:
-            str << std::to_string(v.getData().floating);
+        case ValueTag::jnumber:
+            str << std::to_string(v.getData().number);
             break;
         case ValueTag::jstring:
             str << "\"" << v.getData().str << "\"";
