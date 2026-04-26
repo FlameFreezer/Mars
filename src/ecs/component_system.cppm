@@ -198,6 +198,14 @@ namespace mars {
             return {mSize, *this};
         }
     };
+    export struct DrawProxy {
+        glm::vec2& position;
+        glm::vec2& scale;
+        float& angle;
+        float& zLayer;
+        ID& meshID;
+        ID& textureID;
+    };
     export template<>
     class ComponentSystem<Draw> : public ComponentSystemParent {
         glm::vec2 mPositions[maxEntities];
@@ -207,6 +215,16 @@ namespace mars {
         ID mMeshIDs[maxEntities];
         ID mTextureIDs[maxEntities];
         public:
+        DrawProxy operator[](ID id) noexcept {
+            return {
+                mPositions[index(id)],
+                mScales[index(id)],
+                mAngles[index(id)],
+                mZLayers[index(id)],
+                mMeshIDs[index(id)],
+                mTextureIDs[index(id)]
+            };
+        }
         glm::vec2& position(ID id) noexcept {
             return mPositions[index(id)];
         }

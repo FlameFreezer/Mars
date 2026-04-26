@@ -43,6 +43,9 @@ namespace mars {
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mSystems[std::to_underlying(c)]);
         }
         Position position(Entity e) noexcept;
+        DrawProxy draw(ID id) noexcept {
+            return system<Component::draw>()[id];
+        }
         DEFINE_COMPONENT_GETTER(physics)
         DEFINE_COMPONENT_GETTER(collide)
         DEFINE_COMPONENT_GETTER(dynamics)
