@@ -72,10 +72,10 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
         std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
         mTag = other.mTag;
         if(other.okay()) {
-            mData = std::move(other.mData);
+            mData = std::forward<T>(other.mData);
         }
         else {
-            mMessage = std::move(other.mMessage);
+            mMessage = std::forward<std::string>(other.mMessage);
         }
         other.reset();
     }

@@ -2,7 +2,6 @@ module;
 
 #include <cctype>
 #include <cstring>
-#include <exception>
 #include <sstream>
 #include <set>
 
@@ -11,36 +10,115 @@ module json;
 namespace JSON {
     static const std::set<char> whitespace = {' ', '\n', 13, '\t'};
 
-    void deletePtr(Value* ptr) {
-        delete[] ptr;
+    Value::Value(bool b) noexcept : mData(b) {
+        if(b) mTag = ValueTag::jtrue;
+        else mTag = ValueTag::jfalse;
+    }
+    Value::Value(int i) noexcept : mTag(ValueTag::jnumber), mData(static_cast<double>(i)) {}
+    Value::Value(double f) noexcept : mTag(ValueTag::jnumber), mData(f) {}
+    Value::Value(std::string&& str) noexcept : mTag(ValueTag::jstring), mData(std::forward<std::string>(str)) {}
+    Value::Value(Array&& a) noexcept : mTag(ValueTag::jarray), mData(std::forward<Array>(a)) {}
+    Value::Value(Object&& o) noexcept : mTag(ValueTag::jobject), mData(std::forward<Object>(o)) {}
+    Value::Value(Value&& other) noexcept : mTag(other.mTag) {
+        switch(mTag) {
+            case ValueTag::jnull: break;
+            case ValueTag::jfalse: mData.boolean = false; break;
+            case ValueTag::jtrue: mData.boolean = true; break;
+            case ValueTag::jnumber: mData.number = other.mData.number; break;
+            case ValueTag::jstring: 
+                mData.string = other.mData.string; 
+                other.mData.string = nullptr;
+                break;
+            case ValueTag::jarray: 
+                mData.array = other.mData.array; 
+                other.mData.array = nullptr;
+                break;
+            case ValueTag::jobject: 
+                mData.object = other.mData.object; 
+                other.mData.object = nullptr;
+                break;
+        }
+        other.mTag = ValueTag::jnull;
+    }
+    Value& Value::operator=(Value&& rhs) noexcept {
+        this->~Value();
+        switch(rhs.mTag) {
+            case ValueTag::jnull: break;
+            case ValueTag::jfalse: mData.boolean = false; break;
+            case ValueTag::jtrue: mData.boolean = true; break;
+            case ValueTag::jnumber: mData.number = rhs.mData.number; break;
+            case ValueTag::jstring: 
+                mData.string = rhs.mData.string; 
+                rhs.mData.string = nullptr;
+                break;
+            case ValueTag::jarray: 
+                mData.array = rhs.mData.array; 
+                rhs.mData.array = nullptr;
+                break;
+            case ValueTag::jobject: 
+                mData.object = rhs.mData.object; 
+                rhs.mData.object = nullptr;
+                break;
+        }
+        mTag = rhs.mTag;
+        rhs.mTag = ValueTag::jnull;
+        return *this;
+    }
+    Value::~Value() noexcept {
+        switch(mTag) {
+            case ValueTag::jstring: 
+                delete mData.string;
+                break;
+            case ValueTag::jobject: 
+                for(auto [key, v] : *mData.object) delete v;
+                delete mData.object;
+                break;
+            case ValueTag::jarray: 
+                for(Value* v : *mData.array) delete v;
+                delete mData.array;
+                break;
+            default: break;
+        }
+    }
+    ValueTag Value::getTag() const noexcept {
+        return mTag;
+    }
+    ValueUnion& Value::getData() noexcept {
+        return mData;
+    }
+    const ValueUnion& Value::getData() const noexcept {
+        return mData;
     }
 
-    Value parse(std::istringstream& txt);
+    Error<Value> parse(std::istringstream& txt) noexcept;
 
-    Value parse(const std::string& text) {
+    Error<Value> parse(const std::string& text) noexcept {
         std::istringstream jsontxt(text);
         return parse(jsontxt);
     }
 
-    Value parseObject(std::istringstream& txt);
-    Value parseArray(std::istringstream& txt);
-    std::string parseString(std::istringstream& txt);
-    void parseWhitespace(std::istringstream& txt);
-    Value parseNumber(std::istringstream& txt);
-    Value parseNull(std::istringstream& txt);
-    Value parseTrue(std::istringstream& txt);
-    Value parseFalse(std::istringstream& txt);
+    Error<Value> parseObject(std::istringstream& txt) noexcept;
+    Error<Value> parseArray(std::istringstream& txt) noexcept;
+    Error<std::string> parseString(std::istringstream& txt) noexcept;
+    void parseWhitespace(std::istringstream& txt) noexcept;
+    Value parseNumber(std::istringstream& txt) noexcept;
+    Error<Value> parseNull(std::istringstream& txt) noexcept;
+    Error<Value> parseTrue(std::istringstream& txt) noexcept;
+    Error<Value> parseFalse(std::istringstream& txt) noexcept;
 
-    Value parse(std::istringstream& txt) {
+    Error<Value> parse(std::istringstream& txt) noexcept {
         char c = txt.peek();
-        if(txt.eof()) throw std::exception();
+        if(txt.eof()) return fatal<Value>("Tried to parse at EOF!");
         switch(c) {
         case '{':
             return parseObject(txt);
         case '[':
             return parseArray(txt);
-        case '\"':
-            return Value{parseString(txt)};
+        case '\"': {
+            Error<std::string> str = parseString(txt);
+            if(!str) return str.moveError<Value>();
+            return Value{str.moveData()};
+        }
         case 'n':
             return parseNull(txt);
         case 't':
@@ -59,42 +137,42 @@ namespace JSON {
             }
         }
     }
-    Value parseNull(std::istringstream& txt) {
+    Error<Value> parseNull(std::istringstream& txt) noexcept {
         static const char* nullstr = "null";
         static const std::size_t len = strlen(nullstr);
         char buff[len];
         txt.read(buff, len);
-        if(txt.gcount() < len) throw std::exception();
-        if(strcmp(buff, nullstr) != 0) throw std::exception();
+        if(txt.gcount() < len) return fatal<Value>("Failed to parse null");
+        if(strcmp(buff, nullstr) != 0) return fatal<Value>(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff, len)));
         return Value(); 
     }
-    Value parseTrue(std::istringstream& txt) {
+    Error<Value> parseTrue(std::istringstream& txt) noexcept {
         static const char* truestr = "true";
         static const std::size_t len = strlen(truestr);
         char buff[len];
         txt.read(buff, len);
-        if(txt.gcount() < len) throw std::exception();
-        if(strcmp(buff, truestr) != 0) throw std::exception();
+        if(txt.gcount() < len) return fatal<Value>("Failed to parse true");
+        if(strcmp(buff, truestr) != 0) return fatal<Value>(std::format("Failed to parse true: \"{}\" is not true", std::string_view(buff, len)));
         return Value(true); 
     }
-    Value parseFalse(std::istringstream& txt) {
+    Error<Value> parseFalse(std::istringstream& txt) noexcept {
         static const char* falsestr = "false";
         static const std::size_t len = strlen(falsestr);
         char buff[len];
         txt.read(buff, len);
-        if(txt.gcount() < len) throw std::exception();
-        if(strcmp(buff, falsestr) != 0) throw std::exception();
+        if(txt.gcount() < len) return fatal<Value>("Failed to parse false");
+        if(strcmp(buff, falsestr) != 0) return fatal<Value>(std::format("Failed to parse false: \"{}\" is not false", std::string_view(buff, len)));
         return Value(false); 
     }
 
-    void parseWhitespace(std::istringstream& txt) {
+    void parseWhitespace(std::istringstream& txt) noexcept {
         while(true) {
             char c = txt.peek();
             if(txt.eof() or !whitespace.contains(c)) break;
             else txt.ignore();
         }
     }
-    Value parseObject(std::istringstream& txt) {
+    Error<Value> parseObject(std::istringstream& txt) noexcept {
         //We know first character is '{'
         txt.ignore();
         parseWhitespace(txt);
@@ -102,9 +180,9 @@ namespace JSON {
         //Go until reaching the closing bracket
         while(true) {
             char c = txt.peek();
-            if(txt.eof()) throw std::exception();
+            if(txt.eof()) return fatal<Value>("Failed to parse object: reached EOF");
             switch(c) {
-            default: throw std::exception();
+            default: return fatal<Value>(std::format("Failed to parse object: found unexpected character \'{}\'", c));
             //End of object
             case '}':
                 txt.ignore();
@@ -118,25 +196,27 @@ namespace JSON {
             case '\"':
                 std::string fieldName = parseString(txt);
                 //Objects cannot have duplicate field names
-                if(obj.contains(fieldName)) throw std::exception();
+                if(obj.contains(fieldName)) return fatal<Value>(std::format("Failed to parse object: had duplicate field name \"{}\"", fieldName));
                 //Skip until reaching the colon
                 parseWhitespace(txt);
-                if(txt.peek() != ':') throw std::exception();
+                if(txt.peek() != ':') return fatal<Value>(std::format("Failed to parse object: expected \':\', got \'{}\'", txt.peek()));
                 //Next character is a colon
                 txt.ignore();
-                obj[fieldName] = new Value(parse(txt));
+                auto object = parse(txt);
+                if(object) obj[fieldName] = new Value(object.moveData());
+                else return object;
                 break;
             }
         }
     }
-    Value parseArray(std::istringstream& txt) {
+    Error<Value> parseArray(std::istringstream& txt) noexcept {
         //We know first character is '['
         txt.ignore();
         parseWhitespace(txt);
         Array arr;
         while(true) {
             char c = txt.peek();
-            if(txt.eof()) throw std::exception();
+            if(txt.eof()) return fatal<Value>("Failed to parse array: reached EOF");
             //End of array
             switch(c) {
             case ']':
@@ -147,21 +227,24 @@ namespace JSON {
             case ',':
                 txt.ignore(); //fallthrough is intended
             default:
-                arr.push_back(new Value(parse(txt)));
+                auto value = parse(txt);
+                if(value) arr.push_back(new Value(value.moveData()));
+                else return value;
+                break;
             }
         }
     }
-    std::string parseString(std::istringstream& txt) {
+    Error<std::string> parseString(std::istringstream& txt) noexcept {
         //We know first character is '\"'
         txt.ignore();
         std::string str;
         while(true) {
             char c = txt.get();
-            if(txt.eof()) return str;
+            if(txt.eof()) return fatal<std::string>("Failed to parse string: reached EOF");
             switch(c) {
             //Close quote
             case '\"':
-            parseWhitespace(txt);
+                parseWhitespace(txt);
                 return str;
             //Escape sequence
             case '\\':
@@ -183,7 +266,7 @@ namespace JSON {
             }
         }
     }
-    Value parseNumber(std::istringstream& txt) {
+    Value parseNumber(std::istringstream& txt) noexcept {
         int sign = 1, whole = 0, part = 0, partPlace = 1;
         while(true) {
             char c = txt.get();
@@ -219,14 +302,14 @@ namespace JSON {
         return Value{sign * (whole + static_cast<double>(part) / partPlace)};
     }
 
-    void serializeValue(std::ostringstream& str, const Value& v, int indentCount = 1);
+    void serializeValue(std::ostringstream& str, const Value& v, int indentCount = 1) noexcept;
 
-    std::string serialize(const Value& v) {
+    std::string serialize(const Value& v) noexcept {
         std::ostringstream output;
         serializeValue(output, v);
         return output.str();
     }
-    void serializeValue(std::ostringstream& str, const Value& v, int indentCount) {
+    void serializeValue(std::ostringstream& str, const Value& v, int indentCount) noexcept {
         int index = 0;
         switch(v.getTag()) {
         case ValueTag::jnull: 
@@ -242,7 +325,7 @@ namespace JSON {
             str << std::to_string(v.getData().number);
             break;
         case ValueTag::jstring:
-            str << "\"" << v.getData().str << "\"";
+            str << "\"" << v.getData().string << "\"";
             break;
         case ValueTag::jobject:
             str << "\n";
@@ -251,13 +334,13 @@ namespace JSON {
             }
             str << "{\n";
             index = 0;
-            for(const auto [fieldname, value] : v.getData().object) {
+            for(const auto [fieldname, value] : *v.getData().object) {
                 for(int i = 0; i < indentCount; i++) {
                     str << "\t";
                 }
                 str << "\"" << fieldname << "\" : ";
                 serializeValue(str, *value, indentCount + 1);
-                if(index++ < v.getData().object.size()) {
+                if(index++ < v.getData().object->size()) {
                     str << ",";
                 }
                 str << "\n";
@@ -274,12 +357,12 @@ namespace JSON {
             }
             str << "[\n";
             index = 0;
-            for(const Value* value : v.getData().array) {
+            for(const Value* value : *v.getData().array) {
                 for(int i = 0; i < indentCount; i++) {
                     str << "\t";
                 }
                 serializeValue(str, *value, indentCount + 1);
-                if(index++ < v.getData().array.size()) {
+                if(index++ < v.getData().array->size()) {
                     str << ",";
                 }
                 str << "\n";

@@ -5,12 +5,9 @@ module;
 #include <fstream>
 #include <format>
 #include <unordered_map>
-#include <limits>
-#include <sstream>
 
 #include <SDL3/SDL.h>
-
-#include "mars_macros.h"
+#include <mars_macros.h>
 
 module input;
 import heap_array;
@@ -88,31 +85,31 @@ namespace mars {
         input.seekg(0, std::ios::beg);
         input.read(buff.data(), buff.size());
         input.close();
-        JSON::Value mappings = JSON::parse(std::string(buff.data(), buff.size()));
+        TRY_INIT(JSON::Value, mappings, JSON::parse(std::string(buff.data(), buff.size())), noreturn);
         if(mappings.getTag() != JSON::ValueTag::jarray) {
             return fatal("Input mappings file should start with an array");
         }
-        for(JSON::Value* jmapping : mappings.getData().array) {
+        for(JSON::Value* jmapping : *mappings.getData().array) {
             Mapping resultMapping;
-            JSON::Object& mapping = jmapping->getData().object;
+            JSON::Object& mapping = *jmapping->getData().object;
             if(mapping.contains("scancodes")) {
-                for(JSON::Value* scancodeName : mapping["scancodes"]->getData().array) {
-                    resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode[scancodeName->getData().str];
+                for(JSON::Value* scancodeName : *mapping["scancodes"]->getData().array) {
+                    resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode[*scancodeName->getData().string];
                 }
             }
             if(mapping.contains("buttons")) {
-                for(JSON::Value* buttonName : mapping["buttons"]->getData().array) {
-                    resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton[buttonName->getData().str];
+                for(JSON::Value* buttonName : *mapping["buttons"]->getData().array) {
+                    resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton[*buttonName->getData().string];
                 }
             }
             if(mapping.contains("sticks")) {
-                for(auto [stickName, stickValue] : mapping["sticks"]->getData().object) {
+                for(auto [stickName, stickValue] : *mapping["sticks"]->getData().object) {
                     resultMapping.axes[resultMapping.numAxes] = strToAxis[stickName];
                     resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().number;
                     resultMapping.numAxes++;
                 }
             }
-            mMappings[mapping["tag"]->getData().str] = resultMapping;
+            mMappings[*mapping["tag"]->getData().string] = resultMapping;
         }
         return success();
     }
