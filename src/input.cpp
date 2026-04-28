@@ -105,7 +105,7 @@ namespace mars {
             if(mapping.contains("sticks")) {
                 for(auto [stickName, stickValue] : *mapping["sticks"]->getData().object) {
                     resultMapping.axes[resultMapping.numAxes] = strToAxis[stickName];
-                    resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().number;
+                    resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().number.to<float>();
                     resultMapping.numAxes++;
                 }
             }

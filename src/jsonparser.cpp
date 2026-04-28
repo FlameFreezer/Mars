@@ -15,7 +15,7 @@ namespace JSON {
         else mTag = ValueTag::jfalse;
     }
     Value::Value(int i) noexcept : mTag(ValueTag::jnumber), mData(static_cast<double>(i)) {}
-    Value::Value(double f) noexcept : mTag(ValueTag::jnumber), mData(f) {}
+    Value::Value(Number n) noexcept : mTag(ValueTag::jnumber), mData(n) {}
     Value::Value(std::string&& str) noexcept : mTag(ValueTag::jstring), mData(std::forward<std::string>(str)) {}
     Value::Value(Array&& a) noexcept : mTag(ValueTag::jarray), mData(std::forward<Array>(a)) {}
     Value::Value(Object&& o) noexcept : mTag(ValueTag::jobject), mData(std::forward<Object>(o)) {}
@@ -267,39 +267,56 @@ namespace JSON {
         }
     }
     Value parseNumber(std::istringstream& txt) noexcept {
-        int sign = 1, whole = 0, part = 0, partPlace = 1;
+        Number result;
         while(true) {
             char c = txt.get();
             if(txt.eof()) goto EndParseNumber;
             switch(c) {
-                case '-': sign = -1; break;
+                case '-': result.sign = -1; break;
+                case '.': goto EndParseWhole;
                 default:
                     if(!std::isdigit(c)) {
                         txt.putback(c);
                         goto EndParseWhole;
                     }
-                    whole *= 10;
-                    whole += c - '0';
+                    result.whole *= 10;
+                    result.whole += c - '0';
             }
         }
         EndParseWhole:
         while(true) {
             char c = txt.get();
             if(txt.eof()) goto EndParseNumber;
-            if(c == '.') continue;
-            else {
-                if(!std::isdigit(c)) {
-                    txt.putback(c);
-                    goto EndParseNumber;
-                }
-                part *= 10;
-                partPlace *= 10;
-                part += c - '0';
+            switch(c) {
+                case 'E':
+                case 'e': goto EndParsePart;
+                default:
+                    if(!std::isdigit(c)) {
+                        txt.putback(c);
+                        goto EndParsePart;
+                    }
+                    result.part *= 10;
+                    result.part += c - '0';
+            }
+        }
+        EndParsePart:
+        while(true) {
+            char c = txt.get();
+            if(txt.eof()) goto EndParseNumber;
+            switch(c) {
+                case '-': result.exponentSign = -1; break;
+                default:
+                    if(!std::isdigit(c)) {
+                        txt.putback(c);
+                        goto EndParseNumber;
+                    }
+                    result.exponent *= 10;
+                    result.exponent += c - '0';
             }
         }
         EndParseNumber:
         parseWhitespace(txt);
-        return Value{sign * (whole + static_cast<double>(part) / partPlace)};
+        return Value{result};
     }
 
     void serializeValue(std::ostringstream& str, const Value& v, int indentCount = 1) noexcept;
@@ -322,7 +339,14 @@ namespace JSON {
             str << "true";
             break;
         case ValueTag::jnumber:
-            str << std::to_string(v.getData().number);
+            if(v.getData().number.sign == -1) str << '-';
+            str << v.getData().number.whole;
+            if(v.getData().number.part > 0) str << '.' << v.getData().number.part;
+            if(v.getData().number.exponent != 0) {
+                str << 'e';
+                if(v.getData().number.exponentSign == -1) str << '-';
+                str << v.getData().number.exponent;
+            }
             break;
         case ValueTag::jstring:
             str << "\"" << v.getData().string << "\"";
