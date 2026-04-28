@@ -3,6 +3,8 @@ module;
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
+#include "mars_constants.h"
+
 export module component_system;
 import components;
 import entity;

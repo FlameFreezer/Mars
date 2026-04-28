@@ -4,13 +4,14 @@ module;
 
 #include <vulkan/vulkan.h>
 
+#include "mars_constants.h"
+
 export module renderer_ecs;
 import types;
 import component_system;
 
 namespace mars {
     //The Mesh and Texture component systems are internal to the renderer and are managed by their own entity manager
-    export constexpr u64 maxMeshes = 128;
     export struct Mesh {
         VkBuffer handles[maxMeshes];
         VkDeviceMemory memories[maxMeshes];
@@ -19,7 +20,6 @@ namespace mars {
             u32 numIndices = 0;
         } sizes[maxMeshes];
     };
-    export constexpr u64 maxTextures = 256;
     export struct Texture {
         VkImage handle = nullptr;
         VkDeviceMemory memory = nullptr;

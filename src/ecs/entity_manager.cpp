@@ -2,6 +2,8 @@ module;
 
 #include <queue>
 
+#include "mars_constants.h"
+
 module entity_manager;
 
 namespace mars {

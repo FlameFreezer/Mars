@@ -2,6 +2,8 @@ module;
 
 #include <vulkan/vulkan.h>
 
+#include "mars_constants.h"
+
 module renderer_ecs;
 
 namespace mars {

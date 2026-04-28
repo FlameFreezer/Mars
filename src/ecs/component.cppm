@@ -2,6 +2,8 @@ module;
 
 #include <utility>
 
+#include "mars_constants.h"
+
 export module component;
 export import components;
 export import component_system;

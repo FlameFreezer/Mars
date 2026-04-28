@@ -11,10 +11,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 
 # Add libraries to build
-set(SDL_STATIC True)
-set(SDL_SHARED False)
+set(SDL_STATIC False)
+set(SDL_SHARED True)
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
+
+option(MARS_ECS_MAX_ENTITIES "Maximum number of entities which can be stored by the Entity Component System" OFF)
+option(MARS_RENDERER_MAX_MESHES "Maximum number of meshes which can be loaded by the renderer" OFF)
+option(MARS_RENDERER_MAX_TEXTURES "Maximum number of textures which can be loaded by the renderer" OFF)
 
 # Shader Compilation
 set(MARS_SHADER_PATH "${PROJECT_SOURCE_DIR}/shaders")
@@ -69,6 +73,17 @@ target_sources(Mars
     PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv"
 )
 
+if(${MARS_ECS_MAX_ENTITIES})
+    target_compile_definitions(Mars PUBLIC MARS_ECS_MAX_ENTITIES=${MARS_ECS_MAX_ENTITIES})
+endif()
+if(${MARS_RENDERER_MAX_MESHES})
+    target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_MESHES=${MARS_RENDERER_MAX_MESHES})
+endif()
+if(${MARS_RENDERER_MAX_TEXTURES})
+    target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_TEXTURES=${MARS_RENDERER_MAX_TEXTURES})
+endif()
+
+
 # Link libraries to mars
 target_link_libraries(Mars PRIVATE SDL3::SDL3 glm::glm)
 
@@ -78,21 +93,13 @@ else()
     target_link_libraries(Mars PRIVATE vulkan)
 endif()
 
-#if(NOT DEFINED ENV{VULKAN_SDK})
-    #message(FATAL_ERROR "Environment variable \"VULKAN_SDK\" not defined! Set this to the path to the Vulkan SDK installed on your system.")
-#endif()
-
 target_include_directories(Mars PUBLIC 
     "${PROJECT_SOURCE_DIR}/vendored/SDL/include" 
     "${PROJECT_SOURCE_DIR}/vendored/glm"
     "${PROJECT_SOURCE_DIR}/thirdparty/stb"
     "${PROJECT_SOURCE_DIR}/thirdparty/vulkan"
-    #"$ENV{VULKAN_SDK}/include" 
     "${PROJECT_SOURCE_DIR}/include"
 )
-#target_link_directories(Mars INTERFACE
-#    "$ENV{VULKAN_SDK}/lib"
-#)
 
 # Build for Debug Symbols
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")

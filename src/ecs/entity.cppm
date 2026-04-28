@@ -8,7 +8,6 @@ import components;
 import types;
 
 namespace mars {
-    export constexpr u64 maxEntities = 512;
 
     export using SignatureT = u32;
     //Null Signature has every component such that storage in component systems is always reserved
