@@ -297,6 +297,7 @@ namespace JSON {
                     }
                     result.part *= 10;
                     result.part += c - '0';
+                    result.partPlace *= 10;
             }
         }
         EndParsePart:

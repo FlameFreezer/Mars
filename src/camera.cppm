@@ -1,13 +1,9 @@
 module;
 
+#include "glm/geometric.hpp"
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-
-#define SENSITIVITY 0.001f
-#define MAX_Y 0.90f
-#define NEAR_PLANE 0.1f
-#define FAR_PLANE 100.0f
 
 export module camera;
 import error;
@@ -20,27 +16,25 @@ namespace mars {
         glm::vec3 up;
         float fov = 0.0f;
         float aspect = autoAspect;
-        Camera() = default;
-        Camera(const glm::vec3& inPos, const glm::vec3& inDir, glm::vec3 inUp, float inFov, float inAspect) noexcept 
-            : pos(inPos), dir(glm::normalize(inDir)), up(glm::normalize(inUp)), fov(inFov), aspect(inAspect) {
-                if(dir.y < -MAX_Y) dir.y = -MAX_Y;
-                else if(dir.y > MAX_Y) dir.y = MAX_Y;
-            }
+        float maxY;
+        float nearPlane;
+        float farPlane;
+        float sensitivity;
         glm::mat4 loadMatrices() const noexcept {
             //dir + pos = target (position the camera is looking at)
             const glm::mat4 view = glm::lookAt(pos, dir + pos, up);
-            glm::mat4 proj = glm::perspective(fov, aspect, NEAR_PLANE, FAR_PLANE);
+            glm::mat4 proj = glm::perspective(fov, aspect, nearPlane, farPlane);
             proj[1][1] *= -1.0f;
             return proj * view;
         }
         void rotate(float deltaX, float deltaY) noexcept {
             glm::vec3 d(dir);
 
-            if(d.y >= MAX_Y and deltaY > 0.0f) deltaY = 0.0f;
-            else if(d.y <= -MAX_Y and deltaY < 0.0f) deltaY = 0.0f;
+            if(d.y >= maxY and deltaY > 0.0f) deltaY = 0.0f;
+            else if(d.y <= -maxY and deltaY < 0.0f) deltaY = 0.0f;
 
-            const float deltaYaw = deltaX * SENSITIVITY;
-            const float deltaPitch = deltaY * SENSITIVITY;
+            const float deltaYaw = deltaX * sensitivity;
+            const float deltaPitch = deltaY * sensitivity;
 
             //This gives the angle of dir with the xz-plane
             float pitch = glm::asin(d.y);
@@ -61,6 +55,71 @@ namespace mars {
             d.y = glm::sin(pitch);
             d.z = glm::cos(yaw) * glm::cos(pitch);
             dir = d;
+        }
+    };
+    export class CameraBuilder {
+        glm::vec3 pos = glm::vec3(0.0f);
+        glm::vec3 dir = glm::vec3(0.0f);
+        glm::vec3 up = glm::vec3(0.0f);
+        float fov = 0.0f;
+        float aspect = 0.0f;
+        float maxY = 0.9f;
+        float nearPlane = 0.1f;
+        float farPlane = 100.0f;
+        float sensitivity = 0.001f;
+        public:
+        CameraBuilder() = default;
+        CameraBuilder& setPos(const glm::vec3& inPos) noexcept {
+            pos = inPos;
+            return *this;
+        }
+        CameraBuilder& setDir(const glm::vec3& inDir) noexcept {
+            dir = inDir;
+            return *this;
+        }
+        CameraBuilder& setUp(const glm::vec3& inUp) noexcept {
+            up = inUp;
+            return *this;
+        }
+        CameraBuilder& setFov(float inFov) noexcept {
+            fov = inFov;
+            return *this;
+        }
+        CameraBuilder& setAspect(float inAspect) noexcept {
+            aspect = inAspect;
+            return *this;
+        }
+        CameraBuilder& setMaxY(float inMaxY) noexcept {
+            maxY = inMaxY;
+            return *this;
+        }
+        CameraBuilder& setNearPlane(float inNearPlane) noexcept {
+            nearPlane = inNearPlane;
+            return *this;
+        }
+        CameraBuilder& setFarPlane(float inFarPlane) noexcept {
+            farPlane = inFarPlane;
+            return *this;
+        }
+        CameraBuilder& setSensitivity(float inSensitivity) noexcept {
+            sensitivity = inSensitivity;
+            return *this;
+        }
+        Camera build() const noexcept {
+            Camera cam =  {
+                .pos = pos,
+                .dir = glm::normalize(dir),
+                .up = glm::normalize(up),
+                .fov = fov,
+                .aspect = aspect,
+                .maxY = maxY,
+                .nearPlane = nearPlane,
+                .farPlane = farPlane,
+                .sensitivity = sensitivity
+            };
+            if(cam.dir.y < -cam.maxY) cam.dir.y = -cam.maxY;
+            else if(cam.dir.y > cam.maxY) cam.dir.y = cam.maxY;
+            return cam;
         }
     };
 }

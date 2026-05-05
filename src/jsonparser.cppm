@@ -28,21 +28,13 @@ export namespace JSON {
     struct Number {
         u64 whole = 0;
         u64 part = 0;
+        u64 partPlace = 1;
         u64 exponent = 0;
         i32 sign = 1;
         i32 exponentSign = 1;
         template<typename T> requires std::is_arithmetic<T>::value
         T to() const noexcept {
-            return (sign * (whole + getPart<T>(part))) * std::pow(10, static_cast<i64>(exponent * exponentSign));
-        }
-        private: 
-        template<typename T> requires std::is_arithmetic<T>::value
-        static T getPart(u64 part) noexcept {
-            u64 place = 10;
-            while(part % place != part) {
-                place *= 10;
-            }
-            return static_cast<T>(part) / place;
+            return (sign * (whole + static_cast<double>(part) / partPlace)) * std::pow(10, static_cast<i64>(exponent * exponentSign));
         }
     };
 
