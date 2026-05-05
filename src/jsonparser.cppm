@@ -70,6 +70,18 @@ export namespace JSON {
         ValueTag getTag() const noexcept;        
         ValueUnion& getData() noexcept;        
         const ValueUnion& getData() const noexcept;    
+        bool getBool() const noexcept;
+        template<typename T> requires std::is_arithmetic<T>::value
+        T getNumberAs() const noexcept {
+            return mData.number.to<T>();
+        }
+        const Number& getNumber() const noexcept;
+        std::string* getString() noexcept;
+        const std::string* getString() const noexcept;
+        Array* getArray() noexcept;
+        const Array* getArray() const noexcept;
+        Object* getObject() noexcept;
+        const Object* getObject() const noexcept;
     };
 
     Error<Value> parse(const std::string& text) noexcept;

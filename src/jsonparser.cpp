@@ -89,6 +89,30 @@ namespace JSON {
     const ValueUnion& Value::getData() const noexcept {
         return mData;
     }
+    bool Value::getBool() const noexcept {
+        return mData.boolean;
+    }
+    const Number& Value::getNumber() const noexcept {
+        return mData.number;
+    }
+    std::string* Value::getString() noexcept {
+        return mData.string;
+    }
+    const std::string* Value::getString() const noexcept {
+        return mData.string;
+    }
+    Array* Value::getArray() noexcept {
+        return mData.array;
+    }
+    const Array* Value::getArray() const noexcept {
+        return mData.array;
+    }
+    Object* Value::getObject() noexcept {
+        return mData.object;
+    }
+    const Object* Value::getObject() const noexcept {
+        return mData.object;
+    }
 
     Error<Value> parse(std::istringstream& txt) noexcept;
 
@@ -342,7 +366,15 @@ namespace JSON {
         case ValueTag::jnumber:
             if(v.getData().number.sign == -1) str << '-';
             str << v.getData().number.whole;
-            if(v.getData().number.part > 0) str << '.' << v.getData().number.part;
+            if(v.getData().number.part > 0) {
+                u64 place = v.getData().number.partPlace;
+                u64 part = v.getData().number.part;
+                while(part % place == part) {
+                    str << '0';
+                    place /= 10;
+                }
+                str << '.' << v.getData().number.part;
+            }
             if(v.getData().number.exponent != 0) {
                 str << 'e';
                 if(v.getData().number.exponentSign == -1) str << '-';

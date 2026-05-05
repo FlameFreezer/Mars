@@ -89,27 +89,27 @@ namespace mars {
         if(mappings.getTag() != JSON::ValueTag::jarray) {
             return fatal("Input mappings file should start with an array");
         }
-        for(JSON::Value* jmapping : *mappings.getData().array) {
+        for(JSON::Value* jmapping : *mappings.getArray()) {
             Mapping resultMapping;
-            JSON::Object& mapping = *jmapping->getData().object;
+            JSON::Object& mapping = *jmapping->getObject();
             if(mapping.contains("scancodes")) {
-                for(JSON::Value* scancodeName : *mapping["scancodes"]->getData().array) {
-                    resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode[*scancodeName->getData().string];
+                for(JSON::Value* scancodeName : *mapping["scancodes"]->getArray()) {
+                    resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode[*scancodeName->getString()];
                 }
             }
             if(mapping.contains("buttons")) {
-                for(JSON::Value* buttonName : *mapping["buttons"]->getData().array) {
-                    resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton[*buttonName->getData().string];
+                for(JSON::Value* buttonName : *mapping["buttons"]->getArray()) {
+                    resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton[*buttonName->getString()];
                 }
             }
             if(mapping.contains("sticks")) {
-                for(auto [stickName, stickValue] : *mapping["sticks"]->getData().object) {
+                for(auto [stickName, stickValue] : *mapping["sticks"]->getObject()) {
                     resultMapping.axes[resultMapping.numAxes] = strToAxis[stickName];
-                    resultMapping.axisValues[resultMapping.numAxes] = stickValue->getData().number.to<float>();
+                    resultMapping.axisValues[resultMapping.numAxes] = stickValue->getNumberAs<float>();
                     resultMapping.numAxes++;
                 }
             }
-            mMappings[*mapping["tag"]->getData().string] = resultMapping;
+            mMappings[*mapping["tag"]->getString()] = resultMapping;
         }
         return success();
     }
