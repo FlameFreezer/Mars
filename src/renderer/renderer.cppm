@@ -2204,7 +2204,7 @@ namespace mars {
             if(camera.aspect == Camera::autoAspect) {
                 camera.aspect = static_cast<float>(swapchainImageExtent.width) / swapchainImageExtent.height;
             }
-            cameraMatrices.mappedMemory[1 + currentFrame] = camera.loadMatrices();
+            cameraMatrices.mappedMemory[1 + currentFrame] = camera.getMatrix();
             return drawFrame(camera.fov, camera.aspect, entities);
         }
 

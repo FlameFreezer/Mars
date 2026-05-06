@@ -20,7 +20,7 @@ namespace mars {
         float nearPlane;
         float farPlane;
         float sensitivity;
-        glm::mat4 loadMatrices() const noexcept {
+        glm::mat4 getMatrix() const noexcept {
             //dir + pos = target (position the camera is looking at)
             const glm::mat4 view = glm::lookAt(pos, dir + pos, up);
             glm::mat4 proj = glm::perspective(fov, aspect, nearPlane, farPlane);
