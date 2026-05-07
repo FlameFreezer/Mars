@@ -46,6 +46,8 @@ namespace mars {
         float drag;
         float maxSpeed;
         float jumpSpeed;
+        float jumpEndSpeed;
+        float jumpGravity;
         ID floorID = nullID;
         ID wallID = nullID;
     };
