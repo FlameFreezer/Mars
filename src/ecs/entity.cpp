@@ -20,9 +20,6 @@ namespace mars {
             implyComponents(Component::physics, bits); 
             implyComponents(Component::collide, bits);
             break;
-        case Component::ledgeGrab:
-            implyComponents(Component::dynamics, bits);
-            break;
         default: break;
         }
     }

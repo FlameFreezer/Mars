@@ -2266,12 +2266,12 @@ namespace mars {
             return entityManager.insertMesh(vertexBuffer.handle, vertexBuffer.memory, verticesSize, indicesSize / sizeof(u32));
         }
 
-        Error<ID> makeTexture(std::string const& texturePath) noexcept {
-            int texWidth, texHeight, texChannels;
+        Error<ID> makeTexture(const std::string& texturePath) noexcept {
+            int texWidth{0}, texHeight{0}, texChannels{0};
             stbi_uc* pixels = nullptr;
             pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
             if(pixels == nullptr) {
-                return {ErrorTag::fatalError, "Failed to find/load texture file"};
+                return fatal<ID>(std::format("Failed to find/load texture file at path \"{}\"", texturePath));
             }
             const VkDeviceSize imageSize = texWidth * texHeight * STBI_rgb_alpha; 
             GPUImage textureImage;
@@ -2425,7 +2425,6 @@ namespace mars {
             t.view = textureImage.view;
             return entityManager.insertTexture(t);
         }
-
     };
 }
 

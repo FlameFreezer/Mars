@@ -12,7 +12,7 @@ namespace mars {
     std::chrono::steady_clock::time_point Time::frameTime() const noexcept {
         return mTime;
     }
-    std::chrono::nanoseconds::rep Time::deltaNanos() const noexcept {
+    std::chrono::steady_clock::time_point::duration::rep Time::deltaSystem() const noexcept {
         return mDelta.count();
     }
     float Time::delta() const noexcept {
