@@ -64,6 +64,8 @@ file(GLOB_RECURSE
     MARS_SOURCE_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/*.cpp")
 target_sources(Mars PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv")
 
+target_compile_definitions(Mars PUBLIC MARS_SHADERS_PATH="${CMAKE_BINARY_DIR}/$<CONFIGURATION>/")
+
 if(${MARS_ECS_MAX_ENTITIES})
     target_compile_definitions(Mars PUBLIC MARS_ECS_MAX_ENTITIES=${MARS_ECS_MAX_ENTITIES})
 endif()
