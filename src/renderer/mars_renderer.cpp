@@ -1296,7 +1296,6 @@ namespace mars {
         return success();
     }
 
-
     Error<VkShaderModule> Renderer::createShaderModule(const std::string& filename) const noexcept {
         auto shader = loadShaderFile(filename);
         if(!shader) return shader.moveError<VkShaderModule>();

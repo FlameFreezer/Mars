@@ -15,7 +15,7 @@ enum class ErrorTag : u8 {
     fatalError,
 };
 
-static std::string tagToString(ErrorTag tag) noexcept {
+static constexpr std::string tagToString(ErrorTag tag) noexcept {
     switch(tag) {
     case ErrorTag::allOkay:
         return "All Okay";
