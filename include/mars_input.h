@@ -1,22 +1,19 @@
-module;
+#pragma once
 
 #include <string>
 #include <unordered_map>
 
 #include <SDL3/SDL.h>
 
-export module input;
-import heap_array;
-import error;
-import types;
-import json;
+#include "error.h"
+#include "mars_types.h"
 
 namespace mars {
 
-    export constexpr u8 maxScancodes = 5;
-    export constexpr u8 maxGamepadButtons = 5;
-    export constexpr u8 maxAxes = SDL_GAMEPAD_AXIS_COUNT;
-    export constexpr i16 angleToAxisValue = SDL_JOYSTICK_AXIS_MAX / 90.0f;
+    constexpr u8 maxScancodes = 5;
+    constexpr u8 maxGamepadButtons = 5;
+    constexpr u8 maxAxes = SDL_GAMEPAD_AXIS_COUNT;
+    constexpr i16 angleToAxisValue = SDL_JOYSTICK_AXIS_MAX / 90.0f;
 
     struct Mapping {
         SDL_Scancode scancodes[maxScancodes];
@@ -28,7 +25,7 @@ namespace mars {
         u8 numAxes = 0;
     };
 
-    export class Input {
+    class Input {
         std::unordered_map<std::string, Mapping> mMappings;
         bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
         bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};

@@ -1,4 +1,4 @@
-module;
+#pragma once
 
 #include <cmath>
 #include <string>
@@ -6,11 +6,10 @@ module;
 #include <unordered_map>
 #include <vector>
 
-export module json;
-import types;
-import error;
+#include "mars_types.h"
+#include "error.h"
 
-export namespace JSON {
+namespace JSON {
 
     using Object = std::unordered_map<std::string, class Value*>;
     using Array = std::vector<Value*>;

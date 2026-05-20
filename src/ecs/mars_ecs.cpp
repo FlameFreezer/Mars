@@ -1,6 +1,4 @@
-module;
-
-module ecs;
+#include "mars_ecs.h"
 
 namespace mars {
     EntityComponentSystem& EntityComponentSystem::get() noexcept {

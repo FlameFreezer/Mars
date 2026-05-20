@@ -1,10 +1,8 @@
-module;
+#include "mars_renderer_ecs.h"
 
 #include <vulkan/vulkan.h>
 
 #include "mars_constants.h"
-
-module renderer_ecs;
 
 namespace mars {
     RendererEntityManager::RendererEntityManager() noexcept {

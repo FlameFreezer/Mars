@@ -1,11 +1,9 @@
-module;
+#include "jsonparser.h"
 
 #include <cctype>
 #include <cstring>
 #include <sstream>
 #include <set>
-
-module json;
 
 namespace JSON {
     static const std::set<char> whitespace = {' ', '\n', 13, '\t'};

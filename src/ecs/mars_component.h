@@ -1,15 +1,12 @@
-module;
+#pragma once
 
 #include <utility>
 
 #include "mars_constants.h"
-
-export module component;
-export import components;
-export import component_system;
-import types;
-import error;
-import entity;
+#include "mars_components.h"
+#include "mars_component_system.h"
+#include "mars_types.h"
+#include "mars_entity.h"
 
 #define DEFINE_COMPONENT_GETTER(component) const GetComp<Component::component>::Type& component(Entity e) const noexcept{\
     return system<Component::component>()[e];\
@@ -25,7 +22,7 @@ GetComp<Component::component>::Type& component(ID id) noexcept {\
 }
 
 namespace mars {
-    export class ComponentManager {
+    class ComponentManager {
         ComponentSystemParent* mSystems[numComponents];
         Signature* mSignatures = new Signature[maxEntities];
         public:

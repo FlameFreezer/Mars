@@ -61,17 +61,8 @@ set(CMAKE_LINK_WARNING_AS_ERROR True)
 # Set up mars target library
 add_library(Mars)
 file(GLOB_RECURSE 
-    MARS_MODULE_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/*.cppm")
-file(GLOB_RECURSE 
     MARS_SOURCE_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/*.cpp")
-target_sources(Mars 
-    PUBLIC 
-    FILE_SET mars_module 
-    TYPE CXX_MODULES 
-    BASE_DIRS src
-    FILES "${MARS_MODULE_FILES}"   
-    PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv"
-)
+target_sources(Mars PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv")
 
 if(${MARS_ECS_MAX_ENTITIES})
     target_compile_definitions(Mars PUBLIC MARS_ECS_MAX_ENTITIES=${MARS_ECS_MAX_ENTITIES})
@@ -99,6 +90,8 @@ target_include_directories(Mars PUBLIC
     "${PROJECT_SOURCE_DIR}/thirdparty/stb"
     "${PROJECT_SOURCE_DIR}/thirdparty/vulkan"
     "${PROJECT_SOURCE_DIR}/include"
+    "${PROJECT_SOURCE_DIR}/src/renderer"
+    "${PROJECT_SOURCE_DIR}/src/ecs"
 )
 
 # Build for Debug Symbols

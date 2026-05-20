@@ -1,10 +1,8 @@
-module;
+#include "mars.h"
 
 #include <SDL3/SDL.h>
 
 #include "mars_macros.h"
-
-module mars;
 
 namespace mars {
 

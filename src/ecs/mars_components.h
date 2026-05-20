@@ -1,4 +1,4 @@
-module;
+#pragma once
 
 #include <vector>
 #include <utility>
@@ -6,14 +6,12 @@ module;
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
-export module components;
-import types;
-import error;
-import room;
+#include "mars_types.h"
+#include "mars_room.h"
 
 namespace mars {
-    export using ComponentT = u8;
-    export enum class Component : ComponentT {
+    using ComponentT = u8;
+    enum class Component : ComponentT {
         draw,
         physics,
         collide,
@@ -21,11 +19,11 @@ namespace mars {
         //KEEP THIS AT THE END OF THE ENUM
         maxComponent
     };
-    export constexpr ComponentT numComponents = std::to_underlying(Component::maxComponent);
+    constexpr ComponentT numComponents = std::to_underlying(Component::maxComponent);
     static_assert(numComponents < 1U << 31);
 
     //TODO: default mesh/texture with ID = 0
-    export struct Draw {
+    struct Draw {
         glm::vec2 position = glm::vec2(0.0f);
         glm::vec2 scale = glm::vec2(1.0f);
         float angle = 0;
@@ -33,21 +31,21 @@ namespace mars {
         ID meshID = 0;
         ID textureID = 0;
     };
-    export struct Physics {
+    struct Physics {
         glm::vec2 velocity = glm::vec2(0.0f);
         glm::vec2 gravity = glm::vec2(0.0f, 1.0f);
         const Room* room = nullptr;
     };
-    export struct Dynamics {
+    struct Dynamics {
         std::vector<ID> collisions;
         ID floorID = nullID;
         ID wallID = nullID;
     };
-    export enum class BoundingShape : u8 {
+    enum class BoundingShape : u8 {
         rectangle,
         circle,
     };
-    export struct Collide {
+    struct Collide {
         BoundingShape boundingShape = BoundingShape::rectangle;
         glm::vec2 position = glm::vec2(0.0f);
         union {
@@ -60,7 +58,7 @@ namespace mars {
     };
         
     //This struct template allows accessing the type of a component at compile time just using the actual component enum member
-    export template<Component c>
+    template<Component c>
     struct GetComp {};
     template<> struct GetComp<Component::draw> {using Type = Draw;};
     template<> struct GetComp<Component::physics> {using Type = Physics;};
@@ -68,7 +66,7 @@ namespace mars {
     template<> struct GetComp<Component::dynamics> {using Type = Dynamics;};
 
     //Helper class to help programmers keep transforms and collisions aligned
-    export class Position {
+    class Position {
         glm::vec2& mTransform;
         glm::vec2& mCollide;
         public:

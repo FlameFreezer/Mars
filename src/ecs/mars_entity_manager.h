@@ -1,13 +1,11 @@
-module;
+#pragma once
 
 #include <queue>
 
-export module entity_manager;
-import types;
-import entity;
+#include "mars_types.h"
 
 namespace mars {
-    export class EntityManager {
+    class EntityManager {
         std::queue<ID> mIDQueue;
         public:
         EntityManager() noexcept;

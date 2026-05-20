@@ -1,21 +1,17 @@
-module;
+#pragma once
 
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
 #include "mars_constants.h"
-
-export module component_system;
-import components;
-import entity;
-import types;
-import error;
-import gpubuffer;
+#include "mars_components.h"
+#include "mars_entity.h"
+#include "mars_types.h"
 
 namespace mars {
     //Abstract parent class for component systems - to automate initialization and deinitialization
     // within the EntityManager
-    export class ComponentSystemParent {
+    class ComponentSystemParent {
         protected:
         ID mIDs[maxEntities];
         u64 mIndices[maxEntities];
@@ -60,7 +56,7 @@ namespace mars {
         virtual void erase(ID id) noexcept = 0;
 
     };
-    export template<typename C>
+    template<typename C>
     class ComponentSystem : public ComponentSystemParent {
         C mData[maxEntities];
         public:
@@ -200,7 +196,7 @@ namespace mars {
             return {mSize, *this};
         }
     };
-    export struct DrawProxy {
+    struct DrawProxy {
         glm::vec2& position;
         glm::vec2& scale;
         float& angle;
@@ -208,7 +204,7 @@ namespace mars {
         ID& meshID;
         ID& textureID;
     };
-    export template<>
+    template<>
     class ComponentSystem<Draw> : public ComponentSystemParent {
         glm::vec2 mPositions[maxEntities];
         glm::vec2 mScales[maxEntities];

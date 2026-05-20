@@ -1,9 +1,7 @@
-module;
-
 #include <initializer_list>
 #include <utility>
 
-module entity;
+#include "mars_entity.h"
 
 namespace mars {
 

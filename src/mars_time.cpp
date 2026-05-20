@@ -1,8 +1,6 @@
-module;
-
 #include <chrono>
 
-module time;
+#include "mars_time.h"
 
 namespace mars {
     Time& Time::get() noexcept {

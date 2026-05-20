@@ -1,13 +1,12 @@
-module;
+#pragma once
 
 #include <vulkan/vulkan.h>
 
-export module gpubuffer;
-import error;
-import vkhelper;
+#include "error.h"
+#include "mars_vkhelper.h"
 
 namespace mars {
-    export struct GPUBuffer {
+    struct GPUBuffer {
         VkBuffer handle;
         VkDeviceMemory memory;
         VkDeviceSize size;
@@ -38,7 +37,7 @@ namespace mars {
             return buffer;
         }
     };
-    export template<class T>
+    template<class T>
     struct UniformBuffer {
         GPUBuffer buffer;
         T* mappedMemory;

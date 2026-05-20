@@ -1,14 +1,13 @@
-module;
+#pragma once
 
-export module ecs;
-export import entity;
-export import component;
-export import entity_manager;
-import types;
-import error;
+#include "mars_entity.h"
+#include "mars_component.h"
+#include "mars_entity_manager.h"
+#include "mars_types.h"
+#include "error.h"
 
 namespace mars {
-    export class EntityComponentSystem {
+    class EntityComponentSystem {
         EntityComponentSystem() noexcept = default;
         EntityComponentSystem(const EntityComponentSystem& other) = delete;
         EntityComponentSystem(EntityComponentSystem&& other) = delete;
@@ -20,5 +19,5 @@ namespace mars {
         void destroyEntity(Entity e) noexcept;
         Entity entity(ID id) const noexcept;
     };
-    export using ECS = EntityComponentSystem;
+    using ECS = EntityComponentSystem;
 }

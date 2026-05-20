@@ -1,14 +1,13 @@
-module;
+#pragma once
 
 #include <cstddef>
 #include <format>
 
-export module heap_array;
-import error;
+#include "error.h"
 
 namespace mars {
     //Essentially implements the "fat pointer" from zig
-    export template <class T>
+    template <class T>
     class HeapArray {
         private:
         T* mPtr;
@@ -105,7 +104,7 @@ namespace mars {
     };
 
     //A non-owning reference to a range within a heap-allocated array
-    export template <class T>
+    template <class T>
     class Slice {
         private:
         T* mPtr;
@@ -177,7 +176,7 @@ namespace mars {
             return Iterator(mPtr + mSize);
         }
     };
-    export template <class T>
+    template <class T>
     class ConstSlice {
         private:
         const T* mPtr;

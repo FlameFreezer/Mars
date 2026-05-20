@@ -1,11 +1,9 @@
-module;
+#pragma once
 
 #include <chrono>
 
-export module time;
-
 namespace mars {
-    export class Time {
+    class Time {
         std::chrono::steady_clock::time_point mTime{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point::duration mDelta{0};
         Time() noexcept = default;

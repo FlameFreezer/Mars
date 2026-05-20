@@ -1,10 +1,9 @@
-module;
+#pragma once
 
-export module renderer:flags;
-import types;
+#include "mars_types.h"
 
 namespace mars {
-    export namespace rendererFlags {
+    namespace rendererFlags {
         using FlagT = u16;
         constexpr FlagT recreateSwapchain = 1;
         constexpr FlagT instanceInvalid = 1 << 1;

@@ -1,18 +1,16 @@
-module;
+#pragma once
 
 #include <initializer_list>
 #include <limits>
 
-export module entity;
-import components;
-import types;
+#include "mars_types.h"
+#include "mars_components.h"
 
 namespace mars {
-
-    export using SignatureT = u32;
+    using SignatureT = u32;
     //Null Signature has every component such that storage in component systems is always reserved
-    export constexpr SignatureT nullSignature = std::numeric_limits<SignatureT>::max();
-    export class Signature {
+    constexpr SignatureT nullSignature = std::numeric_limits<SignatureT>::max();
+    class Signature {
         SignatureT mBits = nullSignature;
         public:
         constexpr Signature() noexcept = default;
@@ -25,7 +23,7 @@ namespace mars {
         SignatureT getBits() const noexcept;
     };
 
-    export class Entity {
+    class Entity {
         ID mID = nullID;
         Signature mSignature; 
         public:
@@ -39,5 +37,5 @@ namespace mars {
         friend bool operator!=(Entity lhs, Entity rhs) noexcept;
     };
 
-    export constexpr Entity nullEntity;
+    constexpr Entity nullEntity;
 }

@@ -1,4 +1,4 @@
-module;
+#pragma once
 
 #include <print>
 #include <array>
@@ -23,18 +23,16 @@ module;
 
 #include "mars_macros.h"
 
-export module renderer;
-export import :flags;
-import gpubuffer;
-import gpuimage;
-import error;
-import heap_array;
-import vkhelper;
-import types;
-import component_system;
-import components;
-import renderer_ecs;
-import camera;
+#include "mars_renderer_flags.h"
+#include "mars_renderer_gpubuffer.h"
+#include "mars_renderer_gpuimage.h"
+#include "mars_renderer_ecs.h"
+#include "error.h"
+#include "mars_heaparray.h"
+#include "mars_vkhelper.h"
+#include "mars_types.h"
+#include "mars_ecs.h"
+#include "mars_camera.h"
 
 namespace mars {
     #define TRY_VK(proc, msg) do{\
@@ -171,14 +169,14 @@ namespace mars {
         };
     };
 
-    export struct RendererEntities {
+    struct RendererEntities {
         const glm::mat4* modelMatrices;
         const ID* meshIDs;
         const ID* textureIDs;
         u64 size;
     };
 
-    export class Renderer {
+    class Renderer {
         RendererEntityManager entityManager;
         Cube cube;
         UniformBuffer<glm::mat4> cameraMatrices;

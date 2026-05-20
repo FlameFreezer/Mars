@@ -1,18 +1,16 @@
-module;
+#pragma once
 
 #include <queue>
 
 #include <vulkan/vulkan.h>
 
 #include "mars_constants.h"
-
-export module renderer_ecs;
-import types;
-import component_system;
+#include "mars_types.h"
+#include "mars_component_system.h"
 
 namespace mars {
     //The Mesh and Texture component systems are internal to the renderer and are managed by their own entity manager
-    export struct Mesh {
+    struct Mesh {
         VkBuffer handles[maxMeshes];
         VkDeviceMemory memories[maxMeshes];
         struct {
@@ -20,7 +18,7 @@ namespace mars {
             u32 numIndices = 0;
         } sizes[maxMeshes];
     };
-    export struct Texture {
+    struct Texture {
         VkImage handle = nullptr;
         VkDeviceMemory memory = nullptr;
         VkImageView view = nullptr;
@@ -79,7 +77,7 @@ namespace mars {
         }
     };
 
-    export class RendererEntityManager {
+    class RendererEntityManager {
         std::queue<ID> mMeshIDQueue;
         std::queue<ID> mTextureIDQueue;
         public:

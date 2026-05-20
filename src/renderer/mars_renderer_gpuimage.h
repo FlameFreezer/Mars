@@ -1,13 +1,12 @@
-module;
+#pragma once
 
 #include <vulkan/vulkan.h>
 
-export module gpuimage;
-import error;
-import vkhelper;
+#include "error.h"
+#include "mars_vkhelper.h"
 
 namespace mars {
-    export struct GPUImage {
+    struct GPUImage {
         VkImage handle;
         VkImageView view;
         VkDeviceMemory memory;

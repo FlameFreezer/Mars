@@ -1,10 +1,8 @@
-module;
+#include "mars_entity_manager.h"
 
 #include <queue>
 
 #include "mars_constants.h"
-
-module entity_manager;
 
 namespace mars {
     EntityManager::EntityManager() noexcept {

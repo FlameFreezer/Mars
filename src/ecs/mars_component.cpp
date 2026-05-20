@@ -1,8 +1,6 @@
-module;
+#include "mars_component.h"
 
 #include <glm/glm.hpp>
-
-module component;
 
 namespace mars {
     template<ComponentT c>

@@ -1,7 +1,5 @@
-module;
 
 #include <cstring>
-#include <string>
 #include <fstream>
 #include <format>
 #include <unordered_map>
@@ -9,8 +7,9 @@ module;
 #include <SDL3/SDL.h>
 #include <mars_macros.h>
 
-module input;
-import heap_array;
+#include "mars_input.h"
+#include "mars_heaparray.h"
+#include "jsonparser.h"
 
 std::unordered_map<std::string, SDL_Scancode> initScancodeMap() noexcept {
     std::unordered_map<std::string, SDL_Scancode> map;

@@ -1,12 +1,5 @@
-module;
-
-#include <cstdint>
-#include <string>
-
-#include <vulkan/vulkan.h>
-
-export module vkhelper;
-import error;
+#include "mars_vkhelper.h"
+#include "error.h"
 
 namespace vkhelper {
     Error<std::uint32_t> findPhysicalDeviceMemoryTypeIndex(VkPhysicalDevice physicalDevice, std::uint32_t availableTypes, VkMemoryPropertyFlags memProperties) noexcept {
@@ -21,7 +14,7 @@ namespace vkhelper {
         }
         return {ErrorTag::fatalError, "Physical device does not support needed memory type"};
     }
-    export Error<VkDeviceMemory> allocateDeviceMemory(VkDevice device, VkPhysicalDevice physicalDevice, VkBuffer buffer, VkMemoryPropertyFlags memProperties) noexcept {
+    Error<VkDeviceMemory> allocateDeviceMemory(VkDevice device, VkPhysicalDevice physicalDevice, VkBuffer buffer, VkMemoryPropertyFlags memProperties) noexcept {
         VkMemoryRequirements memRequirements{};
         vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
         Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
@@ -42,7 +35,7 @@ namespace vkhelper {
         }
         return memory;
     }
-    export Error<VkDeviceMemory> allocateDeviceMemory(VkDevice device, VkPhysicalDevice physicalDevice, VkImage image, VkMemoryPropertyFlags memProperties) noexcept {
+    Error<VkDeviceMemory> allocateDeviceMemory(VkDevice device, VkPhysicalDevice physicalDevice, VkImage image, VkMemoryPropertyFlags memProperties) noexcept {
         VkMemoryRequirements memRequirements{};
         vkGetImageMemoryRequirements(device, image, &memRequirements);
         Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
@@ -63,7 +56,7 @@ namespace vkhelper {
         }
         return memory;
     }
-    export constexpr std::string messageSeverityToString(VkDebugUtilsMessageSeverityFlagBitsEXT severity) noexcept {
+    std::string messageSeverityToString(VkDebugUtilsMessageSeverityFlagBitsEXT severity) noexcept {
         switch(severity) {
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
                 return "Verbose"; 
@@ -76,4 +69,5 @@ namespace vkhelper {
             default: return "";
         }
     }
+
 }

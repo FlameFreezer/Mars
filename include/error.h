@@ -1,4 +1,4 @@
-module;
+#pragma once
 
 #include <string>
 #include <utility>
@@ -7,16 +7,15 @@ module;
 #include <iostream>
 #include <stdexcept>
 
-export module error;
-import types;
+#include "mars_types.h"
 
-export enum class ErrorTag : u8 {
+enum class ErrorTag : u8 {
     allOkay = 0,
     searchFail,
     fatalError,
 };
 
-export std::string tagToString(ErrorTag tag) noexcept {
+std::string tagToString(ErrorTag tag) noexcept {
     switch(tag) {
     case ErrorTag::allOkay:
         return "All Okay";
@@ -27,7 +26,7 @@ export std::string tagToString(ErrorTag tag) noexcept {
     }
 }
 
-export template <class T>
+template <class T>
 class [[nodiscard("Potentially unhandled error value")]] Error {
     union {
         T mData;
@@ -167,15 +166,14 @@ template<>
 noreturn& Error<noreturn>::data() = delete;
 
 //Returns an `Error<noreturn>` with `key == allOkay`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
-export Error<noreturn> success() noexcept {
-    return Error<noreturn>();
-}
+Error<noreturn> success() noexcept;
+
 //Returns an `Error<T>` with `key == fatalError`.
-export template<typename T = noreturn>
+template<typename T = noreturn>
 Error<T> fatal(std::string&& message) noexcept {
     return Error<T>(ErrorTag::fatalError, std::move(message));
 }
-export template<typename T = noreturn>
+template<typename T = noreturn>
 Error<T> fatal(const std::string& message) noexcept {
     return Error<T>(ErrorTag::fatalError, message);
 }

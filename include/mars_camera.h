@@ -1,15 +1,11 @@
-module;
+#pragma once
 
-#include "glm/geometric.hpp"
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-export module camera;
-import error;
-
 namespace mars {
-    export struct Camera {
+    struct Camera {
         static constexpr float autoAspect = 0.0f;
         glm::vec3 pos;
         glm::vec3 dir;
@@ -57,7 +53,7 @@ namespace mars {
             dir = d;
         }
     };
-    export class CameraBuilder {
+    class CameraBuilder {
         glm::vec3 pos = glm::vec3(0.0f);
         glm::vec3 dir = glm::vec3(0.0f);
         glm::vec3 up = glm::vec3(0.0f);
@@ -106,7 +102,7 @@ namespace mars {
             return *this;
         }
         Camera build() const noexcept {
-            Camera cam =  {
+            Camera cam = {
                 .pos = pos,
                 .dir = glm::normalize(dir),
                 .up = glm::normalize(up),
@@ -117,8 +113,10 @@ namespace mars {
                 .farPlane = farPlane,
                 .sensitivity = sensitivity
             };
+            //Lock camera direction vector to bounds of maxY
             if(cam.dir.y < -cam.maxY) cam.dir.y = -cam.maxY;
             else if(cam.dir.y > cam.maxY) cam.dir.y = cam.maxY;
+
             return cam;
         }
     };

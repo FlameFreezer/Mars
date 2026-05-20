@@ -1,11 +1,9 @@
-module;
+#pragma once
 
 #include <glm/glm.hpp>
 
-export module room;
-
 namespace mars {
-    export struct Room {
+    struct Room {
         glm::vec2 gravity;
     };
 }
