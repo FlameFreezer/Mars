@@ -4,8 +4,8 @@ Mars is my framework for making silly games with C++. Though incomplete for now,
 
 1. An entity-component system
 2. A nicely encapsulated renderer written in Vulkan
-3. A `mars::Game` class for managing invariants and context
-4. A `mars::Error` class template for error handling in a Zig-like style. Please do not use exceptions with Mars or you will make me very sad
+3. A `mars::Error` class template for error handling in a Zig-like style. Please do not use exceptions with Mars or you will make me very sad
+4. Configurable input maps through JSON
 
 ## Renderer
 
@@ -32,9 +32,9 @@ The renderer, for now, is a two-phase system which first draws a 2D scene and th
 
 ### Compilation Options
 
-- MARS_ECS_MAX_ENTITIES : The maximum number of entities which can be created by the engine.
-- MARS_RENDERER_MAX_TEXTURES : The maximum number of textures which can be loaded by the engine.
-- MARS_RENDERER_MAX_MESHES : The maximum number of meshes which can be loaded by the engine.
+- MARS_ECS_MAX_ENTITIES : The maximum number of entities which can be created by the engine
+- MARS_RENDERER_MAX_TEXTURES : The maximum number of textures which can be loaded by the engine
+- MARS_RENDERER_MAX_MESHES : The maximum number of meshes which can be loaded by the engine
 
 ## Why is it called Mars?
 
