@@ -27,7 +27,7 @@ The renderer, for now, is a two-phase system which first draws a 2D scene and th
 
 1. `$ git clone --recurse-submodules https://github.com/FlameFreezer/Mars`
 2. `$ cd Mars`
-3. `$ mkdir build && cmake --B build`
+3. `$ mkdir build && cmake -B build`
 4. Build with your chosen build system or `$ cmake --build build`
 
 ### Compilation Options
