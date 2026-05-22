@@ -25,16 +25,16 @@ The renderer, for now, is a two-phase system which first draws a 2D scene and th
 
 ## How to Compile
 
-Notes:
+1. `$ git clone --recurse-submodules https://github.com/FlameFreezer/Mars`
+2. `$ cd Mars`
+3. `$ mkdir build && cmake --B build`
+4. Build with your chosen build system or `$ cmake --build build`
 
-- Mars only compiles with Clang for now
-- Mars does not support UNIX Makefiles because of its use of C++20's modules feature
+### Compilation Options
 
-1. Install clang
-2. `$ git clone --recurse-submodules https://github.com/FlameFreezer/Mars`
-3. `$ cd Mars`
-4. `$ mkdir build && cmake --B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++`
-5. Build with your chosen build system or `$ cmake --build build`
+- MARS_ECS_MAX_ENTITIES : The maximum number of entities which can be created by the engine.
+- MARS_RENDERER_MAX_TEXTURES : The maximum number of textures which can be loaded by the engine.
+- MARS_RENDERER_MAX_MESHES : The maximum number of meshes which can be loaded by the engine.
 
 ## Why is it called Mars?
 

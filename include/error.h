@@ -24,6 +24,7 @@ static constexpr std::string tagToString(ErrorTag tag) noexcept {
     case ErrorTag::fatalError:
         return "Fatal Error";
     }
+    std::unreachable();
 }
 
 template <class T>
