@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Ensure all build objects are placed in the same directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+set(CMAKE_CXX_SCAN_FOR_MODULES Off)
 
 # Add libraries to build
 set(SDL_STATIC False)
