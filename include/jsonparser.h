@@ -10,10 +10,6 @@
 #include "error.h"
 
 namespace JSON {
-
-    using Object = std::unordered_map<std::string, class Value*>;
-    using Array = std::vector<Value*>;
-
     enum class ValueTag : u32 {
         jnull,
         jtrue,
@@ -38,6 +34,8 @@ namespace JSON {
     };
 
     class Value {
+        using Array = std::vector<Value>;
+        using Object = std::unordered_map<std::string, Value>;
         ValueTag mTag = ValueTag::jnull;
         union {
             bool mBoolean {false};
@@ -51,10 +49,15 @@ namespace JSON {
         explicit Value(bool b) noexcept;        
         explicit Value(int i) noexcept;
         explicit Value(Number n) noexcept;
+        explicit Value(const std::string& str) noexcept;
         explicit Value(std::string&& str) noexcept;        
+        explicit Value(const Array& a) noexcept;
         explicit Value(Array&& a) noexcept;
+        explicit Value(const Object& o) noexcept;
         explicit Value(Object&& o) noexcept;
+        Value(const Value& other) noexcept;
         Value(Value&& other) noexcept;        
+        Value& operator=(const Value& rhs) noexcept;
         Value& operator=(Value&& rhs) noexcept;        
         ~Value() noexcept;        
         ValueTag getTag() const noexcept;        
@@ -64,13 +67,20 @@ namespace JSON {
             return mNumber.to<T>();
         }
         const Number& getNumber() const noexcept;
-        std::string&& moveString() noexcept;
+        Number& getNumber() noexcept;
         const std::string& getString() const noexcept;
+        std::string& getString() noexcept;
+        std::string&& moveString() noexcept;
         const Array& getArray() const noexcept;
+        Array& getArray() noexcept;
         Array&& moveArray() noexcept;
         const Object& getObject() const noexcept;
+        Object& getObject() noexcept;
         Object&& moveObject() noexcept;
     };
+
+    using Object = std::unordered_map<std::string, Value>;
+    using Array = std::vector<Value>;
 
     Error<Value> parse(const std::string& text) noexcept;
     std::string serialize(const Value& v) noexcept;
