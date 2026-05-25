@@ -117,29 +117,29 @@ namespace mars {
             if(mappings.getTag() != JSON::ValueTag::jarray) {
                 return fatal("Input mappings file should start with an array");
             }
-            for(JSON::Value* jmapping : *mappings.getArray()) {
+            for(JSON::Value* jmapping : mappings.getArray()) {
                 Mapping resultMapping;
                 resultMapping.isValid = true;
-                const JSON::Object& mapping = *jmapping->getObject();
+                const JSON::Object& mapping = jmapping->getObject();
                 if(mapping.contains("scancodes")) {
-                    for(const JSON::Value* scancodeName : *mapping.at("scancodes")->getArray()) {
-                        resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode.at(*scancodeName->getString());
+                    for(const JSON::Value* scancodeName : mapping.at("scancodes")->getArray()) {
+                        resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode.at(scancodeName->getString());
                     }
                 }
                 if(mapping.contains("buttons")) {
-                    for(const JSON::Value* buttonName : *mapping.at("buttons")->getArray()) {
-                        resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton.at(*buttonName->getString());
+                    for(const JSON::Value* buttonName : mapping.at("buttons")->getArray()) {
+                        resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton.at(buttonName->getString());
                     }
                 }
                 if(mapping.contains("sticks")) {
-                    for(const auto [stickName, stickValue] : *mapping.at("sticks")->getObject()) {
+                    for(const auto [stickName, stickValue] : mapping.at("sticks")->getObject()) {
                         resultMapping.axes[resultMapping.numAxes] = strToAxis.at(stickName);
                         resultMapping.axisValues[resultMapping.numAxes] = stickValue->getNumberAs<float>();
                         resultMapping.numAxes++;
                     }
                 }
                 //Get the index of the current mapping from its name
-                const auto mappingIndex = std::to_underlying(strToIndex.at(*mapping.at("tag")->getString()));
+                const auto mappingIndex = std::to_underlying(strToIndex.at(mapping.at("tag")->getString()));
                 //Resize the mappings vector if we need space to fit
                 if(mMappings.size() <= mappingIndex) {
                     mMappings.resize(mappingIndex + 1);

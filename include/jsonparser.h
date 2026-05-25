@@ -37,24 +37,15 @@ namespace JSON {
         }
     };
 
-    union ValueUnion {
-        bool boolean;
-        Number number;
-        std::string* string;
-        Array* array;
-        Object* object;
-        ValueUnion() : boolean(false) {}
-        ValueUnion(bool b) : boolean(b) {}
-        ValueUnion(Number n) : number(n) {}
-        ValueUnion(std::string&& str) : string(new std::string(std::forward<std::string>(str))) {}
-        ValueUnion(Array&& a) : array(new Array(std::forward<Array>(a))) {}
-        ValueUnion(Object&& o) : object(new Object(std::forward<Object>(o))) {}
-        ~ValueUnion() {}
-    };
-
     class Value {
         ValueTag mTag = ValueTag::jnull;
-        ValueUnion mData;
+        union {
+            bool mBoolean {false};
+            std::string mString;
+            Number mNumber;
+            Array mArray;
+            Object mObject;
+        };
         public:
         Value() noexcept = default;
         explicit Value(bool b) noexcept;        
@@ -67,20 +58,18 @@ namespace JSON {
         Value& operator=(Value&& rhs) noexcept;        
         ~Value() noexcept;        
         ValueTag getTag() const noexcept;        
-        ValueUnion& getData() noexcept;        
-        const ValueUnion& getData() const noexcept;    
         bool getBool() const noexcept;
         template<typename T> requires std::is_arithmetic<T>::value
         T getNumberAs() const noexcept {
-            return mData.number.to<T>();
+            return mNumber.to<T>();
         }
         const Number& getNumber() const noexcept;
-        std::string* getString() noexcept;
-        const std::string* getString() const noexcept;
-        Array* getArray() noexcept;
-        const Array* getArray() const noexcept;
-        Object* getObject() noexcept;
-        const Object* getObject() const noexcept;
+        std::string&& moveString() noexcept;
+        const std::string& getString() const noexcept;
+        const Array& getArray() const noexcept;
+        Array&& moveArray() noexcept;
+        const Object& getObject() const noexcept;
+        Object&& moveObject() noexcept;
     };
 
     Error<Value> parse(const std::string& text) noexcept;

@@ -8,32 +8,29 @@
 namespace JSON {
     static const std::set<char> whitespace = {' ', '\n', 13, '\t'};
 
-    Value::Value(bool b) noexcept : mData(b) {
+    Value::Value(bool b) noexcept {
+        mBoolean = b;
         if(b) mTag = ValueTag::jtrue;
         else mTag = ValueTag::jfalse;
     }
-    Value::Value(int i) noexcept : mTag(ValueTag::jnumber), mData(static_cast<double>(i)) {}
-    Value::Value(Number n) noexcept : mTag(ValueTag::jnumber), mData(n) {}
-    Value::Value(std::string&& str) noexcept : mTag(ValueTag::jstring), mData(std::forward<std::string>(str)) {}
-    Value::Value(Array&& a) noexcept : mTag(ValueTag::jarray), mData(std::forward<Array>(a)) {}
-    Value::Value(Object&& o) noexcept : mTag(ValueTag::jobject), mData(std::forward<Object>(o)) {}
+    Value::Value(Number n) noexcept : mTag(ValueTag::jnumber), mNumber{n} {}
+    Value::Value(std::string&& str) noexcept : mTag(ValueTag::jstring), mString(str) {}
+    Value::Value(Array&& a) noexcept : mTag(ValueTag::jarray), mArray(a) {}
+    Value::Value(Object&& o) noexcept : mTag(ValueTag::jobject), mObject(o) {}
     Value::Value(Value&& other) noexcept : mTag(other.mTag) {
         switch(mTag) {
-            case ValueTag::jnull: break;
-            case ValueTag::jfalse: mData.boolean = false; break;
-            case ValueTag::jtrue: mData.boolean = true; break;
-            case ValueTag::jnumber: mData.number = other.mData.number; break;
+            case ValueTag::jnull: mBoolean = false; break;
+            case ValueTag::jfalse: mBoolean = false; break;
+            case ValueTag::jtrue: mBoolean = true; break;
+            case ValueTag::jnumber: mNumber = other.mNumber; break;
             case ValueTag::jstring: 
-                mData.string = other.mData.string; 
-                other.mData.string = nullptr;
+                new (&mString) std::string{std::move(other.mString)};
                 break;
             case ValueTag::jarray: 
-                mData.array = other.mData.array; 
-                other.mData.array = nullptr;
+                new (&mArray) Array{std::move(other.mArray)};
                 break;
             case ValueTag::jobject: 
-                mData.object = other.mData.object; 
-                other.mData.object = nullptr;
+                new (&mObject) Object{std::move(other.mObject)};
                 break;
         }
         other.mTag = ValueTag::jnull;
@@ -41,21 +38,18 @@ namespace JSON {
     Value& Value::operator=(Value&& rhs) noexcept {
         this->~Value();
         switch(rhs.mTag) {
-            case ValueTag::jnull: break;
-            case ValueTag::jfalse: mData.boolean = false; break;
-            case ValueTag::jtrue: mData.boolean = true; break;
-            case ValueTag::jnumber: mData.number = rhs.mData.number; break;
+            case ValueTag::jnull: mBoolean = false; break;
+            case ValueTag::jfalse: mBoolean = false; break;
+            case ValueTag::jtrue: mBoolean = true; break;
+            case ValueTag::jnumber: mNumber = rhs.mNumber; break;
             case ValueTag::jstring: 
-                mData.string = rhs.mData.string; 
-                rhs.mData.string = nullptr;
+                new (&mString) std::string{std::move(rhs.mString)};
                 break;
             case ValueTag::jarray: 
-                mData.array = rhs.mData.array; 
-                rhs.mData.array = nullptr;
+                new (&mArray) Array{std::move(rhs.mArray)};
                 break;
             case ValueTag::jobject: 
-                mData.object = rhs.mData.object; 
-                rhs.mData.object = nullptr;
+                new (&mObject) Object{std::move(rhs.mObject)};
                 break;
         }
         mTag = rhs.mTag;
@@ -65,15 +59,15 @@ namespace JSON {
     Value::~Value() noexcept {
         switch(mTag) {
             case ValueTag::jstring: 
-                delete mData.string;
+                mString.~basic_string();
                 break;
             case ValueTag::jobject: 
-                for(auto [key, v] : *mData.object) delete v;
-                delete mData.object;
+                for(auto [key, v] : mObject) delete v;
+                mObject.~Object();
                 break;
             case ValueTag::jarray: 
-                for(Value* v : *mData.array) delete v;
-                delete mData.array;
+                for(Value* v : mArray) delete v;
+                mArray.~Array();
                 break;
             default: break;
         }
@@ -81,35 +75,32 @@ namespace JSON {
     ValueTag Value::getTag() const noexcept {
         return mTag;
     }
-    ValueUnion& Value::getData() noexcept {
-        return mData;
-    }
-    const ValueUnion& Value::getData() const noexcept {
-        return mData;
-    }
     bool Value::getBool() const noexcept {
-        return mData.boolean;
+        return mBoolean;
     }
     const Number& Value::getNumber() const noexcept {
-        return mData.number;
+        return mNumber;
     }
-    std::string* Value::getString() noexcept {
-        return mData.string;
+    const std::string& Value::getString() const noexcept {
+        return mString;
     }
-    const std::string* Value::getString() const noexcept {
-        return mData.string;
+    std::string&& Value::moveString() noexcept {
+        mTag = ValueTag::jnull;
+        return std::move(mString);
     }
-    Array* Value::getArray() noexcept {
-        return mData.array;
+    const Array& Value::getArray() const noexcept {
+        return mArray;
     }
-    const Array* Value::getArray() const noexcept {
-        return mData.array;
+    Array&& Value::moveArray() noexcept {
+        mTag = ValueTag::jnull;
+        return std::move(mArray);
     }
-    Object* Value::getObject() noexcept {
-        return mData.object;
+    const Object& Value::getObject() const noexcept {
+        return mObject;
     }
-    const Object* Value::getObject() const noexcept {
-        return mData.object;
+    Object&& Value::moveObject() noexcept {
+        mTag = ValueTag::jnull;
+        return std::move(mObject);
     }
 
     Error<Value> parse(std::istringstream& txt) noexcept;
@@ -166,7 +157,7 @@ namespace JSON {
         txt.read(buff, len);
         if(txt.gcount() < len) return fatal<Value>("Failed to parse null");
         if(strcmp(buff, nullstr) != 0) return fatal<Value>(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff, len)));
-        return Value(); 
+        return Value{}; 
     }
     Error<Value> parseTrue(std::istringstream& txt) noexcept {
         static const char* truestr = "true";
@@ -224,9 +215,9 @@ namespace JSON {
                 if(txt.peek() != ':') return fatal<Value>(std::format("Failed to parse object: expected \':\', got \'{}\'", txt.peek()));
                 //Next character is a colon
                 txt.ignore();
-                auto object = parse(txt);
-                if(object) obj[fieldName] = new Value(object.moveData());
-                else return object;
+                Error<Value> value = parse(txt);
+                if(value) obj[fieldName] = new Value(value.moveData());
+                else return value;
                 break;
             }
         }
@@ -362,25 +353,25 @@ namespace JSON {
             str << "true";
             break;
         case ValueTag::jnumber:
-            if(v.getData().number.sign == -1) str << '-';
-            str << v.getData().number.whole;
-            if(v.getData().number.part > 0) {
-                u64 place = v.getData().number.partPlace;
-                u64 part = v.getData().number.part;
+            if(v.getNumber().sign == -1) str << '-';
+            str << v.getNumber().whole;
+            if(v.getNumber().part > 0) {
+                u64 place = v.getNumber().partPlace;
+                u64 part = v.getNumber().part;
                 while(part % place == part) {
                     str << '0';
                     place /= 10;
                 }
-                str << '.' << v.getData().number.part;
+                str << '.' << v.getNumber().part;
             }
-            if(v.getData().number.exponent != 0) {
+            if(v.getNumber().exponent != 0) {
                 str << 'e';
-                if(v.getData().number.exponentSign == -1) str << '-';
-                str << v.getData().number.exponent;
+                if(v.getNumber().exponentSign == -1) str << '-';
+                str << v.getNumber().exponent;
             }
             break;
         case ValueTag::jstring:
-            str << "\"" << v.getData().string << "\"";
+            str << "\"" << v.getString() << "\"";
             break;
         case ValueTag::jobject:
             str << "\n";
@@ -389,13 +380,13 @@ namespace JSON {
             }
             str << "{\n";
             index = 0;
-            for(const auto [fieldname, value] : *v.getData().object) {
+            for(const auto [fieldname, value] : v.getObject()) {
                 for(int i = 0; i < indentCount; i++) {
                     str << "\t";
                 }
                 str << "\"" << fieldname << "\" : ";
                 serializeValue(str, *value, indentCount + 1);
-                if(index++ < v.getData().object->size()) {
+                if(index++ < v.getObject().size()) {
                     str << ",";
                 }
                 str << "\n";
@@ -412,12 +403,12 @@ namespace JSON {
             }
             str << "[\n";
             index = 0;
-            for(const Value* value : *v.getData().array) {
+            for(const Value* value : v.getArray()) {
                 for(int i = 0; i < indentCount; i++) {
                     str << "\t";
                 }
                 serializeValue(str, *value, indentCount + 1);
-                if(index++ < v.getData().array->size()) {
+                if(index++ < v.getArray().size()) {
                     str << ",";
                 }
                 str << "\n";
