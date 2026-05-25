@@ -1,10 +1,12 @@
 #include "mars_renderer.h"
+#include "mars_renderer_flags.h"
 
 #include <fstream>
 #include <print>
 #include <set>
 #include <string>
 #include <vector>
+#include <cstring>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -1940,7 +1942,7 @@ namespace mars {
             return res.moveError<Renderer*>();\
         } while(false)
         if(auto res = r->createVkInstance(name); !res) {
-            r->flags |= rendererFlags::instanceInvalid;
+            r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
             delete r;
             return res.moveError<Renderer*>();
         }

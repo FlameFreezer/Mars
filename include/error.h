@@ -2,7 +2,6 @@
 
 #include <string>
 #include <utility>
-#include <cstring>
 #include <print>
 #include <iostream>
 #include <stdexcept>
@@ -30,26 +29,11 @@ static constexpr std::string tagToString(ErrorTag tag) noexcept {
 template <class T>
 class [[nodiscard("Potentially unhandled error value")]] Error {
     union {
-        T mData;
+        T mData {};
         std::string mMessage;
     };
     ErrorTag mTag;
-    //Writes zeroes to the entire memory space taken up by the Error union, then sets the tag to 
-    // `allOkay`. Does NOT call destructors to the member `data` or `memory`.
-    void reset() {
-        std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
-        mTag = ErrorTag::allOkay;
-    }
     //Calls the destructor of the active data member, then resets the union.
-    void clear() {
-        if(okay()) {
-            mData.~T();
-        }
-        else {
-            mMessage.~basic_string();
-        }
-        reset();
-    }
     public:
     Error() noexcept : mTag(ErrorTag::allOkay), mData() {}
     Error(const T& inData) noexcept : mTag(ErrorTag::allOkay), mData(inData) {}
@@ -57,43 +41,35 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
     Error(ErrorTag inTag, const std::string& inMessage) noexcept : mTag(inTag), mMessage(inMessage) {}
     Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage(std::move(inMessage)) {}
     Error(const Error<T>& other) noexcept {
-        //Zero memory, so that any pointers stored within data members are null before any attempted initialization
-        std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
         mTag = other.mTag;
         if(other.okay()) {
             mData = other.mData;
         }
         else {
-            mMessage = other.mMessage;
+            mData.~T();
+            new (&mMessage) std::string{other.mMessage};
         }
     }
     Error(Error<T>&& other) noexcept {
-        //Zero memory, so that any pointers stored within data members are null before any attempted initialization
-        std::memset(static_cast<void*>(this), 0x00, sizeof(Error<T>));
         mTag = other.mTag;
         if(other.okay()) {
-            mData = std::forward<T>(other.mData);
+            mData = std::move(other.mData);
         }
         else {
-            mMessage = std::forward<std::string>(other.mMessage);
+            mData.~T();
+            new (&mMessage) std::string{std::move(other.mMessage)};
         }
-        other.reset();
     }
     Error<T>& operator=(Error<T>&& rhs) noexcept {
         if(this != &rhs) {
-            //Call destructor on active data member, then write zeroes to whole object.
-            //We have to do this to prevent any invalid pointers from being read once the 
-            // memory is reinterpreted
-            clear();
-            //Now we can safely assign data members
+            this->~Error<T>();
             mTag = rhs.mTag;
             if(rhs.okay()) {
-                mData = std::move(rhs.mData);
+                new (&mData) T{std::move(rhs.mData)};
             }
             else {
-                mMessage = std::move(rhs.mMessage);
+                new (&mMessage) std::string{std::move(rhs.mMessage)};
             }
-            rhs.reset();
         }
         return *this;
     }
@@ -143,8 +119,9 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
     template<class U = noreturn>
     Error<U> moveError() {
         if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveError\"  on an error union which does not have a message");
-        Error<U> result(mTag, std::move(mMessage));
-        reset();
+        Error<U> result{mTag, std::move(mMessage)};
+        mTag = ErrorTag::allOkay;
+        new (&mData) T{};
         return result;
     }
     //Returns `true` if okay. Otherwise, prints `message` and returns `false`.

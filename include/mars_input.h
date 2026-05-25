@@ -5,6 +5,7 @@
 #include <fstream>
 #include <utility>
 #include <vector>
+#include <cstring>
 
 #include <SDL3/SDL.h>
 
