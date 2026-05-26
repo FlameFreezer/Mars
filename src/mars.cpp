@@ -2,8 +2,6 @@
 
 #include <SDL3/SDL.h>
 
-#include "mars_macros.h"
-
 namespace mars {
 
     Error<noreturn> init() noexcept {

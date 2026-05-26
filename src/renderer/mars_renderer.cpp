@@ -11,8 +11,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "mars_macros.h"
-
 namespace mars {
 
     #define TRY_VK(proc, msg) do{\

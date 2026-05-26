@@ -100,7 +100,7 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
         return mData;
     }
     operator const T&() const {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"operator T& const\" on an error union which does not have a value");
+        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"operator const T& \" on an error union which does not have a value");
         return mData;
     }
     //Creates an rvalue reference to `data`. `data` is invalid after calling this, 
@@ -110,7 +110,7 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
         return std::move(mData);
     }
     const std::string& message() const {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\"  on an error union which does not have a message");
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have a message");
         return mMessage;
     }
     //Creates an Error union of the templated type, moving the tag and message from the calling 
@@ -118,7 +118,7 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
     // Error union that is `okay` throws an exception.
     template<class U = noreturn>
     Error<U> moveError() {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveError\"  on an error union which does not have a message");
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveError\" on an error union which does not have a message");
         Error<U> result{mTag, std::move(mMessage)};
         mTag = ErrorTag::allOkay;
         new (&mData) T{};
@@ -155,3 +155,15 @@ template<typename T = noreturn>
 Error<T> fatal(const std::string& message) noexcept {
     return Error<T>(ErrorTag::fatalError, message);
 }
+
+#define TRY(proc) \
+if(auto procResult = proc; !procResult) return procResult
+
+#define TRY_ASSIGN(name, proc, errType) \
+if(auto procResult = proc; !procResult) return procResult.moveError<errType>();\
+else name = procResult.moveData()
+
+#define TRY_INIT(type, name, proc, errType) \
+type name{};\
+if(auto procResult = proc; !procResult) return procResult.moveError<errType>();\
+else name = procResult.moveData()

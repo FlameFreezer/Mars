@@ -4,6 +4,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "mars_types.h"
@@ -19,6 +20,19 @@ namespace JSON {
         jarray,
         jobject
     };
+
+    static constexpr std::string tagToString(ValueTag tag) noexcept {
+        switch(tag) {
+            case ValueTag::jnull: return "null";
+            case ValueTag::jtrue: return "true";
+            case ValueTag::jfalse: return "false";
+            case ValueTag::jnumber: return "number";
+            case ValueTag::jstring: return "string";
+            case ValueTag::jarray: return "array";
+            case ValueTag::jobject: return "object";
+        }
+        std::unreachable();
+    }
 
     struct Number {
         u64 whole = 0;
@@ -61,22 +75,19 @@ namespace JSON {
         Value& operator=(Value&& rhs) noexcept;        
         ~Value() noexcept;        
         ValueTag getTag() const noexcept;        
-        bool getBool() const noexcept;
+        Error<bool> getBool() const noexcept;
         template<typename T> requires std::is_arithmetic<T>::value
         T getNumberAs() const noexcept {
             return mNumber.to<T>();
         }
-        const Number& getNumber() const noexcept;
-        Number& getNumber() noexcept;
-        const std::string& getString() const noexcept;
-        std::string& getString() noexcept;
-        std::string&& moveString() noexcept;
-        const Array& getArray() const noexcept;
-        Array& getArray() noexcept;
-        Array&& moveArray() noexcept;
-        const Object& getObject() const noexcept;
-        Object& getObject() noexcept;
-        Object&& moveObject() noexcept;
+        Error<const Number*> getNumber() const noexcept;
+        Error<Number*> getNumber() noexcept;
+        Error<const std::string*> getString() const noexcept;
+        Error<std::string*> getString() noexcept;
+        Error<const Array*> getArray() const noexcept;
+        Error<Array*> getArray() noexcept;
+        Error<const Object*> getObject() const noexcept;
+        Error<Object*> getObject() noexcept;
     };
 
     using Object = std::unordered_map<std::string, Value>;
