@@ -116,29 +116,53 @@ namespace mars {
             if(mappings.getTag() != JSON::ValueTag::jarray) {
                 return fatal("Input mappings file should start with an array");
             }
-            for(const JSON::Value& jmapping : *mappings.getArray()) {
+            for(const JSON::Value& jmapping : *mappings.getArray().value()) {
                 Mapping resultMapping;
                 resultMapping.isValid = true;
-                const JSON::Object& mapping = *jmapping.getObject();
+                if(jmapping.getTag() != JSON::ValueTag::jobject) {
+                    return fatal("Entries inside mappings JSON array should be objects");
+                }
+                const JSON::Object& mapping = *jmapping.getObject().value();
                 if(mapping.contains("scancodes")) {
-                    for(const JSON::Value& scancodeName : *mapping.at("scancodes").getArray()) {
-                        resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode.at(*scancodeName.getString());
+                    if(mapping.at("scancodes").getTag() != JSON::ValueTag::jarray) {
+                        return fatal("Mapping field \"scancodes\" should hold a JSON array");
+                    }
+                    for(const JSON::Value& scancodeName : *mapping.at("scancodes").getArray().value()) {
+                        if(scancodeName.getTag() != JSON::ValueTag::jstring) {
+                            return fatal("Scancode name should be a string!");
+                        }
+                        resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode.at(*scancodeName.getString().value());
                     }
                 }
                 if(mapping.contains("buttons")) {
-                    for(const JSON::Value& buttonName : *mapping.at("buttons").getArray()) {
-                        resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton.at(*buttonName.getString());
+                    if(mapping.at("buttons").getTag() != JSON::ValueTag::jarray) {
+                        return fatal("Mapping field \"buttons\" should hold a JSON array");
+                    }
+                    for(const JSON::Value& buttonName : *mapping.at("buttons").getArray().value()) {
+                        if(buttonName.getTag() != JSON::ValueTag::jstring) {
+                            return fatal("Button name should be a string!");
+                        }
+                        resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton.at(*buttonName.getString().value());
                     }
                 }
                 if(mapping.contains("sticks")) {
-                    for(const auto [stickName, stickValue] : *mapping.at("sticks").getObject()) {
+                    if(mapping.at("sticks").getTag() != JSON::ValueTag::jobject) {
+                        return fatal("Mapping field \"sticks\" should hold a JSON object");
+                    }
+                    for(const auto [stickName, stickValue] : *mapping.at("sticks").getObject().value()) {
                         resultMapping.axes[resultMapping.numAxes] = strToAxis.at(stickName);
+                        if(stickValue.getTag() != JSON::ValueTag::jnumber) {
+                            return fatal("Joystick values should be numbers");
+                        }
                         resultMapping.axisValues[resultMapping.numAxes] = stickValue.getNumberAs<float>();
                         resultMapping.numAxes++;
                     }
                 }
                 //Get the index of the current mapping from its name
-                const auto mappingIndex = std::to_underlying(strToIndex.at(*mapping.at("tag").getString()));
+                if(mapping.at("tag").getTag() != JSON::ValueTag::jstring) {
+                    return fatal("Mapping field \"tag\" should hold a JSON string");
+                }
+                const auto mappingIndex = std::to_underlying(strToIndex.at(*mapping.at("tag").getString().value()));
                 //Resize the mappings vector if we need space to fit
                 if(mMappings.size() <= mappingIndex) {
                     mMappings.resize(mappingIndex + 1);

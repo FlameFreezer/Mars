@@ -50,9 +50,10 @@ namespace mars {
                 return {ErrorTag::fatalError, "Failed to create image"};
             }
 
-            Error<VkDeviceMemory> mem = vkhelper::allocateDeviceMemory(device, physicalDevice, result.handle, memProperties);
-            if(!mem) return mem.moveError<GPUImage>();
-            result.memory = mem;
+            TRY_ASSIGN(result.memory, vkhelper::allocateDeviceMemory(device, physicalDevice, result.handle, memProperties), GPUImage);
+            //Error<VkDeviceMemory> mem = vkhelper::allocateDeviceMemory(device, physicalDevice, result.handle, memProperties);
+            //if(!mem) return mem.moveError<GPUImage>();
+            //result.memory = mem.value();
 
             const VkImageViewCreateInfo viewInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,

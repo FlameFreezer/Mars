@@ -29,34 +29,33 @@ static constexpr std::string tagToString(ErrorTag tag) noexcept {
 template <class T>
 class [[nodiscard("Potentially unhandled error value")]] Error {
     union {
-        T mData {};
+        T mValue {};
         std::string mMessage;
     };
-    ErrorTag mTag;
-    //Calls the destructor of the active data member, then resets the union.
+    ErrorTag mTag {ErrorTag::allOkay};
     public:
-    Error() noexcept : mTag(ErrorTag::allOkay), mData() {}
-    Error(const T& inData) noexcept : mTag(ErrorTag::allOkay), mData(inData) {}
-    Error(T&& inData) noexcept : mTag(ErrorTag::allOkay), mData(std::move(inData)) {}
+    Error() noexcept = default;
+    Error(const T& inValue) noexcept : mTag(ErrorTag::allOkay), mValue(inValue) {}
+    Error(T&& inValue) noexcept : mTag(ErrorTag::allOkay), mValue(std::move(inValue)) {}
     Error(ErrorTag inTag, const std::string& inMessage) noexcept : mTag(inTag), mMessage(inMessage) {}
     Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage(std::move(inMessage)) {}
     Error(const Error<T>& other) noexcept {
         mTag = other.mTag;
         if(other.okay()) {
-            mData = other.mData;
+            mValue = other.mValue;
         }
         else {
-            mData.~T();
+            mValue.~T();
             new (&mMessage) std::string{other.mMessage};
         }
     }
     Error(Error<T>&& other) noexcept {
         mTag = other.mTag;
         if(other.okay()) {
-            mData = std::move(other.mData);
+            mValue = std::move(other.mValue);
         }
         else {
-            mData.~T();
+            mValue.~T();
             new (&mMessage) std::string{std::move(other.mMessage)};
         }
     }
@@ -65,7 +64,7 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
             this->~Error<T>();
             mTag = rhs.mTag;
             if(rhs.okay()) {
-                new (&mData) T{std::move(rhs.mData)};
+                new (&mValue) T{std::move(rhs.mValue)};
             }
             else {
                 new (&mMessage) std::string{std::move(rhs.mMessage)};
@@ -75,7 +74,7 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
     }
     ~Error() noexcept {
         if(okay()) {
-            mData.~T();
+            mValue.~T();
         }
         else {
             mMessage.~basic_string();
@@ -91,37 +90,33 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
     ErrorTag tag() const noexcept {
         return mTag;
     }
-    const T& data() const {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"data\" on an error union which does not have a value");
-        return mData;
+    const T& value() const {
+        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+        return mValue;
     }
-    T& data() {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"data\" on an error union which does not have a value");
-        return mData;
+    T& value() {
+        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+        return mValue;
     }
-    operator const T&() const {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"operator const T& \" on an error union which does not have a value");
-        return mData;
-    }
-    //Creates an rvalue reference to `data`. `data` is invalid after calling this, 
+    //Creates an rvalue reference to `value`. `value` is invalid after calling this, 
     // though it is still considered the active union field.
-    T&& moveData() {
+    T&& moveValue() {
         if(!okay()) [[unlikely]] throw std::runtime_error("Called \"moveData\" on an error union which does not have a value");
-        return std::move(mData);
+        return std::move(mValue);
     }
     const std::string& message() const {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have a message");
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have an error");
         return mMessage;
     }
     //Creates an Error union of the templated type, moving the tag and message from the calling 
-    // Error union to it. The callng Error union is left `okay`, with data set to zeroes. Calling this function on an 
-    // Error union that is `okay` throws an exception.
+    // Error union to it. The callng Error union is left `okay`, with value in a default-initialized 
+    // state. Calling this function on an Error union that is `okay` throws an exception.
     template<class U = noreturn>
     Error<U> moveError() {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveError\" on an error union which does not have a message");
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveError\" on an error union which does not have an error");
         Error<U> result{mTag, std::move(mMessage)};
         mTag = ErrorTag::allOkay;
-        new (&mData) T{};
+        new (&mValue) T{};
         return result;
     }
     //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
@@ -139,9 +134,9 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
 };
 
 template<>
-const noreturn& Error<noreturn>::data() const = delete;
+const noreturn& Error<noreturn>::value() const = delete;
 template<>
-noreturn& Error<noreturn>::data() = delete;
+noreturn& Error<noreturn>::value() = delete;
 
 //Returns an `Error<noreturn>` with `key == allOkay`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
 Error<noreturn> success() noexcept;
@@ -161,9 +156,10 @@ if(auto procResult = proc; !procResult) return procResult
 
 #define TRY_ASSIGN(name, proc, errType) \
 if(auto procResult = proc; !procResult) return procResult.moveError<errType>();\
-else name = procResult.moveData()
+else name = procResult.moveValue()
 
 #define TRY_INIT(type, name, proc, errType) \
 type name{};\
 if(auto procResult = proc; !procResult) return procResult.moveError<errType>();\
-else name = procResult.moveData()
+else name = procResult.moveValue()
+

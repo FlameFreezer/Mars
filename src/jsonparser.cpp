@@ -200,7 +200,7 @@ namespace JSON {
         case '\"': {
             Error<std::string> str = parseString(txt);
             if(!str) return str.moveError<Value>();
-            return Value{str.moveData()};
+            return Value{str.moveValue()};
         }
         case 'n':
             return parseNull(txt);
@@ -277,7 +277,7 @@ namespace JSON {
                 parseWhitespace(txt); //fallthrough is intended
             //String identifier for a field
             case '\"':
-                std::string fieldName = parseString(txt);
+                TRY_INIT(std::string, fieldName, parseString(txt), Value);
                 //Objects cannot have duplicate field names
                 if(obj.contains(fieldName)) return fatal<Value>(std::format("Failed to parse object: had duplicate field name \"{}\"", fieldName));
                 //Skip until reaching the colon
@@ -287,7 +287,7 @@ namespace JSON {
                 txt.ignore();
                 Error<Value> value = parse(txt);
                 if(value) {
-                    obj[fieldName] = Value{value.moveData()};
+                    obj[fieldName] = Value{value.moveValue()};
                 }
                 else return value;
                 break;
@@ -313,7 +313,7 @@ namespace JSON {
                 txt.ignore(); //fallthrough is intended
             default:
                 auto value = parse(txt);
-                if(value) arr.push_back(Value{value.moveData()});
+                if(value) arr.push_back(Value{value.moveValue()});
                 else return value;
                 break;
             }
@@ -425,7 +425,7 @@ namespace JSON {
             str << "true";
             break;
         case ValueTag::jnumber: {
-            const Number& n = *v.getNumber();
+            const Number& n = *v.getNumber().value();
             if(n.sign == -1) str << '-';
             str << n.whole;
             if(n.part > 0) {
@@ -445,7 +445,7 @@ namespace JSON {
             break;
         }
         case ValueTag::jstring:
-            str << "\"" << *v.getString() << "\"";
+            str << "\"" << *v.getString().value() << "\"";
             break;
         case ValueTag::jobject:
             str << "\n";
@@ -454,13 +454,13 @@ namespace JSON {
             }
             str << "{\n";
             index = 0;
-            for(const auto [fieldname, value] : *v.getObject()) {
+            for(const auto [fieldname, value] : *v.getObject().value()) {
                 for(int i = 0; i < indentCount; i++) {
                     str << "\t";
                 }
                 str << "\"" << fieldname << "\" : ";
                 serializeValue(str, value, indentCount + 1);
-                if(index++ < v.getObject().data()->size()) {
+                if(index++ < v.getObject().value()->size()) {
                     str << ",";
                 }
                 str << "\n";
@@ -477,12 +477,12 @@ namespace JSON {
             }
             str << "[\n";
             index = 0;
-            for(const Value& value : *v.getArray()) {
+            for(const Value& value : *v.getArray().value()) {
                 for(int i = 0; i < indentCount; i++) {
                     str << "\t";
                 }
                 serializeValue(str, value, indentCount + 1);
-                if(index++ < v.getArray().data()->size()) {
+                if(index++ < v.getArray().value()->size()) {
                     str << ",";
                 }
                 str << "\n";
