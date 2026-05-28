@@ -14,7 +14,7 @@ enum class ErrorTag : u8 {
     fatalError,
 };
 
-static constexpr std::string tagToString(ErrorTag tag) noexcept {
+static constexpr std::string typeToString(ErrorTag tag) noexcept {
     switch(tag) {
     case ErrorTag::allOkay:
         return "All Okay";
@@ -108,6 +108,10 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
         if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have an error");
         return mMessage;
     }
+    std::string&& moveMessage() {
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveMessage\" on an error union which does not have an error");
+        return std::move(mMessage);
+    }
     //Creates an Error union of the templated type, moving the tag and message from the calling 
     // Error union to it. The callng Error union is left `okay`, with value in a default-initialized 
     // state. Calling this function on an Error union that is `okay` throws an exception.
@@ -122,13 +126,13 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
     //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     bool report() const noexcept {
         if(okay()) return true;
-        std::println("{}: {}", tagToString(mTag), mMessage);
+        std::println("{}: {}", typeToString(mTag), mMessage);
         return false;
     }
     //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     bool report(std::ostream& ostrm) const noexcept {
         if(okay()) return true;
-        std::println(ostrm, "{}: {}", tagToString(mTag), mMessage);
+        std::println(ostrm, "{}: {}", typeToString(mTag), mMessage);
         return false;
     }
 };
@@ -151,15 +155,16 @@ Error<T> fatal(const std::string& message) noexcept {
     return Error<T>(ErrorTag::fatalError, message);
 }
 
+#define MOVE_ERROR(err) {err.tag(), err.moveMessage()}
+
 #define TRY(proc) \
 if(auto procResult = proc; !procResult) return procResult
 
-#define TRY_ASSIGN(name, proc, errType) \
-if(auto procResult = proc; !procResult) return procResult.moveError<errType>();\
+#define TRY_ASSIGN(name, proc) \
+if(auto procResult = proc; !procResult) return MOVE_ERROR(procResult);\
 else name = procResult.moveValue()
 
-#define TRY_INIT(type, name, proc, errType) \
+#define TRY_INIT(type, name, proc) \
 type name{};\
-if(auto procResult = proc; !procResult) return procResult.moveError<errType>();\
+if(auto procResult = proc; !procResult) return MOVE_ERROR(procResult);\
 else name = procResult.moveValue()
-

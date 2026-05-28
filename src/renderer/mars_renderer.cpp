@@ -245,7 +245,7 @@ namespace mars {
             }
 
             //Get a surface format to use
-            TRY_ASSIGN(result.surfaceInfo.format, checkDeviceSurfaceFormats(currentPhysicalDevice, surface), PickPhysicalDeviceResult);
+            TRY_ASSIGN(result.surfaceInfo.format, checkDeviceSurfaceFormats(currentPhysicalDevice, surface));
 
             //Choose a present mode to use
             switch(Error<VkPresentModeKHR> presentMode = choosePresentMode(currentPhysicalDevice, surface); presentMode.tag()) {
@@ -467,11 +467,11 @@ namespace mars {
             std::format("Something went from while waiting on fence {}", currentFrame)
         );
         //These semaphores indicate that we have successfully acquired an image on this frame
-        TRY_INIT(Slice<VkSemaphore>, imageAcquiredSemaphores, Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames), noreturn);
+        TRY_INIT(Slice<VkSemaphore>, imageAcquiredSemaphores, Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames));
         //These semaphores indicate that we have finished rendering a 2D scene on this frame
-        TRY_INIT(Slice<VkSemaphore>, scene2DReadySemaphores, Slice<VkSemaphore>::make(semaphores, maxConcurrentFrames, 2), noreturn);
+        TRY_INIT(Slice<VkSemaphore>, scene2DReadySemaphores, Slice<VkSemaphore>::make(semaphores, maxConcurrentFrames, 2));
         //These semaphores indicate that the image acquired is ready to present
-        TRY_INIT(Slice<VkSemaphore>, presentReadySemaphores, Slice<VkSemaphore>::make(semaphores, 2 * maxConcurrentFrames), noreturn);
+        TRY_INIT(Slice<VkSemaphore>, presentReadySemaphores, Slice<VkSemaphore>::make(semaphores, 2 * maxConcurrentFrames));
 
         u32 imageIndex;
         VkResult res = vkAcquireNextImageKHR(
@@ -820,7 +820,7 @@ namespace mars {
                 VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                 format, VK_IMAGE_ASPECT_COLOR_BIT
-            ), noreturn);
+            ));
         }
         //create 2D textures - for mapping to the cube
         textures2DScene.resize(maxConcurrentFrames);
@@ -835,7 +835,7 @@ namespace mars {
                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                 format, VK_IMAGE_ASPECT_COLOR_BIT
-            ), noreturn);
+            ));
         }
         //create 3D render targets
         renderTargets3D.resize(maxConcurrentFrames);
@@ -1306,8 +1306,8 @@ namespace mars {
     }
 
     Error<noreturn> Renderer::createGraphicsPipeline() noexcept {
-        TRY_INIT(VkShaderModule, shaderMod2D, createShaderModule("shader2d.spv"), noreturn);
-        TRY_INIT(VkShaderModule, shaderMod3D, createShaderModule("shader3d.spv"), noreturn);
+        TRY_INIT(VkShaderModule, shaderMod2D, createShaderModule("shader2d.spv"));
+        TRY_INIT(VkShaderModule, shaderMod3D, createShaderModule("shader3d.spv"));
 
         std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos2D;
         shaderStageInfos2D[0] = {
@@ -1628,7 +1628,7 @@ namespace mars {
     }
 
     Error<noreturn> Renderer::createSwapchain(SurfaceInfo const& surfaceInfo) noexcept {
-        TRY_ASSIGN(swapchainImageExtent, chooseImageExtent(surfaceInfo.capabilities), noreturn);
+        TRY_ASSIGN(swapchainImageExtent, chooseImageExtent(surfaceInfo.capabilities));
 
         const VkSwapchainCreateInfoKHR swapchainInfo = {
             .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -1797,12 +1797,12 @@ namespace mars {
             graphicsQueueCount -= (graphicsQueueCount / 2U);
         }
 
-        TRY_ASSIGN(graphicsQueues, Slice<VkQueue>::make(queues, 0, graphicsQueueCount), noreturn);
+        TRY_ASSIGN(graphicsQueues, Slice<VkQueue>::make(queues, 0, graphicsQueueCount));
         if(graphicsQueueCount == 1U) {
             presentQueues = graphicsQueues;
         }
         else {
-            TRY_ASSIGN(presentQueues, Slice<VkQueue>::make(queues, graphicsQueueCount), noreturn);
+            TRY_ASSIGN(presentQueues, Slice<VkQueue>::make(queues, graphicsQueueCount));
         }
 
         return success();

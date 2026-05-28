@@ -54,10 +54,10 @@ namespace mars {
         }
     };
     class CameraBuilder {
-        glm::vec3 pos = glm::vec3(0.0f);
-        glm::vec3 dir = glm::vec3(0.0f);
-        glm::vec3 up = glm::vec3(0.0f);
-        float fov = 0.0f;
+        glm::vec3 pos = glm::vec3(0.0f, 0.0f, -1.0f);
+        glm::vec3 dir = glm::vec3(0.0f, 0.0f, 1.0f);
+        glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
+        float fov = 45.0f;
         float aspect = 0.0f;
         float maxY = 0.9f;
         float nearPlane = 0.1f;

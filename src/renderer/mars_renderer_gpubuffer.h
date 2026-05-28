@@ -31,10 +31,7 @@ namespace mars {
             if(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer.handle) != VK_SUCCESS) {
                 return {ErrorTag::fatalError, "Failed to create VkBuffer while initializing GPUBuffer"};
             }
-            TRY_ASSIGN(buffer.memory, vkhelper::allocateDeviceMemory(device, physicalDevice, buffer.handle, memProperties), GPUBuffer);
-            //Error<VkDeviceMemory> mem = vkhelper::allocateDeviceMemory(device, physicalDevice, buffer.handle, memProperties);
-            //if(!mem) return mem.moveError<GPUBuffer>();
-            //buffer.memory = mem.value();
+            TRY_ASSIGN(buffer.memory, vkhelper::allocateDeviceMemory(device, physicalDevice, buffer.handle, memProperties));
             return buffer;
         }
     };

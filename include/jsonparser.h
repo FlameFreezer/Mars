@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <format>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -11,7 +12,7 @@
 #include "error.h"
 
 namespace JSON {
-    enum class ValueTag : u32 {
+    enum class Type : u32 {
         jnull,
         jtrue,
         jfalse,
@@ -21,18 +22,19 @@ namespace JSON {
         jobject
     };
 
-    static constexpr std::string tagToString(ValueTag tag) noexcept {
+    constexpr std::string typeToString(Type tag) noexcept {
         switch(tag) {
-            case ValueTag::jnull: return "null";
-            case ValueTag::jtrue: return "true";
-            case ValueTag::jfalse: return "false";
-            case ValueTag::jnumber: return "number";
-            case ValueTag::jstring: return "string";
-            case ValueTag::jarray: return "array";
-            case ValueTag::jobject: return "object";
+            case Type::jnull: return "null";
+            case Type::jtrue: return "true";
+            case Type::jfalse: return "false";
+            case Type::jnumber: return "number";
+            case Type::jstring: return "string";
+            case Type::jarray: return "array";
+            case Type::jobject: return "object";
         }
         std::unreachable();
     }
+
 
     struct Number {
         u64 whole = 0;
@@ -50,7 +52,7 @@ namespace JSON {
     class Value {
         using Array = std::vector<Value>;
         using Object = std::unordered_map<std::string, Value>;
-        ValueTag mTag = ValueTag::jnull;
+        Type mType = Type::jnull;
         union {
             bool mBoolean {false};
             std::string mString;
@@ -74,12 +76,12 @@ namespace JSON {
         Value& operator=(const Value& rhs) noexcept;
         Value& operator=(Value&& rhs) noexcept;        
         ~Value() noexcept;        
-        ValueTag getTag() const noexcept;        
+        Type getType() const noexcept;        
         Error<bool> getBool() const noexcept;
         template<typename T> requires std::is_arithmetic<T>::value
         Error<T> getNumberAs() const noexcept {
-            if(mTag != ValueTag::jnumber) {
-                return fatal<T>(std::format("Tried to get a number from a JSON value, but the type was {}", tagToString(mTag)));
+            if(mType != Type::jnumber) {
+                return fatal<T>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
             }
             return mNumber.to<T>();
         }
@@ -92,6 +94,20 @@ namespace JSON {
         Error<const Object*> getObject() const noexcept;
         Error<Object*> getObject() noexcept;
     };
+
+    template<class T>
+    Error<T> valueTo(const Value& value) noexcept;
+
+    template<>
+    Error<bool> valueTo(const Value& value) noexcept;
+
+    template<>
+    Error<std::string> valueTo(const Value& value) noexcept;
+
+    template<class T> requires std::is_arithmetic<T>::value
+    Error<T> valueTo(const Value& value) noexcept {
+        return value.getNumberAs<T>();
+    }
 
     using Object = std::unordered_map<std::string, Value>;
     using Array = std::vector<Value>;

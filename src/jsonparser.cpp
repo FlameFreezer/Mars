@@ -10,165 +10,165 @@ namespace JSON {
 
     Value::Value(bool b) noexcept {
         mBoolean = b;
-        if(b) mTag = ValueTag::jtrue;
-        else mTag = ValueTag::jfalse;
+        if(b) mType = Type::jtrue;
+        else mType = Type::jfalse;
     }
-    Value::Value(Number n) noexcept : mTag(ValueTag::jnumber), mNumber{n} {}
-    Value::Value(const std::string& str) noexcept : mTag(ValueTag::jstring), mString(str) {}
-    Value::Value(std::string&& str) noexcept : mTag(ValueTag::jstring), mString(std::move(str)) {}
-    Value::Value(const Array& a) noexcept : mTag(ValueTag::jarray), mArray(a) {}
-    Value::Value(Array&& a) noexcept : mTag(ValueTag::jarray), mArray(std::move(a)) {}
-    Value::Value(const Object& o) noexcept : mTag(ValueTag::jobject), mObject(o) {}
-    Value::Value(Object&& o) noexcept : mTag(ValueTag::jobject), mObject(std::move(o)) {}
-    Value::Value(const Value& other) noexcept : mTag(other.mTag) {
-        switch(mTag) {
-            case ValueTag::jnull: mBoolean = false; break;
-            case ValueTag::jfalse: mBoolean = false; break;
-            case ValueTag::jtrue: mBoolean = true; break;
-            case ValueTag::jnumber: mNumber = other.mNumber; break;
-            case ValueTag::jstring: 
+    Value::Value(Number n) noexcept : mType(Type::jnumber), mNumber{n} {}
+    Value::Value(const std::string& str) noexcept : mType(Type::jstring), mString(str) {}
+    Value::Value(std::string&& str) noexcept : mType(Type::jstring), mString(std::move(str)) {}
+    Value::Value(const Array& a) noexcept : mType(Type::jarray), mArray(a) {}
+    Value::Value(Array&& a) noexcept : mType(Type::jarray), mArray(std::move(a)) {}
+    Value::Value(const Object& o) noexcept : mType(Type::jobject), mObject(o) {}
+    Value::Value(Object&& o) noexcept : mType(Type::jobject), mObject(std::move(o)) {}
+    Value::Value(const Value& other) noexcept : mType(other.mType) {
+        switch(mType) {
+            case Type::jnull: mBoolean = false; break;
+            case Type::jfalse: mBoolean = false; break;
+            case Type::jtrue: mBoolean = true; break;
+            case Type::jnumber: mNumber = other.mNumber; break;
+            case Type::jstring: 
                 new (&mString) std::string{other.mString};
                 break;
-            case ValueTag::jarray: 
+            case Type::jarray: 
                 new (&mArray) Array{other.mArray};
                 break;
-            case ValueTag::jobject: 
+            case Type::jobject: 
                 new (&mObject) Object{other.mObject};
                 break;
         }
     }
-    Value::Value(Value&& other) noexcept : mTag(other.mTag) {
-        switch(mTag) {
-            case ValueTag::jnull: mBoolean = false; break;
-            case ValueTag::jfalse: mBoolean = false; break;
-            case ValueTag::jtrue: mBoolean = true; break;
-            case ValueTag::jnumber: mNumber = other.mNumber; break;
-            case ValueTag::jstring: 
+    Value::Value(Value&& other) noexcept : mType(other.mType) {
+        switch(mType) {
+            case Type::jnull: mBoolean = false; break;
+            case Type::jfalse: mBoolean = false; break;
+            case Type::jtrue: mBoolean = true; break;
+            case Type::jnumber: mNumber = other.mNumber; break;
+            case Type::jstring: 
                 new (&mString) std::string{std::move(other.mString)};
                 break;
-            case ValueTag::jarray: 
+            case Type::jarray: 
                 new (&mArray) Array{std::move(other.mArray)};
                 break;
-            case ValueTag::jobject: 
+            case Type::jobject: 
                 new (&mObject) Object{std::move(other.mObject)};
                 break;
         }
-        other.mTag = ValueTag::jnull;
+        other.mType = Type::jnull;
     }
     Value& Value::operator=(const Value& rhs) noexcept {
-        if(mTag != rhs.mTag) this->~Value();
-        switch(rhs.mTag) {
-            case ValueTag::jnull: mBoolean = false; break;
-            case ValueTag::jfalse: mBoolean = false; break;
-            case ValueTag::jtrue: mBoolean = true; break;
-            case ValueTag::jnumber: mNumber = rhs.mNumber; break;
-            case ValueTag::jstring: 
+        if(mType != rhs.mType) this->~Value();
+        switch(rhs.mType) {
+            case Type::jnull: mBoolean = false; break;
+            case Type::jfalse: mBoolean = false; break;
+            case Type::jtrue: mBoolean = true; break;
+            case Type::jnumber: mNumber = rhs.mNumber; break;
+            case Type::jstring: 
                 new (&mString) std::string{rhs.mString};
                 break;
-            case ValueTag::jarray: 
+            case Type::jarray: 
                 new (&mArray) Array{rhs.mArray};
                 break;
-            case ValueTag::jobject: 
+            case Type::jobject: 
                 new (&mObject) Object{rhs.mObject};
                 break;
         }
-        mTag = rhs.mTag;
+        mType = rhs.mType;
         return *this;
     }
     Value& Value::operator=(Value&& rhs) noexcept {
-        if(mTag != rhs.mTag) this->~Value();
-        switch(rhs.mTag) {
-            case ValueTag::jnull: mBoolean = false; break;
-            case ValueTag::jfalse: mBoolean = false; break;
-            case ValueTag::jtrue: mBoolean = true; break;
-            case ValueTag::jnumber: mNumber = rhs.mNumber; break;
-            case ValueTag::jstring: 
+        if(mType != rhs.mType) this->~Value();
+        switch(rhs.mType) {
+            case Type::jnull: mBoolean = false; break;
+            case Type::jfalse: mBoolean = false; break;
+            case Type::jtrue: mBoolean = true; break;
+            case Type::jnumber: mNumber = rhs.mNumber; break;
+            case Type::jstring: 
                 new (&mString) std::string{std::move(rhs.mString)};
                 break;
-            case ValueTag::jarray: 
+            case Type::jarray: 
                 new (&mArray) Array{std::move(rhs.mArray)};
                 break;
-            case ValueTag::jobject: 
+            case Type::jobject: 
                 new (&mObject) Object{std::move(rhs.mObject)};
                 break;
         }
-        mTag = rhs.mTag;
-        rhs.mTag = ValueTag::jnull;
+        mType = rhs.mType;
+        rhs.mType = Type::jnull;
         return *this;
     }
     Value::~Value() noexcept {
-        switch(mTag) {
-            case ValueTag::jstring: 
+        switch(mType) {
+            case Type::jstring: 
                 mString.~basic_string();
                 break;
-            case ValueTag::jobject: 
+            case Type::jobject: 
                 mObject.~Object();
                 break;
-            case ValueTag::jarray: 
+            case Type::jarray: 
                 mArray.~Array();
                 break;
             default: break;
         }
     }
-    ValueTag Value::getTag() const noexcept {
-        return mTag;
+    Type Value::getType() const noexcept {
+        return mType;
     }
     Error<bool> Value::getBool() const noexcept {
-        if(mTag != ValueTag::jtrue and mTag != ValueTag::jfalse) {
-            return fatal<bool>(std::format("Tried to get true or false from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jtrue and mType != Type::jfalse) {
+            return fatal<bool>(std::format("Tried to get true or false from a JSON value, but the type was {}", typeToString(mType)));
         }
         return mBoolean;
     }
     Error<const Number*> Value::getNumber() const noexcept {
-        if(mTag != ValueTag::jnumber) {
-            return fatal<const Number*>(std::format("Tried to get a number from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jnumber) {
+            return fatal<const Number*>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
         }
 
         return &mNumber;
     }
     Error<Number*> Value::getNumber() noexcept {
-        if(mTag != ValueTag::jnumber) {
-            return fatal<Number*>(std::format("Tried to get a number from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jnumber) {
+            return fatal<Number*>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
         }
 
         return &mNumber;
 
     }
     Error<const std::string*> Value::getString() const noexcept {
-        if(mTag != ValueTag::jstring) {
-            return fatal<const std::string*>(std::format("Tried to get a string from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jstring) {
+            return fatal<const std::string*>(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
         }
         return &mString;
     }
     Error<std::string*> Value::getString() noexcept {
-        if(mTag != ValueTag::jstring) {
-            return fatal<std::string*>(std::format("Tried to get a string from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jstring) {
+            return fatal<std::string*>(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
         }
         return &mString;
 
     }
     Error<const Array*> Value::getArray() const noexcept {
-        if(mTag != ValueTag::jarray) {
-            return fatal<const Array*>(std::format("Tried to get an array from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jarray) {
+            return fatal<const Array*>(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
         }
         return &mArray;
     }
     Error<Array*> Value::getArray() noexcept {
-        if(mTag != ValueTag::jarray) {
-            return fatal<Array*>(std::format("Tried to get an array from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jarray) {
+            return fatal<Array*>(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
         }
         return &mArray;
     }
 
     Error<const Object*> Value::getObject() const noexcept {
-        if(mTag != ValueTag::jobject) {
-            return fatal<const Object*>(std::format("Tried to get an object from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jobject) {
+            return fatal<const Object*>(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
         }
         return &mObject;
     }
     Error<Object*> Value::getObject() noexcept {
-        if(mTag != ValueTag::jobject) {
-            return fatal<Object*>(std::format("Tried to get an object from a JSON value, but the type was {}", tagToString(mTag)));
+        if(mType != Type::jobject) {
+            return fatal<Object*>(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
         }
         return &mObject;
     }
@@ -178,6 +178,17 @@ namespace JSON {
     Error<Value> parse(const std::string& text) noexcept {
         std::istringstream jsontxt(text);
         return parse(jsontxt);
+    }
+
+    template<>
+    Error<bool> valueTo(const Value& value) noexcept {
+        return value.getBool();
+    }
+    template<>
+    Error<std::string> valueTo(const Value& value) noexcept {
+        Error<const std::string*> res = value.getString();
+        if(!res) return res.moveError<std::string>();
+        else return *res.value();
     }
 
     Error<Value> parseObject(std::istringstream& txt) noexcept;
@@ -277,7 +288,7 @@ namespace JSON {
                 parseWhitespace(txt); //fallthrough is intended
             //String identifier for a field
             case '\"':
-                TRY_INIT(std::string, fieldName, parseString(txt), Value);
+                TRY_INIT(std::string, fieldName, parseString(txt));
                 //Objects cannot have duplicate field names
                 if(obj.contains(fieldName)) return fatal<Value>(std::format("Failed to parse object: had duplicate field name \"{}\"", fieldName));
                 //Skip until reaching the colon
@@ -414,17 +425,17 @@ namespace JSON {
     }
     void serializeValue(std::ostringstream& str, const Value& v, int indentCount) noexcept {
         int index = 0;
-        switch(v.getTag()) {
-        case ValueTag::jnull: 
+        switch(v.getType()) {
+        case Type::jnull: 
             str << "null";
             break;
-        case ValueTag::jfalse:
+        case Type::jfalse:
             str << "false";
             break;
-        case ValueTag::jtrue:
+        case Type::jtrue:
             str << "true";
             break;
-        case ValueTag::jnumber: {
+        case Type::jnumber: {
             const Number& n = *v.getNumber().value();
             if(n.sign == -1) str << '-';
             str << n.whole;
@@ -444,10 +455,10 @@ namespace JSON {
             }
             break;
         }
-        case ValueTag::jstring:
+        case Type::jstring:
             str << "\"" << *v.getString().value() << "\"";
             break;
-        case ValueTag::jobject:
+        case Type::jobject:
             str << "\n";
             for(int i = 0; i < indentCount - 1; i++) {
                 str << "\t";
@@ -470,7 +481,7 @@ namespace JSON {
             }
             str << "}";
             break;
-        case ValueTag::jarray:
+        case Type::jarray:
             str << "\n";
             for(int i = 0; i < indentCount - 1; i++) {
                 str << "\t";
