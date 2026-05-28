@@ -77,7 +77,10 @@ namespace JSON {
         ValueTag getTag() const noexcept;        
         Error<bool> getBool() const noexcept;
         template<typename T> requires std::is_arithmetic<T>::value
-        T getNumberAs() const noexcept {
+        Error<T> getNumberAs() const noexcept {
+            if(mTag != ValueTag::jnumber) {
+                return fatal<T>(std::format("Tried to get a number from a JSON value, but the type was {}", tagToString(mTag)));
+            }
             return mNumber.to<T>();
         }
         Error<const Number*> getNumber() const noexcept;
