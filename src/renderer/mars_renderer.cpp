@@ -1,5 +1,6 @@
 #include "mars_renderer.h"
 #include "mars_renderer_flags.h"
+#include "mars_renderer_gpubuffer.h"
 
 #include <fstream>
 #include <print>
@@ -2008,6 +2009,10 @@ namespace mars {
             for(GPUImage& target : renderTargets2D) target.destroy(device);
             for(GPUImage& texture : textures2DScene) texture.destroy(device);
             for(GPUImage& target : renderTargets3D) target.destroy(device);
+            while(!transferBuffers.empty()) {
+                transferBuffers.front().destroy(device);
+                transferBuffers.pop();
+            }
             vkDestroySampler(device, sampler, nullptr);
             vkFreeCommandBuffers(device, commandPool, commandBuffers.size(), commandBuffers.data());
             vkDestroyCommandPool(device, commandPool, nullptr);
