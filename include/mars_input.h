@@ -65,7 +65,7 @@ namespace mars {
 
     template<class ActionIndex>
     class Input {
-        std::vector<Mapping> mMappings;
+        std::vector<Mapping> mMappings{};
         bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
         bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
         i16 mPrevAxisState[SDL_GAMEPAD_AXIS_COUNT] = {0};
@@ -117,7 +117,7 @@ namespace mars {
                 return fatal("Input mappings file should start with an array");
             }
             for(const JSON::Value& jmapping : *mappings.getArray().value()) {
-                Mapping resultMapping;
+                Mapping resultMapping{};
                 resultMapping.isValid = true;
                 if(jmapping.getType() != JSON::Type::jobject) {
                     return fatal("Entries inside mappings JSON array should be objects");
@@ -179,15 +179,18 @@ namespace mars {
             mKeyState = SDL_GetKeyboardState(nullptr);
             int numGamepads = 0;
             SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
+            //If a gamepad is detected but we don't have any connected, open the first gamepad
             if(numGamepads != 0 and !SDL_GamepadConnected(mGamepad)) {
                 mGamepad = SDL_OpenGamepad(gamepads[0]);
             }
+            //If no gamepads are connected, close the first gamepad
             else if(!SDL_GamepadConnected(mGamepad)) {
                 SDL_CloseGamepad(mGamepad);
                 mGamepad = nullptr;
                 std::memset(mPrevGamepadButtonState, SDL_GAMEPAD_BUTTON_COUNT, false);
                 std::memset(mGamepadButtonState, SDL_GAMEPAD_BUTTON_COUNT, false);
             }
+            //Otherwise, update the gamepad states
             else {
                 for(u64 i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; i++) {
                     mPrevGamepadButtonState[i] = mGamepadButtonState[i];
@@ -225,7 +228,7 @@ namespace mars {
                 if(isKeyDown(mapping.scancodes[i])) return true;
             }
             for(u8 i = 0; i < mapping.numGamepadButtons; i++) {
-                if(isButtonDown(mapping.gamepadButtons[i])) return true;
+               if(isButtonDown(mapping.gamepadButtons[i])) return true;
             }
             for(u8 i = 0; i < mapping.numAxes; i++) {
                 const i16 val = mapping.axisValues[i] * angleToAxisValue;

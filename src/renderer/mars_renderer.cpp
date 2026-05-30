@@ -1939,7 +1939,7 @@ namespace mars {
             return res.moveError<Renderer*>();\
         } while(false)
 
-        if(auto res = r->createVkInstance(name); !res) {
+        if(Error<noreturn> res = r->createVkInstance(name); !res) {
             r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
             delete r;
             return res.moveError<Renderer*>();
