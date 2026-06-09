@@ -7,13 +7,17 @@
 
 namespace mars {
     struct GPUBuffer {
-        VkBuffer handle;
-        VkDeviceMemory memory;
-        VkDeviceSize size;
+        VkBuffer handle{};
+        VkDeviceMemory memory{};
+        VkDeviceSize size{};
 
         void destroy(VkDevice device) {
-            vkDestroyBuffer(device, handle, nullptr);
-            vkFreeMemory(device, memory, nullptr);
+            if (handle) {
+				vkDestroyBuffer(device, handle, nullptr);
+            }
+            if (memory) {
+				vkFreeMemory(device, memory, nullptr);
+            }
         }
         static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
             GPUBuffer buffer;
@@ -37,11 +41,13 @@ namespace mars {
     };
     template<class T>
     struct UniformBuffer {
-        GPUBuffer buffer;
-        T* mappedMemory;
+        GPUBuffer buffer{};
+        T* mappedMemory{};
 
         void destroy(VkDevice device) noexcept {
-            vkUnmapMemory(device, buffer.memory);
+            if (buffer.memory) {
+				vkUnmapMemory(device, buffer.memory);
+            }
             buffer.destroy(device);
         }
         static Error<UniformBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size) noexcept {
@@ -52,7 +58,7 @@ namespace mars {
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             ); 
-            if(!buffer) return buffer.moveError<UniformBuffer>();
+            if(!buffer.okay()) return buffer.moveError<UniformBuffer>();
 
             UniformBuffer result{buffer.moveValue()};
 

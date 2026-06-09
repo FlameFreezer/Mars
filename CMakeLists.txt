@@ -77,7 +77,6 @@ if(${MARS_RENDERER_MAX_TEXTURES})
     target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_TEXTURES=${MARS_RENDERER_MAX_TEXTURES})
 endif()
 
-
 # Link libraries to mars
 target_link_libraries(Mars PRIVATE SDL3::SDL3 glm::glm)
 
@@ -91,7 +90,7 @@ target_include_directories(Mars PUBLIC
     "${PROJECT_SOURCE_DIR}/vendored/SDL/include" 
     "${PROJECT_SOURCE_DIR}/vendored/glm"
     "${PROJECT_SOURCE_DIR}/thirdparty/stb"
-    "${PROJECT_SOURCE_DIR}/thirdparty/vulkan"
+    "$ENV{VULKAN_SDK}/include"
     "${PROJECT_SOURCE_DIR}/include"
     "${PROJECT_SOURCE_DIR}/src/renderer"
     "${PROJECT_SOURCE_DIR}/src/ecs"

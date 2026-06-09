@@ -11,8 +11,8 @@
 namespace mars {
     //The Mesh and Texture component systems are internal to the renderer and are managed by their own entity manager
     struct Mesh {
-        VkBuffer handles[maxMeshes];
-        VkDeviceMemory memories[maxMeshes];
+        VkBuffer handles[maxMeshes] = {};
+        VkDeviceMemory memories[maxMeshes] = {};
         struct {
             VkDeviceSize indexOffset = 0;
             u32 numIndices = 0;
@@ -27,7 +27,7 @@ namespace mars {
     template<>
     class ComponentSystem<Mesh> : public ComponentSystemParent {
         //Remember, Mesh is a struct of arrays
-        Mesh mData;
+        Mesh mData {};
         public:
         //Getter for array of vertex buffer handles
         VkBuffer* handles() noexcept {

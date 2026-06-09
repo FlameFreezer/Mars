@@ -18,13 +18,13 @@ namespace vkhelper {
         VkMemoryRequirements memRequirements{};
         vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
         Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
-        if(!memType) return memType.moveError<VkDeviceMemory>();
+        if(!memType.okay()) return memType.moveError<VkDeviceMemory>();
 
         const VkMemoryAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .pNext = nullptr,
             .allocationSize = memRequirements.size,
-            .memoryTypeIndex = memType
+            .memoryTypeIndex = memType.value()
         };
         VkDeviceMemory memory = nullptr;
         if(vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
@@ -39,13 +39,13 @@ namespace vkhelper {
         VkMemoryRequirements memRequirements{};
         vkGetImageMemoryRequirements(device, image, &memRequirements);
         Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
-        if(!memType) return memType.moveError<VkDeviceMemory>();
+        if(!memType.okay()) return memType.moveError<VkDeviceMemory>();
 
         const VkMemoryAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .pNext = nullptr,
             .allocationSize = memRequirements.size,
-            .memoryTypeIndex = memType
+            .memoryTypeIndex = memType.value()
         };
         VkDeviceMemory memory = nullptr;
         if(vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {

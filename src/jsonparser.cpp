@@ -187,7 +187,7 @@ namespace JSON {
     template<>
     Error<std::string> valueTo(const Value& value) noexcept {
         Error<const std::string*> res = value.getString();
-        if(!res) return res.moveError<std::string>();
+        if(!res.okay()) return res.moveError<std::string>();
         else return *res.value();
     }
 
@@ -210,7 +210,7 @@ namespace JSON {
             return parseArray(txt);
         case '\"': {
             Error<std::string> str = parseString(txt);
-            if(!str) return str.moveError<Value>();
+            if(!str.okay()) return str.moveError<Value>();
             return Value{str.moveValue()};
         }
         case 'n':
@@ -234,29 +234,32 @@ namespace JSON {
     Error<Value> parseNull(std::istringstream& txt) noexcept {
         static const char* nullstr = "null";
         static const std::size_t len = strlen(nullstr);
-        char buff[len];
-        txt.read(buff, len);
+        std::string buff{};
+        buff.reserve(len);
+        txt.read(buff.data(), buff.capacity());
         if(txt.gcount() < len) return fatal<Value>("Failed to parse null");
-        if(strcmp(buff, nullstr) != 0) return fatal<Value>(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff, len)));
+        if(strcmp(buff.data(), nullstr) != 0) return fatal<Value>(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff)));
         return Value{}; 
     }
     Error<Value> parseTrue(std::istringstream& txt) noexcept {
         static const char* truestr = "true";
         static const std::size_t len = strlen(truestr);
-        char buff[len];
-        txt.read(buff, len);
+        std::string buff{};
+        buff.reserve(len);
+        txt.read(buff.data(), buff.capacity());
         if(txt.gcount() < len) return fatal<Value>("Failed to parse true");
-        if(strcmp(buff, truestr) != 0) return fatal<Value>(std::format("Failed to parse true: \"{}\" is not true", std::string_view(buff, len)));
-        return Value(true); 
+        if(strcmp(buff.data(), truestr) != 0) return fatal<Value>(std::format("Failed to parse true: \"{}\" is not true", std::string_view(buff)));
+        return Value{true}; 
     }
     Error<Value> parseFalse(std::istringstream& txt) noexcept {
         static const char* falsestr = "false";
         static const std::size_t len = strlen(falsestr);
-        char buff[len];
-        txt.read(buff, len);
+        std::string buff{};
+        buff.reserve(len);
+        txt.read(buff.data(), buff.capacity());
         if(txt.gcount() < len) return fatal<Value>("Failed to parse false");
-        if(strcmp(buff, falsestr) != 0) return fatal<Value>(std::format("Failed to parse false: \"{}\" is not false", std::string_view(buff, len)));
-        return Value(false); 
+        if(strcmp(buff.data(), falsestr) != 0) return fatal<Value>(std::format("Failed to parse false: \"{}\" is not false", std::string_view(buff)));
+        return Value{false}; 
     }
 
     void parseWhitespace(std::istringstream& txt) noexcept {
@@ -297,7 +300,7 @@ namespace JSON {
                 //Next character is a colon
                 txt.ignore();
                 Error<Value> value = parse(txt);
-                if(value) {
+                if(value.okay()) {
                     obj[fieldName] = Value{value.moveValue()};
                 }
                 else return value;
@@ -323,8 +326,8 @@ namespace JSON {
             case ',':
                 txt.ignore(); //fallthrough is intended
             default:
-                auto value = parse(txt);
-                if(value) arr.push_back(Value{value.moveValue()});
+                Error<Value> value = parse(txt);
+                if(value.okay()) arr.push_back(Value{value.moveValue()});
                 else return value;
                 break;
             }

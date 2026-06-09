@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <algorithm>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -439,10 +440,10 @@ namespace mars {
     }
 
     Error<noreturn> Renderer::createCamera() noexcept {
-        auto res = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
+        Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
             //Each frame gets its own 3D camera, while one 2D camera exists
             sizeof(glm::mat4) * (maxConcurrentFrames + 1)); 
-        if(!res) {
+        if(!res.okay()) {
             return res.moveError();
         }
         else cameraMatrices = res.moveValue(); 
@@ -748,42 +749,40 @@ namespace mars {
     Error<noreturn> Renderer::createCube() noexcept {
         const VkDeviceSize verticesSize = Cube::vertices.max_size() * sizeof(Vertex);
         const VkDeviceSize indicesSize = Cube::indices.max_size() * sizeof(u32);
-        auto buff = GPUBuffer::make(
-            device, physicalDevice, 
+        TRY_ASSIGN(cube.buffer, GPUBuffer::make(
+            device, physicalDevice,
             verticesSize + indicesSize,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT 
-                | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        );
-        if(!buff) return buff.moveError();
-        else cube.buffer = buff.moveValue();
+        ));
         
-        auto transferBuffer = GPUBuffer::make(
+        Error<GPUBuffer> transferBuffer = GPUBuffer::make(
             device, physicalDevice,
             verticesSize + indicesSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         );
-        if(!transferBuffer) {
+        if(!transferBuffer.okay()) {
             return transferBuffer.moveError();
         }
-        void* memory;
+        void* memory{};
         if(vkMapMemory(device, transferBuffer.value().memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
             transferBuffer.value().destroy(device);
-            return {ErrorTag::fatalError, "Failed to map device memory"};
+            return {ErrorTag::fatalError, "Failed to map device memory while initializing cube mesh vertex data"};
         }
         std::memcpy(memory, reinterpret_cast<void const*>(Cube::vertices.data()), verticesSize);
         vkUnmapMemory(device, transferBuffer.value().memory);
 
         if(vkMapMemory(device, transferBuffer.value().memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
             transferBuffer.value().destroy(device);
-            return {ErrorTag::fatalError, "Failed to map device memory"};
+            return {ErrorTag::fatalError, "Failed to map device memory while initializing cube mesh index data"};
         }
         std::memcpy(memory, reinterpret_cast<void const*>(Cube::indices.data()), indicesSize);
         vkUnmapMemory(device, transferBuffer.value().memory);
 
         if(!(flags & rendererFlags::beganTransferOps)) {
-            if(auto res = beginTransferOps(); !res) {
+            if(Error<noreturn> res = beginTransferOps(); !res.okay()) {
                 transferBuffer.value().destroy(device);
                 cube.buffer.destroy(device);
                 return res;
@@ -841,19 +840,17 @@ namespace mars {
         //create 3D render targets
         renderTargets3D.resize(maxConcurrentFrames);
         for(GPUImage& target : renderTargets3D) {
-            Error<GPUImage> t = GPUImage::make(
+            TRY_ASSIGN(target, GPUImage::make(
                 device, physicalDevice,
-                {swapchainImageExtent.width, swapchainImageExtent.height, 1},
+                { swapchainImageExtent.width, swapchainImageExtent.height, 1 },
                 //this image will be multisampled
-                msaaSampleCount, 
+                msaaSampleCount,
                 VK_IMAGE_TILING_OPTIMAL,
                 //this will be resolved to the swapchain images
-                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 
+                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                 format, VK_IMAGE_ASPECT_COLOR_BIT
-            );
-            if(!t) return t.moveError();
-            else target = t.moveValue();
+            ));
         }
         return success();
     }
@@ -861,24 +858,20 @@ namespace mars {
         const u32 d = cube.dim;
         const VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
         //2D depth image has the dimensions of the cube
-        Error<GPUImage> dp = GPUImage::make(device, physicalDevice,
-            {d, d, 1},
+        TRY_ASSIGN(depthImage2D, GPUImage::make(device, physicalDevice,
+            { d, d, 1 },
             msaaSampleCount, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-        if(!dp) return dp.moveError();
-        depthImage2D = dp.moveValue();
+            depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT));
         
         //3D depth image has the dimensions of the swapchain images
-        dp = GPUImage::make(device, physicalDevice,
-            {swapchainImageExtent.width, swapchainImageExtent.height, 1},
+        TRY_ASSIGN(depthImage3D, GPUImage::make(device, physicalDevice,
+            { swapchainImageExtent.width, swapchainImageExtent.height, 1 },
             msaaSampleCount, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-        if(!dp) return dp.moveError();
-        depthImage3D = dp.moveValue();
+            depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT));
 
         return success();
     }
@@ -942,16 +935,16 @@ namespace mars {
         vkDeviceWaitIdle(device);
 
         Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevice, surface); 
-        if(!presentMode) return presentMode.moveError();
+        if(!presentMode.okay()) return presentMode.moveError();
 
         VkSurfaceCapabilitiesKHR surfaceCapabilities{};
         TRY_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities), "Failed to get physical device surface capabilities while recreating the swapchain");
 
         Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevice, surface);
-        if(!surfaceFormat) return surfaceFormat.moveError();
+        if(!surfaceFormat.okay()) return surfaceFormat.moveError();
 
         Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceCapabilities);
-        if(!imageExtent) return imageExtent.moveError();
+        if(!imageExtent.okay()) return imageExtent.moveError();
         swapchainImageExtent = imageExtent.value();
 
         cube.dim = std::max(swapchainImageExtent.width, swapchainImageExtent.height);
@@ -1293,7 +1286,7 @@ namespace mars {
 
     Error<VkShaderModule> Renderer::createShaderModule(const std::string& filename) const noexcept {
         auto shader = loadShaderFile(filename);
-        if(!shader) return shader.moveError<VkShaderModule>();
+        if(!shader.okay()) return shader.moveError<VkShaderModule>();
         const VkShaderModuleCreateInfo moduleInfo = {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .pNext = nullptr,
@@ -1674,9 +1667,7 @@ namespace mars {
         }
 
         //Pick a physical device to use
-        if(const Error<PickPhysicalDeviceResult> pickResult = 
-                pickPhysicalDevice(physicalDevices, surface)
-            ) {
+        if (const Error<PickPhysicalDeviceResult> pickResult = pickPhysicalDevice(physicalDevices, surface); pickResult.okay()) {
             PickPhysicalDeviceResult const& res = pickResult.value();
             physicalDevice = res.physicalDevice;
             graphicsQueueFamilyIndex = res.queueFamilyInfo.graphicsIndex;
@@ -1880,7 +1871,7 @@ namespace mars {
             .applicationVersion = 1,
             .pEngineName = nullptr,
             .engineVersion = 0,
-            .apiVersion = VK_MAKE_API_VERSION(1, 4, 335, 0)
+            .apiVersion = VK_MAKE_API_VERSION(1, 4, 0, 0)
         };
         VkInstanceCreateInfo instanceInfo = {
             .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -1934,12 +1925,12 @@ namespace mars {
     Error<Renderer*> Renderer::make(const std::string& name, ID& squareID) noexcept {
         Renderer* r = new Renderer;
         #define RTRY(proc) \
-        if(auto res = proc; !res) do{\
+        if(auto res = proc; !res.okay()) do{\
             delete r;\
             return res.moveError<Renderer*>();\
         } while(false)
 
-        if(Error<noreturn> res = r->createVkInstance(name); !res) {
+        if(Error<noreturn> res = r->createVkInstance(name); !res.okay()) {
             r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
             delete r;
             return res.moveError<Renderer*>();
@@ -1947,7 +1938,7 @@ namespace mars {
         if constexpr(enableValidationLayers) RTRY(r->createDebugUtilsMessenger());
         RTRY(r->createSurface(name));
         SurfaceInfo surfaceInfo{};
-        if(Error<noreturn> res = r->createDevice(surfaceInfo); !res) {
+        if(Error<noreturn> res = r->createDevice(surfaceInfo); !res.okay()) {
             r->flags |= rendererFlags::deviceInvalid;
             delete r;
             return res.moveError<Renderer*>();
@@ -1970,7 +1961,7 @@ namespace mars {
 
         //Create square mesh
         Error<ID> sq = r->makeMesh(Square::vertices, Square::indices);
-        if(!sq) {
+        if(!sq.okay()) {
             delete r;
             return sq.moveError<Renderer*>();
         }
@@ -2048,13 +2039,13 @@ namespace mars {
         Error<GPUBuffer> buffer = GPUBuffer::make(device, physicalDevice, size, 
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        if(!buffer) return buffer.moveError<std::size_t>();
+        if(!buffer.okay()) return buffer.moveError<std::size_t>();
         GPUBuffer vertexBuffer = buffer.moveValue();
         
         //Initialize transfer buffer
         buffer = GPUBuffer::make(device, physicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        if(!buffer) {
+        if(!buffer.okay()) {
             vertexBuffer.destroy(device);
             return buffer.moveError<std::size_t>();
         }
@@ -2080,7 +2071,7 @@ namespace mars {
 
         if(!(flags & rendererFlags::beganTransferOps)) {
             Error<noreturn> res = beginTransferOps();
-            if(!res) {
+            if(!res.okay()) {
                 vertexBuffer.destroy(device);
                 transferBuffer.destroy(device);
                 return res.moveError<std::size_t>();
@@ -2116,7 +2107,7 @@ namespace mars {
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                 VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT
-            ); !image) {
+            ); !image.okay()) {
             stbi_image_free(pixels);
             return image.moveError<std::size_t>();
         }
@@ -2130,7 +2121,7 @@ namespace mars {
                 imageSize, 
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-            ); !tb) {
+            ); !tb.okay()) {
             stbi_image_free(pixels);
             textureImage.destroy(device);
             return tb.moveError<ID>();
@@ -2150,8 +2141,8 @@ namespace mars {
         stbi_image_free(pixels);
 
         if(!(flags & rendererFlags::beganTransferOps)) {
-            auto res = beginTransferOps();
-            if(!res) {
+            Error<noreturn> res = beginTransferOps();
+            if(!res.okay()) {
                 textureImage.destroy(device);
                 transferBuffer.destroy(device);
                 return res.moveError<ID>();

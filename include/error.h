@@ -84,9 +84,6 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
     bool okay() const noexcept {
         return mTag == ErrorTag::allOkay;
     }
-    operator bool() const noexcept {
-        return okay();
-    }
     ErrorTag tag() const noexcept {
         return mTag;
     }
@@ -158,13 +155,13 @@ Error<T> fatal(const std::string& message) noexcept {
 #define MOVE_ERROR(err) {err.tag(), err.moveMessage()}
 
 #define TRY(proc) \
-if(auto procResult = proc; !procResult) return procResult
+if(auto procResult = proc; !procResult.okay()) return procResult
 
 #define TRY_ASSIGN(name, proc) \
-if(auto procResult = proc; !procResult) return MOVE_ERROR(procResult);\
+if(auto procResult = proc; !procResult.okay()) return MOVE_ERROR(procResult);\
 else name = procResult.moveValue()
 
 #define TRY_INIT(type, name, proc) \
 type name{};\
-if(auto procResult = proc; !procResult) return MOVE_ERROR(procResult);\
+if(auto procResult = proc; !procResult.okay()) return MOVE_ERROR(procResult);\
 else name = procResult.moveValue()
