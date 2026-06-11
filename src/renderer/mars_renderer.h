@@ -160,9 +160,9 @@ namespace mars {
         u32 presentQueueFamilyIndex = 0;
         VkSampleCountFlagBits msaaSampleCount;
 
-        void setup3DMemoryBarriers(u32 imageIndex, std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers3D) noexcept;
+        std::array<VkImageMemoryBarrier2, 3> setup3DMemoryBarriers(u32 imageIndex) noexcept;
 
-        void setup2DMemoryBarriers(std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers2D) noexcept;
+        std::array<VkImageMemoryBarrier2, 3> setup2DMemoryBarriers() const noexcept;
 
         void updateCamera() noexcept;
 

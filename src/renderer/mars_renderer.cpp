@@ -283,7 +283,8 @@ namespace mars {
             0, 2, 3
         };
     };
-    void Renderer::setup3DMemoryBarriers(u32 imageIndex, std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers3D) noexcept {
+    std::array<VkImageMemoryBarrier2, 3> Renderer::setup3DMemoryBarriers(u32 imageIndex) noexcept {
+        std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D{};
         //Transition image layout for color writing
         imageMemoryBarriers3D[0] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -347,9 +348,11 @@ namespace mars {
                 .layerCount = 1
             }
         };
+        return imageMemoryBarriers3D;
     }
 
-    void Renderer::setup2DMemoryBarriers(std::array<VkImageMemoryBarrier2, 3>& imageMemoryBarriers2D) noexcept {
+    std::array<VkImageMemoryBarrier2, 3> Renderer::setup2DMemoryBarriers() const noexcept {
+        std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers2D{};
         //Transition image layout for color writing
         imageMemoryBarriers2D[0] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -413,6 +416,7 @@ namespace mars {
                 .layerCount = 1
             }
         };
+        return imageMemoryBarriers2D;
     }
 
     void Renderer::updateCamera() noexcept {
@@ -509,30 +513,33 @@ namespace mars {
         else if(res != VK_SUCCESS) {
             return {ErrorTag::fatalError, "Failed to acquire next swapchain image index"};
         }
+
         if(flags & rendererFlags::beganTransferOps) {
             TRY(doTransferOps());
         }
+
         TRY_VK(vkResetFences(device, 1, &fences[currentFrame]), std::format("Failed to reset fence {}", currentFrame));
 
         //Acquire the command buffers to use for this frame
         VkCommandBuffer commandBuffer2D = commandBuffers[currentFrame];
-        VkCommandBuffer commandBuffer3D = commandBuffers[2 + currentFrame];
+        VkCommandBuffer commandBuffer3D = commandBuffers[maxConcurrentFrames + currentFrame];
 
         //Reset command buffers for the current frame, both for the 2D and 3D scene
         TRY_VK(vkResetCommandBuffer(commandBuffer2D, 0), "Failed to reset command buffer");
         TRY_VK(vkResetCommandBuffer(commandBuffer3D, 0), "Failed to reset command buffer");
 
         //Render 2D scene
-        VkCommandBufferBeginInfo const beginInfo = {
+        const VkCommandBufferBeginInfo beginInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .pNext = nullptr,
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
             .pInheritanceInfo = nullptr
         };
-        TRY_VK(vkBeginCommandBuffer(commandBuffer2D, &beginInfo), "Failed to begin command buffer {}");
+        if (vkBeginCommandBuffer(commandBuffer2D, &beginInfo) != VK_SUCCESS) {
+            return fatal(std::format("Failed to begin 2d command buffer {}", currentFrame));
+        }
 
-        std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers2D;
-        setup2DMemoryBarriers(imageMemoryBarriers2D);
+        const std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers2D = setup2DMemoryBarriers();
 
         VkDependencyInfo const colorWriteDependency2D = {
             .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -585,8 +592,7 @@ namespace mars {
         //Render 3D Scene
         TRY_VK(vkBeginCommandBuffer(commandBuffer3D, &beginInfo), std::format("Failed to begin command buffer {}", 2 + currentFrame));
 
-        std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D;
-        setup3DMemoryBarriers(imageIndex, imageMemoryBarriers3D);
+        const std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D = setup3DMemoryBarriers(imageIndex);
 
         VkDependencyInfo const colorWriteDependency3D = {
             .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
