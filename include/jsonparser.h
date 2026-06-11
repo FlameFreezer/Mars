@@ -85,14 +85,14 @@ namespace JSON {
             }
             return mNumber.to<T>();
         }
-        Error<const Number*> getNumber() const noexcept;
-        Error<Number*> getNumber() noexcept;
-        Error<const std::string*> getString() const noexcept;
-        Error<std::string*> getString() noexcept;
-        Error<const Array*> getArray() const noexcept;
-        Error<Array*> getArray() noexcept;
-        Error<const Object*> getObject() const noexcept;
-        Error<Object*> getObject() noexcept;
+        Error<const Number&> getNumber() const noexcept;
+        Error<Number&> getNumber() noexcept;
+        Error<const std::string&> getString() const noexcept;
+        Error<std::string&> getString() noexcept;
+        Error<const Array&> getArray() const noexcept;
+        Error<Array&> getArray() noexcept;
+        Error<const Object&> getObject() const noexcept;
+        Error<Object&> getObject() noexcept;
     };
 
     template<class T>

@@ -119,58 +119,58 @@ namespace JSON {
         }
         return mBoolean;
     }
-    Error<const Number*> Value::getNumber() const noexcept {
+    Error<const Number&> Value::getNumber() const noexcept {
         if(mType != Type::jnumber) {
-            return fatal<const Number*>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
+            return fatal<const Number&>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
         }
 
-        return &mNumber;
+        return mNumber;
     }
-    Error<Number*> Value::getNumber() noexcept {
+    Error<Number&> Value::getNumber() noexcept {
         if(mType != Type::jnumber) {
-            return fatal<Number*>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
+            return fatal<Number&>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
         }
 
-        return &mNumber;
+        return mNumber;
 
     }
-    Error<const std::string*> Value::getString() const noexcept {
+    Error<const std::string&> Value::getString() const noexcept {
         if(mType != Type::jstring) {
-            return fatal<const std::string*>(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
+            return fatal<const std::string&>(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
         }
-        return &mString;
+        return mString;
     }
-    Error<std::string*> Value::getString() noexcept {
+    Error<std::string&> Value::getString() noexcept {
         if(mType != Type::jstring) {
-            return fatal<std::string*>(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
+            return fatal<std::string&>(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
         }
-        return &mString;
+        return mString;
 
     }
-    Error<const Array*> Value::getArray() const noexcept {
+    Error<const Array&> Value::getArray() const noexcept {
         if(mType != Type::jarray) {
-            return fatal<const Array*>(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
+            return fatal<const Array&>(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
         }
-        return &mArray;
+        return mArray;
     }
-    Error<Array*> Value::getArray() noexcept {
+    Error<Array&> Value::getArray() noexcept {
         if(mType != Type::jarray) {
-            return fatal<Array*>(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
+            return fatal<Array&>(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
         }
-        return &mArray;
+        return mArray;
     }
 
-    Error<const Object*> Value::getObject() const noexcept {
+    Error<const Object&> Value::getObject() const noexcept {
         if(mType != Type::jobject) {
-            return fatal<const Object*>(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
+            return fatal<const Object&>(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
         }
-        return &mObject;
+        return mObject;
     }
-    Error<Object*> Value::getObject() noexcept {
+    Error<Object&> Value::getObject() noexcept {
         if(mType != Type::jobject) {
-            return fatal<Object*>(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
+            return fatal<Object&>(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
         }
-        return &mObject;
+        return mObject;
     }
 
     Error<Value> parse(std::istringstream& txt) noexcept;
@@ -186,9 +186,9 @@ namespace JSON {
     }
     template<>
     Error<std::string> valueTo(const Value& value) noexcept {
-        Error<const std::string*> res = value.getString();
-        if(!res.okay()) return res.moveError<std::string>();
-        else return *res.value();
+        Error<const std::string&> res = value.getString();
+        if (!res.okay()) return { res.tag(), res.moveMessage() };
+        else return res.value();
     }
 
     Error<Value> parseObject(std::istringstream& txt) noexcept;
@@ -439,7 +439,7 @@ namespace JSON {
             str << "true";
             break;
         case Type::jnumber: {
-            const Number& n = *v.getNumber().value();
+            const Number& n = v.getNumber().value();
             if(n.sign == -1) str << '-';
             str << n.whole;
             if(n.part > 0) {
@@ -459,7 +459,7 @@ namespace JSON {
             break;
         }
         case Type::jstring:
-            str << "\"" << *v.getString().value() << "\"";
+            str << "\"" << v.getString().value() << "\"";
             break;
         case Type::jobject:
             str << "\n";
@@ -468,13 +468,13 @@ namespace JSON {
             }
             str << "{\n";
             index = 0;
-            for(const auto [fieldname, value] : *v.getObject().value()) {
+            for(const auto [fieldname, value] : v.getObject().value()) {
                 for(int i = 0; i < indentCount; i++) {
                     str << "\t";
                 }
                 str << "\"" << fieldname << "\" : ";
                 serializeValue(str, value, indentCount + 1);
-                if(index++ < v.getObject().value()->size()) {
+                if(index++ < v.getObject().value().size()) {
                     str << ",";
                 }
                 str << "\n";
@@ -491,12 +491,12 @@ namespace JSON {
             }
             str << "[\n";
             index = 0;
-            for(const Value& value : *v.getArray().value()) {
+            for(const Value& value : v.getArray().value()) {
                 for(int i = 0; i < indentCount; i++) {
                     str << "\t";
                 }
                 serializeValue(str, value, indentCount + 1);
-                if(index++ < v.getArray().value()->size()) {
+                if(index++ < v.getArray().value().size()) {
                     str << ",";
                 }
                 str << "\n";

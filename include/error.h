@@ -33,7 +33,9 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
         std::string mMessage;
     };
     ErrorTag mTag {ErrorTag::allOkay};
-    public:
+public:
+	friend class Error<T&>;
+	friend class Error<const T&>;
     Error() noexcept = default;
     Error(const T& inValue) noexcept : mTag(ErrorTag::allOkay), mValue(inValue) {}
     Error(T&& inValue) noexcept : mTag(ErrorTag::allOkay), mValue(std::move(inValue)) {}
@@ -119,6 +121,154 @@ class [[nodiscard("Potentially unhandled error value")]] Error {
         mTag = ErrorTag::allOkay;
         new (&mValue) T{};
         return result;
+    }
+    //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
+    bool report() const noexcept {
+        if(okay()) return true;
+        std::println("{}: {}", typeToString(mTag), mMessage);
+        return false;
+    }
+    //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
+    bool report(std::ostream& ostrm) const noexcept {
+        if(okay()) return true;
+        std::println(ostrm, "{}: {}", typeToString(mTag), mMessage);
+        return false;
+    }
+};
+
+template <class T>
+class [[nodiscard("Potentially unhandled error value")]] Error<T&> {
+    union {
+        T* mValue;
+        std::string mMessage;
+    };
+    ErrorTag mTag {ErrorTag::allOkay};
+public:
+	friend class Error<T&>;
+	friend class Error<const T&>;
+    Error() noexcept = delete;
+    Error(T& inValue) noexcept : mTag(ErrorTag::allOkay), mValue(&inValue) {}
+    Error(ErrorTag inTag, const std::string& inMessage) noexcept : mTag(inTag), mMessage(inMessage) {}
+    Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage(std::move(inMessage)) {}
+    Error(const Error<T&>& other) noexcept {
+        mTag = other.mTag;
+        if(other.okay()) {
+            mValue = other.mValue;
+        }
+        else {
+            new (&mMessage) std::string{other.mMessage};
+        }
+    }
+    ~Error() noexcept {
+
+        if (!okay()) {
+            mMessage.~basic_string();
+        }
+    }
+    //Cannot move Error Unions which hold references
+    Error(Error<T&>&&) noexcept = delete;
+    Error<T&>& operator=(Error<T&>&&) noexcept = delete;
+    //Returns `true` if `this->tag` is of a value not indicating an error during execution.
+    bool okay() const noexcept {
+        return mTag == ErrorTag::allOkay;
+    }
+    ErrorTag tag() const noexcept {
+        return mTag;
+    }
+    const T& value() const {
+        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+        return *mValue;
+    }
+    T& value() {
+        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+        return *mValue;
+    }
+    const T& moveValue() const {
+        return value();
+    }
+    T& moveValue() {
+        return value();
+    }
+    const std::string& message() const {
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have an error");
+        return mMessage;
+    }
+    std::string&& moveMessage() {
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveMessage\" on an error union which does not have an error");
+        return std::move(mMessage);
+    }
+    //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
+    bool report() const noexcept {
+        if(okay()) return true;
+        std::println("{}: {}", typeToString(mTag), mMessage);
+        return false;
+    }
+    //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
+    bool report(std::ostream& ostrm) const noexcept {
+        if(okay()) return true;
+        std::println(ostrm, "{}: {}", typeToString(mTag), mMessage);
+        return false;
+    }
+};
+template <class T>
+class [[nodiscard("Potentially unhandled error value")]] Error<const T&> {
+    union {
+        const T* mValue;
+        std::string mMessage;
+    };
+    ErrorTag mTag {ErrorTag::allOkay};
+public:
+	friend class Error<T&>;
+	friend class Error<const T&>;
+    Error() noexcept = delete;
+    Error(const T& inValue) noexcept : mTag(ErrorTag::allOkay), mValue(&inValue) {}
+    Error(ErrorTag inTag, const std::string& inMessage) noexcept : mTag(inTag), mMessage(inMessage) {}
+    Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage(std::move(inMessage)) {}
+    Error(const Error<const T&>& other) noexcept {
+        mTag = other.mTag;
+        if(other.okay()) {
+            mValue = other.mValue;
+        }
+        else {
+            new (&mMessage) std::string{other.mMessage};
+        }
+    }
+    Error(const Error<T&>& other) noexcept {
+        mTag = other.mTag;
+        if(other.okay()) {
+            mValue = other.mValue;
+        }
+        else {
+            new (&mMessage) std::string{ other.mMessage };
+        }
+    }
+
+    ~Error() noexcept {
+        if (!okay()) {
+            mMessage.~basic_string();
+        }
+    }
+    //Cannot move Error Unions which hold references
+    Error(Error<const T&>&&) noexcept = delete;
+    Error<const T&>& operator=(Error<const T&>&&) noexcept = delete;
+    //Returns `true` if `this->tag` is of a value not indicating an error during execution.
+    bool okay() const noexcept {
+        return mTag == ErrorTag::allOkay;
+    }
+    ErrorTag tag() const noexcept {
+        return mTag;
+    }
+    const T& value() const {
+        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+        return *mValue;
+    }
+    const std::string& message() const {
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have an error");
+        return mMessage;
+    }
+    std::string&& moveMessage() {
+        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveMessage\" on an error union which does not have an error");
+        return std::move(mMessage);
     }
     //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
     bool report() const noexcept {
