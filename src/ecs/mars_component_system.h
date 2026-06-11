@@ -15,7 +15,7 @@ namespace mars {
         protected:
         ID mIDs[maxEntities];
         u64 mIndices[maxEntities];
-        u64 mSize;
+        u64 mSize{ 0 };
         void swapErase(ID id) noexcept {
             //Swap the index of the data at id for the data at end
             mIndices[mIDs[mSize]] = mIndices[id];
@@ -48,7 +48,11 @@ namespace mars {
             return mSize++;
         }
         //Tells whether the ID has this component
-        bool has(ID id) noexcept {
+        bool has(ID id) const noexcept {
+            if (id >= maxEntities) return false;
+            if (index(id) >= maxEntities) return false;
+            //The nullID has space reserved in this component, but shouldn't be considered ot have it
+            if (id == nullID) return false;
             return mIDs[index(id)] == id;
         }
         //Abstract function which should swap the data at id with the data at the end, then calls
