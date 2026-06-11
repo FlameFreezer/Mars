@@ -58,7 +58,7 @@ namespace mars {
         SDL_GamepadButton gamepadButtons[maxGamepadButtons];
         u8 numGamepadButtons = 0;
         SDL_GamepadAxis axes[maxAxes];
-        float axisValues[maxAxes];
+        float axisValues[maxAxes] = { 0.0f };
         u8 numAxes = 0;
         bool isValid = false;
     };
@@ -74,6 +74,11 @@ namespace mars {
         bool* mPrevKeyState = nullptr;
         const bool* mKeyState = nullptr;
         int mNumKeys = 0;
+
+		const std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
+		const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
+		const std::unordered_map<std::string, SDL_GamepadAxis> strToAxis = initAxisMap();
+
         Input() noexcept {
             int numGamepads;
             SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
@@ -101,9 +106,6 @@ namespace mars {
             return instance;
         }
         Error<noreturn> loadMappings(const std::string& path, const std::unordered_map<std::string, ActionIndex>& strToIndex) noexcept {
-            static const std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
-            static const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
-            static const std::unordered_map<std::string, SDL_GamepadAxis> strToAxis = initAxisMap();
             std::ifstream input(path, std::ios::ate);
             if(!input.is_open()) {
                 return fatal(std::format("Couldn't find an input mappings file at \"{}\"", path));
@@ -175,8 +177,16 @@ namespace mars {
         /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
         /// Returns: void    Nothing
         void update() noexcept {
-            std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
+            //std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
+            for (int i = 0; i < mNumKeys; i++) {
+                mPrevKeyState[i] = mKeyState[i];
+            }
             mKeyState = SDL_GetKeyboardState(nullptr);
+
+            for (const auto& pair : strToScancode) {
+                //std::println("{}: {}", pair.first, mKeyState[pair.second]);
+            }
+
             int numGamepads = 0;
             SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
             //If a gamepad is detected but we don't have any connected, open the first gamepad
