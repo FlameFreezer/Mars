@@ -464,10 +464,6 @@ namespace mars {
             cube.aspect = aspect;
         };
 
-        TRY_VK(
-            vkWaitForFences(device, 1, &fences[currentFrame], VK_TRUE, std::numeric_limits<u64>::max()),
-            std::format("Something went from while waiting on fence {}", currentFrame)
-        );
         //These semaphores indicate that we have successfully acquired an image on this frame
         TRY_INIT(Slice<VkSemaphore>, imageAcquiredSemaphores, Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames));
         //These semaphores indicate that we have finished rendering a 2D scene on this frame
@@ -475,8 +471,14 @@ namespace mars {
         //These semaphores indicate that the image acquired is ready to present
         TRY_INIT(Slice<VkSemaphore>, presentReadySemaphores, Slice<VkSemaphore>::make(semaphores, 2 * maxConcurrentFrames));
 
-        u32 imageIndex;
-        VkResult res = vkAcquireNextImageKHR(
+        //Wait on the fence for this current frame
+        TRY_VK(
+            vkWaitForFences(device, 1, &fences[currentFrame], VK_TRUE, std::numeric_limits<u64>::max()),
+            std::format("Something went from while waiting on fence {}", currentFrame)
+        );
+
+        u32 imageIndex{};
+        const VkResult res = vkAcquireNextImageKHR(
             device, 
             swapchain, 
             std::numeric_limits<u64>::max(), 

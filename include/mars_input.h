@@ -177,15 +177,8 @@ namespace mars {
         /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
         /// Returns: void    Nothing
         void update() noexcept {
-            //std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
-            for (int i = 0; i < mNumKeys; i++) {
-                mPrevKeyState[i] = mKeyState[i];
-            }
+            std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
             mKeyState = SDL_GetKeyboardState(nullptr);
-
-            for (const auto& pair : strToScancode) {
-                //std::println("{}: {}", pair.first, mKeyState[pair.second]);
-            }
 
             int numGamepads = 0;
             SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
