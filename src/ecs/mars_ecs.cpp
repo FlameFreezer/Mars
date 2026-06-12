@@ -24,9 +24,11 @@ namespace mars {
     }
 
     EntityComponentSystem::EntityComponentSystem() noexcept {
+        //Start at ID 1 to skip the nullID at index 0
         for(ID i = 1; i < maxEntities; i++) {
             mIDs.push(i);
         }
+        mSignatures[nullID] = nullSignature;
         allocSystems(mComponentSystems);
     }
     EntityComponentSystem::~EntityComponentSystem() noexcept {
@@ -75,6 +77,6 @@ namespace mars {
     }
 
     Entity EntityComponentSystem::entityFromID(ID id) const noexcept {
-        return {id, mSignatures[id]};
+        return Entity{id, mSignatures[id]};
     }
 };
