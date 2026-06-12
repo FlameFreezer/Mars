@@ -1,10 +1,8 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
 #include "mars_constants.h"
-#include "mars_components.h"
 #include "mars_entity.h"
 #include "mars_types.h"
 
@@ -12,8 +10,8 @@ namespace mars {
     //Abstract parent class for component systems - to automate initialization and deinitialization
     // within the EntityManager
     class ComponentSystemParent {
-        protected:
-        ID mIDs[maxEntities];
+	protected:
+        ID mIDs[maxEntities]{};
         u64 mIndices[maxEntities];
         u64 mSize{ 0 };
         void swapErase(ID id) noexcept {
@@ -25,8 +23,6 @@ namespace mars {
             --mSize;
         }
         public:
-        ComponentSystemParent() noexcept : mSize(0) {}
-        virtual ~ComponentSystemParent() noexcept {}
         u64 size() const noexcept {
             return mSize;
         }

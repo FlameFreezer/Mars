@@ -306,6 +306,8 @@ Error<T> fatal(const std::string& message) noexcept {
 }
 
 #define MOVE_ERROR(err) {err.tag(), err.moveMessage()}
+#define FATAL(msg) {ErrorTag::fatalError, msg}
+#define SUCCESS Error<noreturn>{}
 
 #define TRY(proc) \
 if(auto procResult = proc; !procResult.okay()) return procResult

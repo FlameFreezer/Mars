@@ -1,26 +1,80 @@
 #include "mars_ecs.h"
 
+#include "mars_types.h"
+#include "mars_constants.h"
+#include "error.h"
+#include "mars_signature.h"
+#include "mars_entity.h"
+
 namespace mars {
+    template<ComponentT c>
+    void allocSystem(ComponentSystemParent* systems[]) noexcept {
+        //Allocate the system
+        systems[c] = new ComponentSystem<typename GetComp<static_cast<Component>(c)>::Type>();
+        //Reserve space for the null entity
+        systems[c]->reserve(nullID);
+        //Allocate the next system
+        allocSystem<c + 1>(systems);
+    }
+    //Base Case: do nothing once all systems have been allocated
+    template<> void allocSystem<numComponents>(ComponentSystemParent**) noexcept {}
+
+    static void allocSystems(ComponentSystemParent* systems[]) noexcept {
+        allocSystem<0>(systems);
+    }
+
+    EntityComponentSystem::EntityComponentSystem() noexcept {
+        for(ID i = 1; i < maxEntities; i++) {
+            mIDs.push(i);
+        }
+        allocSystems(mComponentSystems);
+    }
+    EntityComponentSystem::~EntityComponentSystem() noexcept {
+        for(ComponentT i = 0; i < numComponents; i++) {
+            if (mComponentSystems[i]) {
+                delete mComponentSystems[i];
+            }
+        }
+    }
     EntityComponentSystem& EntityComponentSystem::get() noexcept {
-        static EntityComponentSystem instance;
+        static EntityComponentSystem instance{};
         return instance;
     }
     Error<Entity> EntityComponentSystem::createEntity(Signature s) noexcept {
-        ID id = entityManager.createEntity();
-        if(id == nullID) {
-            return fatal<Entity>("Tried to create an entity, but the maximum number of entities were already created");
+        if (mIDs.empty()) {
+            return FATAL("Tried to create an entity, but the maximum number of entities were already created");
         }
-        componentManager.reserveFor(id, s);
-        return Entity(id, s);
+        const ID id = mIDs.front();
+        mIDs.pop();
+
+        const SignatureT bits = s.getBits();
+        ComponentT bitNum = 0;
+        for(SignatureT i = 1; i != 0; i <<= 1) {
+            if(bits & i) {
+                mComponentSystems[bitNum]->reserve(id);
+            }
+            ++bitNum;
+        }
+
+        mSignatures[id] = s;
+        return Entity{id, s};
     }
 
     void EntityComponentSystem::destroyEntity(Entity e) noexcept {
         if(e == nullEntity) return;
-        componentManager.freeFor(e.id());
-        entityManager.destroyEntity(e.id());
+        const SignatureT bits = e.signature().getBits();
+        ComponentT bitNum = 0;
+        for(SignatureT i = 1; i != 0; i <<= 1) {
+            if(bits & i) {
+                mComponentSystems[bitNum]->erase(e.id());
+            }
+            ++bitNum;
+        }
+
+        mIDs.push(e.id());
     }
 
-    Entity EntityComponentSystem::entity(ID id) const noexcept {
-        return {id, componentManager.getSignature(id)};
+    Entity EntityComponentSystem::entityFromID(ID id) const noexcept {
+        return {id, mSignatures[id]};
     }
 };
