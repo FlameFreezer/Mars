@@ -10,8 +10,6 @@ namespace mars {
             mIDQueue.push(i);
         }
     }
-    EntityManager::~EntityManager() noexcept {
-    }
     ID EntityManager::createEntity() noexcept {
         if(mIDQueue.empty()) return nullID;
         ID id = mIDQueue.front();

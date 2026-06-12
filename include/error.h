@@ -5,6 +5,7 @@
 #include <print>
 #include <iostream>
 #include <stdexcept>
+#include <cassert>
 
 #include "mars_types.h"
 
@@ -89,34 +90,34 @@ public:
     ErrorTag tag() const noexcept {
         return mTag;
     }
-    const T& value() const {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+    const T& value() const noexcept {
+        assert(okay());
         return mValue;
     }
-    T& value() {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+    T& value() noexcept {
+        assert(okay());
         return mValue;
     }
     //Creates an rvalue reference to `value`. `value` is invalid after calling this, 
     // though it is still considered the active union field.
-    T&& moveValue() {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"moveData\" on an error union which does not have a value");
+    T&& moveValue() noexcept {
+        assert(okay());
         return std::move(mValue);
     }
-    const std::string& message() const {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have an error");
+    const std::string& message() const noexcept {
+        assert(!okay());
         return mMessage;
     }
-    std::string&& moveMessage() {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveMessage\" on an error union which does not have an error");
+    std::string&& moveMessage() noexcept {
+        assert(!okay());
         return std::move(mMessage);
     }
     //Creates an Error union of the templated type, moving the tag and message from the calling 
     // Error union to it. The callng Error union is left `okay`, with value in a default-initialized 
     // state. Calling this function on an Error union that is `okay` throws an exception.
     template<class U = noreturn>
-    Error<U> moveError() {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveError\" on an error union which does not have an error");
+    Error<U> moveError() noexcept {
+        assert(!okay());
         Error<U> result{mTag, std::move(mMessage)};
         mTag = ErrorTag::allOkay;
         new (&mValue) T{};
@@ -175,26 +176,28 @@ public:
     ErrorTag tag() const noexcept {
         return mTag;
     }
-    const T& value() const {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+    const T& value() const noexcept {
+        assert(okay());
         return *mValue;
     }
-    T& value() {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+    T& value() noexcept {
+        assert(okay());
         return *mValue;
     }
-    const T& moveValue() const {
+    const T& moveValue() const noexcept {
+        assert(okay());
         return value();
     }
-    T& moveValue() {
+    T& moveValue() noexcept {
+        assert(okay());
         return value();
     }
-    const std::string& message() const {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have an error");
+    const std::string& message() const noexcept {
+        assert(!okay());
         return mMessage;
     }
-    std::string&& moveMessage() {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveMessage\" on an error union which does not have an error");
+    std::string&& moveMessage() noexcept {
+        assert(!okay());
         return std::move(mMessage);
     }
     //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
@@ -258,16 +261,16 @@ public:
     ErrorTag tag() const noexcept {
         return mTag;
     }
-    const T& value() const {
-        if(!okay()) [[unlikely]] throw std::runtime_error("Called \"value\" on an error union which does not have a value");
+    const T& value() const noexcept {
+        assert(okay());
         return *mValue;
     }
-    const std::string& message() const {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"message\" on an error union which does not have an error");
+    const std::string& message() const noexcept {
+        assert(!okay());
         return mMessage;
     }
-    std::string&& moveMessage() {
-        if(okay()) [[unlikely]] throw std::runtime_error("Called \"moveMessage\" on an error union which does not have an error");
+    std::string&& moveMessage() noexcept {
+        assert(!okay());
         return std::move(mMessage);
     }
     //Returns `true` if okay. Otherwise, prints `message` and returns `false`.
@@ -285,9 +288,9 @@ public:
 };
 
 template<>
-const noreturn& Error<noreturn>::value() const = delete;
+const noreturn& Error<noreturn>::value() const noexcept = delete;
 template<>
-noreturn& Error<noreturn>::value() = delete;
+noreturn& Error<noreturn>::value() noexcept = delete;
 
 //Returns an `Error<noreturn>` with `key == allOkay`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
 Error<noreturn> success() noexcept;

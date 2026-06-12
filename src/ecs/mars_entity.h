@@ -1,41 +1,20 @@
 #pragma once
 
-#include <initializer_list>
-#include <limits>
-
 #include "mars_types.h"
-#include "mars_components.h"
+#include "mars_signature.h"
 
 namespace mars {
-    using SignatureT = u32;
-    //Null Signature has every component such that storage in component systems is always reserved
-    constexpr SignatureT nullSignature = std::numeric_limits<SignatureT>::max();
-    class Signature {
-        SignatureT mBits = nullSignature;
-        public:
-        constexpr Signature() noexcept = default;
-        Signature(std::initializer_list<Component> comps) noexcept;
-        constexpr Signature(const Signature& s) noexcept : mBits(s.mBits) {}
-        bool has(const std::initializer_list<Component> comps) const noexcept;
-        bool has(Component comp) const noexcept;
-        bool operator==(std::initializer_list<Component> comps) const noexcept;
-        bool operator!=(std::initializer_list<Component> comps) const noexcept;
-        SignatureT getBits() const noexcept;
-    };
-
     class Entity {
         ID mID = nullID;
-        Signature mSignature; 
+        Signature mSignature{};
         public:
         constexpr Entity() = default;
-        constexpr Entity(ID id, const Signature& sig) noexcept : mID(id), mSignature(sig) {}
+        constexpr Entity(ID id, Signature sig) noexcept : mID(id), mSignature(sig) {}
         ID id() const noexcept;
         Signature signature() const noexcept;
-        bool has(const std::initializer_list<Component> comps) const noexcept;
-        bool has(Component comp) const noexcept;
         friend bool operator==(Entity lhs, Entity rhs) noexcept;
         friend bool operator!=(Entity lhs, Entity rhs) noexcept;
     };
 
-    constexpr Entity nullEntity;
+    constexpr inline Entity nullEntity{};
 }

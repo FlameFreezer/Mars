@@ -41,7 +41,6 @@ namespace mars {
         const ComponentSystem<typename GetComp<c>::Type>& system() const noexcept {
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mSystems[std::to_underlying(c)]);
         }
-        Position position(Entity e) noexcept;
         DrawProxy draw(ID id) noexcept {
             return system<Component::draw>()[id];
         }

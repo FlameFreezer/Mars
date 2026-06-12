@@ -1,0 +1,26 @@
+#define MOVE_ERROR(err) {err.tag(), err.moveMessage()}
+
+#define TRY(proc) \
+if(auto procResult = proc; !procResult.okay()) return procResult
+
+#define TRY_ASSIGN(name, proc) \
+if(auto procResult = proc; !procResult.okay()) return MOVE_ERROR(procResult);\
+else name = procResult.moveValue()
+
+#define TRY_INIT(type, name, proc) \
+type name{};\
+if(auto procResult = proc; !procResult.okay()) return MOVE_ERROR(procResult);\
+else name = procResult.moveValue()
+
+#define DEFINE_COMPONENT_GETTER(component) const GetComp<Component::component>::Type& component(Entity e) const noexcept{\
+    return system<Component::component>()[e];\
+}\
+GetComp<Component::component>::Type& component(Entity e) noexcept {\
+    return system<Component::component>()[e];\
+}\
+const GetComp<Component::component>::Type& component(ID id) const noexcept{\
+    return system<Component::component>()[id];\
+}\
+GetComp<Component::component>::Type& component(ID id) noexcept {\
+    return system<Component::component>()[id];\
+}

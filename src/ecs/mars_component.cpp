@@ -1,7 +1,5 @@
 #include "mars_component.h"
 
-#include <glm/glm.hpp>
-
 namespace mars {
     template<ComponentT c>
     void allocSystem(ComponentSystemParent* systems[]) noexcept {
