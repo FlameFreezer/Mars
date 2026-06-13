@@ -12,13 +12,16 @@ namespace vkhelper {
                 return i;
             }
         }
-        return {ErrorTag::fatalError, "Physical device does not support needed memory type"};
+        FATAL("Physical device does not support needed memory type");
     }
     Error<VkDeviceMemory> allocateDeviceMemory(VkDevice device, VkPhysicalDevice physicalDevice, VkBuffer buffer, VkMemoryPropertyFlags memProperties) noexcept {
         VkMemoryRequirements memRequirements{};
         vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
         Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
-        if(!memType.okay()) return memType.moveError<VkDeviceMemory>();
+        if (!memType.okay()) {
+            APPEND_SOURCE_INFO(memType);
+            return MOVE_ERROR(memType);
+        }
 
         const VkMemoryAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -28,10 +31,10 @@ namespace vkhelper {
         };
         VkDeviceMemory memory = nullptr;
         if(vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to allocate device memory"};
+            FATAL("Failed to allocate device memory");
         }
         if(vkBindBufferMemory(device, buffer, memory, 0) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to bind buffer memory"};
+            FATAL("Failed to allocate device memory");
         }
         return memory;
     }
@@ -39,7 +42,10 @@ namespace vkhelper {
         VkMemoryRequirements memRequirements{};
         vkGetImageMemoryRequirements(device, image, &memRequirements);
         Error<std::uint32_t> memType = findPhysicalDeviceMemoryTypeIndex(physicalDevice, memRequirements.memoryTypeBits, memProperties);
-        if(!memType.okay()) return memType.moveError<VkDeviceMemory>();
+        if (!memType.okay()) {
+            APPEND_SOURCE_INFO(memType);
+            return MOVE_ERROR(memType);
+        }
 
         const VkMemoryAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -49,10 +55,10 @@ namespace vkhelper {
         };
         VkDeviceMemory memory = nullptr;
         if(vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to allocate device memory"};
+            FATAL("Failed to allocate device memory");
         }
         if(vkBindImageMemory(device, image, memory, 0) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to bind image memory"};
+            FATAL("Failed to allocate device memory");
         }
         return memory;
     }
@@ -69,5 +75,4 @@ namespace vkhelper {
             default: return "";
         }
     }
-
 }

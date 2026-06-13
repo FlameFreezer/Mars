@@ -115,20 +115,20 @@ namespace JSON {
     }
     Error<bool> Value::getBool() const noexcept {
         if(mType != Type::jtrue and mType != Type::jfalse) {
-            return fatal<bool>(std::format("Tried to get true or false from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get true or false from a JSON value, but the type was {}", typeToString(mType)));
         }
         return mBoolean;
     }
     Error<const Number&> Value::getNumber() const noexcept {
         if(mType != Type::jnumber) {
-            return fatal<const Number&>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
         }
 
         return mNumber;
     }
     Error<Number&> Value::getNumber() noexcept {
         if(mType != Type::jnumber) {
-            return fatal<Number&>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
         }
 
         return mNumber;
@@ -136,39 +136,39 @@ namespace JSON {
     }
     Error<const std::string&> Value::getString() const noexcept {
         if(mType != Type::jstring) {
-            return fatal<const std::string&>(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
         }
         return mString;
     }
     Error<std::string&> Value::getString() noexcept {
         if(mType != Type::jstring) {
-            return fatal<std::string&>(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get a string from a JSON value, but the type was {}", typeToString(mType)));
         }
         return mString;
 
     }
     Error<const Array&> Value::getArray() const noexcept {
         if(mType != Type::jarray) {
-            return fatal<const Array&>(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
         }
         return mArray;
     }
     Error<Array&> Value::getArray() noexcept {
         if(mType != Type::jarray) {
-            return fatal<Array&>(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get an array from a JSON value, but the type was {}", typeToString(mType)));
         }
         return mArray;
     }
 
     Error<const Object&> Value::getObject() const noexcept {
         if(mType != Type::jobject) {
-            return fatal<const Object&>(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
         }
         return mObject;
     }
     Error<Object&> Value::getObject() noexcept {
         if(mType != Type::jobject) {
-            return fatal<Object&>(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
+            FATAL(std::format("Tried to get an object from a JSON value, but the type was {}", typeToString(mType)));
         }
         return mObject;
     }
@@ -177,17 +177,20 @@ namespace JSON {
 
     Error<Value> parse(const std::string& text) noexcept {
         std::istringstream jsontxt(text);
-        return parse(jsontxt);
+        TRY_RETURN(parse(jsontxt));
     }
 
     template<>
     Error<bool> valueTo(const Value& value) noexcept {
-        return value.getBool();
+        TRY_RETURN(value.getBool());
     }
     template<>
     Error<std::string> valueTo(const Value& value) noexcept {
         Error<const std::string&> res = value.getString();
-        if (!res.okay()) return { res.tag(), res.moveMessage() };
+        if (!res.okay()) {
+            APPEND_SOURCE_INFO(res);
+            return MOVE_ERROR(res);
+        }
         else return res.value();
     }
 
@@ -202,29 +205,34 @@ namespace JSON {
 
     Error<Value> parse(std::istringstream& txt) noexcept {
         char c = txt.peek();
-        if(txt.eof()) return fatal<Value>("Tried to parse at EOF!");
+        if (txt.eof()) {
+            FATAL("Tried to parse at EOF!");
+        }
         switch(c) {
-        case '{':
-            return parseObject(txt);
-        case '[':
-            return parseArray(txt);
+        case '{': 
+            TRY_RETURN(parseObject(txt));
+        case '[': 
+            TRY_RETURN(parseArray(txt));
         case '\"': {
             Error<std::string> str = parseString(txt);
-            if(!str.okay()) return str.moveError<Value>();
+            if (!str.okay()) {
+                APPEND_SOURCE_INFO(str);
+                return MOVE_ERROR(str);
+            }
             return Value{str.moveValue()};
         }
-        case 'n':
-            return parseNull(txt);
-        case 't':
-            return parseTrue(txt);
-        case 'f':
-            return parseFalse(txt);
+        case 'n': 
+            TRY_RETURN(parseNull(txt));
+        case 't': 
+            TRY_RETURN(parseTrue(txt));
+        case 'f': 
+            TRY_RETURN(parseFalse(txt));
         default:
             if(whitespace.contains(c)) {
                 //Parse whitespace
                 parseWhitespace(txt);
                 //Try to parse the value again
-                return parse(txt);
+                TRY_RETURN(parse(txt));
             }
             else {
                 return parseNumber(txt);
@@ -237,8 +245,12 @@ namespace JSON {
         std::string buff{};
         buff.reserve(len);
         txt.read(buff.data(), buff.capacity());
-        if(txt.gcount() < len) return fatal<Value>("Failed to parse null");
-        if(strcmp(buff.data(), nullstr) != 0) return fatal<Value>(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff)));
+        if (txt.gcount() < len) {
+            FATAL("Failed to parse null");
+        }
+        if (strcmp(buff.data(), nullstr) != 0) {
+            FATAL(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff)));
+        }
         return Value{}; 
     }
     Error<Value> parseTrue(std::istringstream& txt) noexcept {
@@ -247,8 +259,12 @@ namespace JSON {
         std::string buff{};
         buff.reserve(len);
         txt.read(buff.data(), buff.capacity());
-        if(txt.gcount() < len) return fatal<Value>("Failed to parse true");
-        if(strcmp(buff.data(), truestr) != 0) return fatal<Value>(std::format("Failed to parse true: \"{}\" is not true", std::string_view(buff)));
+        if (txt.gcount() < len) {
+            FATAL("Failed to parse true");
+        }
+        if (strcmp(buff.data(), truestr) != 0) {
+            FATAL(std::format("Failed to parse true: \"{}\" is not true", std::string_view(buff)));
+        }
         return Value{true}; 
     }
     Error<Value> parseFalse(std::istringstream& txt) noexcept {
@@ -257,8 +273,12 @@ namespace JSON {
         std::string buff{};
         buff.reserve(len);
         txt.read(buff.data(), buff.capacity());
-        if(txt.gcount() < len) return fatal<Value>("Failed to parse false");
-        if(strcmp(buff.data(), falsestr) != 0) return fatal<Value>(std::format("Failed to parse false: \"{}\" is not false", std::string_view(buff)));
+        if (txt.gcount() < len) {
+            FATAL("Failed to parse false");
+        }
+        if (strcmp(buff.data(), falsestr) != 0) {
+            FATAL(std::format("Failed to parse false: \"{}\" is not false", std::string_view(buff)));
+        }
         return Value{false}; 
     }
 
@@ -277,34 +297,45 @@ namespace JSON {
         //Go until reaching the closing bracket
         while(true) {
             char c = txt.peek();
-            if(txt.eof()) return fatal<Value>("Failed to parse object: reached EOF");
+            if (txt.eof()) {
+                FATAL("Failed to parse object: reached EOF");
+            }
             switch(c) {
-            default: return fatal<Value>(std::format("Failed to parse object: found unexpected character \'{}\'", c));
+            default: 
+                FATAL(std::format("Failed to parse object: found unexpected character \'{}\'", c));
             //End of object
-            case '}':
+            case '}': 
                 txt.ignore();
                 parseWhitespace(txt);
                 return Value{std::move(obj)};
             //Deliniates consecutive values
             case ',': 
                 txt.ignore();
-                parseWhitespace(txt); //fallthrough is intended
+                parseWhitespace(txt);
+                //We know after a comma is another field name, so the fallthrough is intentional
+                [[fallthrough]];
             //String identifier for a field
-            case '\"':
+            case '\"': 
                 TRY_INIT(std::string, fieldName, parseString(txt));
                 //Objects cannot have duplicate field names
-                if(obj.contains(fieldName)) return fatal<Value>(std::format("Failed to parse object: had duplicate field name \"{}\"", fieldName));
+                if (obj.contains(fieldName)) {
+                    FATAL(std::format("Failed to parse object: had duplicate field name \"{}\"", fieldName));
+                }
                 //Skip until reaching the colon
                 parseWhitespace(txt);
-                if(txt.peek() != ':') return fatal<Value>(std::format("Failed to parse object: expected \':\', got \'{}\'", txt.peek()));
+                if (txt.peek() != ':') {
+                    FATAL(std::format("Failed to parse object: expected \':\', got \'{}\'", txt.peek()));
+                }
                 //Next character is a colon
                 txt.ignore();
                 Error<Value> value = parse(txt);
-                if(value.okay()) {
+                if (!value.okay()) {
+                    APPEND_SOURCE_INFO(value);
+                    return MOVE_ERROR(value);
+                }
+                else {
                     obj[fieldName] = Value{value.moveValue()};
                 }
-                else return value;
-                break;
             }
         }
     }
@@ -315,7 +346,9 @@ namespace JSON {
         Array arr;
         while(true) {
             char c = txt.peek();
-            if(txt.eof()) return fatal<Value>("Failed to parse array: reached EOF");
+            if (txt.eof()) {
+                FATAL("Failed to parse array: reached EOF");
+            }
             //End of array
             switch(c) {
             case ']':
@@ -324,11 +357,16 @@ namespace JSON {
                 parseWhitespace(txt);
                 return Value{std::move(arr)};
             case ',':
-                txt.ignore(); //fallthrough is intended
-            default:
+                txt.ignore();
+                //We know that after a comma is another value, so fallthrough is intended
+                [[fallthrough]];
+            default: 
                 Error<Value> value = parse(txt);
-                if(value.okay()) arr.push_back(Value{value.moveValue()});
-                else return value;
+                if (!value.okay()) {
+                    APPEND_SOURCE_INFO(value);
+                    return MOVE_ERROR(value);
+                }
+                else arr.push_back(Value{ value.moveValue() });
                 break;
             }
         }
@@ -339,7 +377,9 @@ namespace JSON {
         std::string str;
         while(true) {
             char c = txt.get();
-            if(txt.eof()) return fatal<std::string>("Failed to parse string: reached EOF");
+            if (txt.eof()) {
+                FATAL("Failed to parse string: reached EOF");
+            }
             switch(c) {
             //Close quote
             case '\"':

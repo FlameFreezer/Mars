@@ -33,7 +33,7 @@ namespace mars {
                 .pQueueFamilyIndices = nullptr
             };
             if(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer.handle) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to create VkBuffer while initializing GPUBuffer"};
+                FATAL("Failed to create VkBuffer while initializing GPUBuffer");
             }
             TRY_ASSIGN(buffer.memory, vkhelper::allocateDeviceMemory(device, physicalDevice, buffer.handle, memProperties));
             return buffer;
@@ -58,12 +58,15 @@ namespace mars {
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             ); 
-            if(!buffer.okay()) return buffer.moveError<UniformBuffer>();
+            if (!buffer.okay()) {
+                APPEND_SOURCE_INFO(buffer);
+                return MOVE_ERROR(buffer);
+            }
 
             UniformBuffer result{buffer.moveValue()};
 
             if(vkMapMemory(device, result.buffer.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to map device memory to host while creating uniform buffer"};
+                FATAL("Failed to map device memory to host while creating uniform buffer");
             }
             return result;
         }

@@ -44,7 +44,7 @@ namespace mars {
     }
     Error<Entity> EntityComponentSystem::createEntity(Signature s) noexcept {
         if (mIDs.empty()) {
-            return FATAL("Tried to create an entity, but the maximum number of entities were already created");
+            FATAL("Tried to create an entity, but the maximum number of entities were already created");
         }
         const ID id = mIDs.front();
         mIDs.pop();

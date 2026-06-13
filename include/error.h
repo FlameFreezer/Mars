@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <cassert>
 #include <list>
+#include <source_location>
 
 #include "mars_types.h"
 
@@ -52,16 +53,9 @@ class MessageList {
     }
     void copyList(const MessageList& other) noexcept {
         ErrorMessage* current = other.mHead;
-        ErrorMessage** cursor = &mHead;
-        ErrorMessage* prev = nullptr;
 
         while (current) {
-            *cursor = new ErrorMessage{ .message = current->message, .prev = prev };
-            mTail = *cursor;
-            if (prev) {
-                prev->next = *cursor;
-            }
-            prev = *cursor;
+            pushBack(current->message);
             current = current->next;
         }
     }
@@ -115,7 +109,17 @@ public:
 			mTail->next = back;
 			mTail = back;
         }
-
+    }
+    void pushFront(const std::string& message) noexcept {
+        ErrorMessage* front = new ErrorMessage{ .message = message, .prev = nullptr, .next = mHead };
+        if (!mHead) {
+            mHead = front;
+            mTail = front;
+        }
+        else {
+            mHead->prev = front;
+            mHead = front;
+        }
     }
     ErrorMessage* front() noexcept {
         return mHead;
@@ -221,6 +225,10 @@ public:
         assert(!okay());
         return mMessage;
     }
+    MessageList& message() noexcept {
+        assert(!okay());
+        return mMessage;
+    }
     MessageList&& moveMessage() noexcept {
         assert(!okay());
         return std::move(mMessage);
@@ -240,8 +248,6 @@ public:
     bool report() const noexcept {
         if(okay()) return true;
         const ErrorMessage* cursor = mMessage.front();
-        std::println("{}: {}", typeToString(mTag), cursor->message);
-        cursor = cursor->next;
         while (cursor) {
             std::println("{}", cursor->message);
             cursor = cursor->next;
@@ -252,8 +258,6 @@ public:
     bool report(std::ostream& ostrm) const noexcept {
         if(okay()) return true;
         const ErrorMessage* cursor = mMessage.front();
-        std::println(ostrm, "{}: {}", typeToString(mTag), cursor->message);
-        cursor = cursor->next;
         while (cursor) {
             std::println(ostrm, "{}", cursor->message);
             cursor = cursor->next;
@@ -324,6 +328,10 @@ public:
         assert(!okay());
         return mMessage;
     }
+    MessageList& message() noexcept {
+        assert(!okay());
+        return mMessage;
+    }
     MessageList&& moveMessage() noexcept {
         assert(!okay());
         return std::move(mMessage);
@@ -332,8 +340,6 @@ public:
     bool report() const noexcept {
         if(okay()) return true;
         const ErrorMessage* cursor = mMessage.front();
-        std::println("{}: {}", typeToString(mTag), cursor->message);
-        cursor = cursor->next;
         while (cursor) {
             std::println("{}", cursor->message);
             cursor = cursor->next;
@@ -344,8 +350,6 @@ public:
     bool report(std::ostream& ostrm) const noexcept {
         if(okay()) return true;
         const ErrorMessage* cursor = mMessage.front();
-        std::println(ostrm, "{}: {}", typeToString(mTag), cursor->message);
-        cursor = cursor->next;
         while (cursor) {
             std::println(ostrm, "{}", cursor->message);
             cursor = cursor->next;
@@ -413,6 +417,10 @@ public:
         assert(!okay());
         return mMessage;
     }
+    MessageList& message() noexcept {
+        assert(!okay());
+        return mMessage;
+    }
     MessageList&& moveMessage() noexcept {
         assert(!okay());
         return std::move(mMessage);
@@ -421,8 +429,6 @@ public:
     bool report() const noexcept {
         if(okay()) return true;
         const ErrorMessage* cursor = mMessage.front();
-        std::println("{}: {}", typeToString(mTag), cursor->message);
-        cursor = cursor->next;
         while (cursor) {
             std::println("{}", cursor->message);
             cursor = cursor->next;
@@ -433,8 +439,6 @@ public:
     bool report(std::ostream& ostrm) const noexcept {
         if(okay()) return true;
         const ErrorMessage* cursor = mMessage.front();
-        std::println(ostrm, "{}: {}", typeToString(mTag), cursor->message);
-        cursor = cursor->next;
         while (cursor) {
             std::println(ostrm, "{}", cursor->message);
             cursor = cursor->next;
@@ -462,17 +466,45 @@ Error<T> fatal(const std::string& message) noexcept {
 }
 
 #define MOVE_ERROR(err) {err.tag(), err.moveMessage()}
-#define FATAL(msg) {ErrorTag::fatalError, msg}
+
+#define FATAL(msg) do{\
+std::source_location source{std::source_location::current()};\
+std::string fullMessage {std::format("In file: {}:{}\n\tIn function: {}\n{}: {}", source.file_name(), source.line()-1, source.function_name(), typeToString(ErrorTag::fatalError), msg)};\
+return {ErrorTag::fatalError, fullMessage};\
+} while(false)
+
 #define SUCCESS Error<noreturn>{}
 
+#define APPEND_SOURCE_INFO(errorUnion) do{\
+std::source_location source{std::source_location::current()};\
+std::string nextMsg {std::format("In file: {}:{}\n\tIn function: {}\n", source.file_name(), source.line()-1, source.function_name())};\
+errorUnion.message().pushFront(std::move(nextMsg));\
+} while(false)
+
 #define TRY(proc) \
-if(auto procResult = proc; !procResult.okay()) return procResult
+if(auto procResult = proc; !procResult.okay()) do {\
+    APPEND_SOURCE_INFO(procResult);\
+	return procResult;\
+} while(false)
 
 #define TRY_ASSIGN(name, proc) \
-if(auto procResult = proc; !procResult.okay()) return MOVE_ERROR(procResult);\
+if(auto procResult = proc; !procResult.okay()) {\
+    APPEND_SOURCE_INFO(procResult);\
+	return MOVE_ERROR(procResult);\
+}\
 else name = procResult.moveValue()
 
 #define TRY_INIT(type, name, proc) \
 type name{};\
-if(auto procResult = proc; !procResult.okay()) return MOVE_ERROR(procResult);\
+if(auto procResult = proc; !procResult.okay()) {\
+    APPEND_SOURCE_INFO(procResult);\
+	return MOVE_ERROR(procResult);\
+}\
 else name = procResult.moveValue()
+
+#define TRY_RETURN(proc) \
+if(auto procResult = proc; !procResult.okay()) {\
+    APPEND_SOURCE_INFO(procResult);\
+    return MOVE_ERROR(procResult);\
+}\
+else return procResult

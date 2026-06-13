@@ -81,7 +81,7 @@ namespace JSON {
         template<typename T> requires std::is_arithmetic<T>::value
         Error<T> getNumberAs() const noexcept {
             if(mType != Type::jnumber) {
-                return fatal<T>(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
+                FATAL(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
             }
             return mNumber.to<T>();
         }
@@ -106,7 +106,7 @@ namespace JSON {
 
     template<class T> requires std::is_arithmetic<T>::value
     Error<T> valueTo(const Value& value) noexcept {
-        return value.getNumberAs<T>();
+        TRY_RETURN(value.getNumberAs<T>());
     }
 
     using Object = std::unordered_map<std::string, Value>;

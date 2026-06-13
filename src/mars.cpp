@@ -6,9 +6,9 @@ namespace mars {
 
     Error<noreturn> init() noexcept {
         if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
-            return fatal(SDL_GetError());
+            FATAL(SDL_GetError());
         }
-        return success();
+        return SUCCESS;
     }
 
     void quit() noexcept {

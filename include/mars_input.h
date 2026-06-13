@@ -108,7 +108,7 @@ namespace mars {
         Error<noreturn> loadMappings(const std::string& path, const std::unordered_map<std::string, ActionIndex>& strToIndex) noexcept {
             std::ifstream input(path, std::ios::ate);
             if(!input.is_open()) {
-                return fatal(std::format("Couldn't find an input mappings file at \"{}\"", path));
+                FATAL(std::format("Couldn't find an input mappings file at \"{}\"", path));
             }
             HeapArray<char> buff(input.tellg());
             input.seekg(0, std::ios::beg);
@@ -116,45 +116,45 @@ namespace mars {
             input.close();
             TRY_INIT(JSON::Value, mappings, JSON::parse(std::string(buff.data(), buff.size())));
             if(mappings.getType() != JSON::Type::jarray) {
-                return fatal("Input mappings file should start with an array");
+                FATAL("Input mappings file should start with an array");
             }
             for(const JSON::Value& jmapping : mappings.getArray().value()) {
                 Mapping resultMapping{};
                 resultMapping.isValid = true;
                 if(jmapping.getType() != JSON::Type::jobject) {
-                    return fatal("Entries inside mappings JSON array should be objects");
+                    FATAL("Entries inside mappings JSON array should be objects");
                 }
                 const JSON::Object& mapping = jmapping.getObject().value();
                 if(mapping.contains("scancodes")) {
                     if(mapping.at("scancodes").getType() != JSON::Type::jarray) {
-                        return fatal("Mapping field \"scancodes\" should hold a JSON array");
+                        FATAL("Mapping field \"scancodes\" should hold a JSON array");
                     }
                     for(const JSON::Value& scancodeName : mapping.at("scancodes").getArray().value()) {
                         if(scancodeName.getType() != JSON::Type::jstring) {
-                            return fatal("Scancode name should be a string!");
+                            FATAL("Scancode name should be a string!");
                         }
                         resultMapping.scancodes[resultMapping.numScancodes++] = strToScancode.at(scancodeName.getString().value());
                     }
                 }
                 if(mapping.contains("buttons")) {
                     if(mapping.at("buttons").getType() != JSON::Type::jarray) {
-                        return fatal("Mapping field \"buttons\" should hold a JSON array");
+                        FATAL("Mapping field \"buttons\" should hold a JSON array");
                     }
                     for(const JSON::Value& buttonName : mapping.at("buttons").getArray().value()) {
                         if(buttonName.getType() != JSON::Type::jstring) {
-                            return fatal("Button name should be a string!");
+                            FATAL("Button name should be a string!");
                         }
                         resultMapping.gamepadButtons[resultMapping.numGamepadButtons++] = strToGamepadButton.at(buttonName.getString().value());
                     }
                 }
                 if(mapping.contains("sticks")) {
                     if(mapping.at("sticks").getType() != JSON::Type::jobject) {
-                        return fatal("Mapping field \"sticks\" should hold a JSON object");
+                        FATAL("Mapping field \"sticks\" should hold a JSON object");
                     }
                     for(const auto [stickName, stickValue] : mapping.at("sticks").getObject().value()) {
                         resultMapping.axes[resultMapping.numAxes] = strToAxis.at(stickName);
                         if(stickValue.getType() != JSON::Type::jnumber) {
-                            return fatal("Joystick values should be numbers");
+                            FATAL("Joystick values should be numbers");
                         }
                         resultMapping.axisValues[resultMapping.numAxes] = stickValue.getNumberAs<float>().value();
                         resultMapping.numAxes++;
@@ -162,7 +162,7 @@ namespace mars {
                 }
                 //Get the index of the current mapping from its name
                 if(mapping.at("tag").getType() != JSON::Type::jstring) {
-                    return fatal("Mapping field \"tag\" should hold a JSON string");
+                    FATAL("Mapping field \"tag\" should hold a JSON string");
                 }
                 const auto mappingIndex = std::to_underlying(strToIndex.at(mapping.at("tag").getString().value()));
                 //Resize the mappings vector if we need space to fit
@@ -172,7 +172,7 @@ namespace mars {
                 //Write the result mapping
                 mMappings[mappingIndex] = resultMapping;
             }
-            return success();
+            return SUCCESS;
         }
         /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
         /// Returns: void    Nothing

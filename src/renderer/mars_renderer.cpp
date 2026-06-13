@@ -16,7 +16,9 @@
 namespace mars {
 
     #define TRY_VK(proc, msg) do{\
-        if((proc) != VK_SUCCESS) return {ErrorTag::fatalError, (msg)};\
+        if((proc) != VK_SUCCESS) {\
+            FATAL(msg);\
+        }\
     } while(false)
 
     constexpr std::array<const char*, 3> neededDeviceExtensions = {
@@ -66,7 +68,7 @@ namespace mars {
     Error<std::vector<char>> loadShaderFile(const std::string& filename) noexcept {
         std::ifstream shaderFile(MARS_SHADERS_PATH + filename, std::ios::binary | std::ios::ate);
         if(!shaderFile.is_open()) {
-            return {ErrorTag::fatalError, "Failed to find shader code!"};
+            FATAL("Failed to find shader code!");
         }
         std::vector<char> code(shaderFile.tellg());
         shaderFile.seekg(0, std::ios::beg);
@@ -100,7 +102,7 @@ namespace mars {
             }
             VkBool32 surfaceSupport;
             if(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &surfaceSupport) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to get physical device surface support!"};
+                FATAL("Failed to get physical device surface support!");
             }
             if(surfaceSupport == VK_TRUE and currentQueueCount >= result.presentCount) {
                 result.presentIndex = i;
@@ -108,8 +110,9 @@ namespace mars {
             }
         }
         if(result.presentIndex == std::numeric_limits<u32>::max() 
-                or result.graphicsIndex == std::numeric_limits<u32>::max()) {
-            return {ErrorTag::searchFail, "Physical Device did not have queue family with needed properties!"};
+                or result.graphicsIndex == std::numeric_limits<u32>::max()) 
+        {
+            FATAL("Physical Device did not have queue family with needed properties!");
         }
         return result;
     }
@@ -123,8 +126,9 @@ namespace mars {
                 surface, 
                 &presentModeCount, 
                 nullptr
-            ) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to get physical device surface present modes!"};
+            ) != VK_SUCCESS) 
+        {
+            FATAL("Failed to get physical device surface present modes!");
         }
         HeapArray<VkPresentModeKHR> presentModes(presentModeCount);
         if(vkGetPhysicalDeviceSurfacePresentModesKHR(
@@ -132,8 +136,9 @@ namespace mars {
                 surface, 
                 &presentModeCount, 
                 presentModes.data()
-            ) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to get physical device surface present modes!"};
+            ) != VK_SUCCESS) 
+        {
+            FATAL("Failed to get physical device surface present modes!");
         }
         //Select correct present mode
         for(VkPresentModeKHR mode : presentModes) {
@@ -149,14 +154,16 @@ namespace mars {
         u32 surfaceFormatCount = 0;
         if(vkGetPhysicalDeviceSurfaceFormatsKHR(
                 physicalDevice, surface, &surfaceFormatCount, nullptr
-            ) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to get physical device surface formats!"};
+            ) != VK_SUCCESS) 
+        {
+            FATAL("Failed to get physical device surface formats!");
         }
         HeapArray<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
         if(vkGetPhysicalDeviceSurfaceFormatsKHR(
                 physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()
-            ) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to get physical device surface formats!"};
+            ) != VK_SUCCESS) 
+        {
+            FATAL("Failed to get physical device surface formats!");
         }
         for(int i = 0; i < surfaceFormatCount; i++) {
             if(surfaceFormats[i].format == VK_FORMAT_B8G8R8A8_SRGB 
@@ -173,14 +180,16 @@ namespace mars {
         u32 deviceExtensionPropertyCount = 0;
         if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, 
                 &deviceExtensionPropertyCount, nullptr
-            ) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to enumerate physical device extension properties!"};
+            ) != VK_SUCCESS) 
+        {
+            FATAL("Failed to enumerate physical device extension properties!");
         }
         HeapArray<VkExtensionProperties> extensionProperties(deviceExtensionPropertyCount);
         if(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, 
             &deviceExtensionPropertyCount, extensionProperties.data()
-            ) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to enumerate physical device extension properties!"};
+            ) != VK_SUCCESS) 
+        {
+            FATAL("Failed to enumerate physical device extension properties!");
         }
         //Construct set of extension names
         std::set<std::string> unfoundExtensions;
@@ -195,7 +204,7 @@ namespace mars {
             //	extensions
             if(unfoundExtensions.empty()) return success();
         }
-        return {ErrorTag::searchFail, "Physical Device did not support needed extensions!"};
+        FATAL("Physical Device did not support needed extensions!");
     }
 
     bool checkDeviceFeatureSupport(VkPhysicalDevice physicalDevice) noexcept {
@@ -228,7 +237,10 @@ namespace mars {
             //Check device extension support for the current physical device
             switch(Error<noreturn> procResult = checkDeviceExtensionSupport(currentPhysicalDevice); procResult.tag()) {
                 case ErrorTag::searchFail: continue;
-                case ErrorTag::fatalError: return procResult.moveError<PickPhysicalDeviceResult>();
+                case ErrorTag::fatalError: {
+                    APPEND_SOURCE_INFO(procResult);
+                    return MOVE_ERROR(procResult);
+                }
                 case ErrorTag::allOkay: break;
             }
 
@@ -242,8 +254,9 @@ namespace mars {
                     currentPhysicalDevice, 
                     surface, 
                     &result.surfaceInfo.capabilities
-                ) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to get physical device surface capabilities!"};
+                ) != VK_SUCCESS) 
+            {
+                FATAL("Failed to get physical device surface capabilities!");
             }
 
             //Get a surface format to use
@@ -252,14 +265,20 @@ namespace mars {
             //Choose a present mode to use
             switch(Error<VkPresentModeKHR> presentMode = choosePresentMode(currentPhysicalDevice, surface); presentMode.tag()) {
                 case ErrorTag::searchFail: continue;
-                case ErrorTag::fatalError: return presentMode.moveError<PickPhysicalDeviceResult>();
+                case ErrorTag::fatalError: {
+                    APPEND_SOURCE_INFO(presentMode);
+                    return MOVE_ERROR(presentMode);
+                }
                 case ErrorTag::allOkay: result.surfaceInfo.presentMode = presentMode.value();
             }
 
             //Pick the desired queue family index
             switch(Error<PickQueueFamilyIndexResult> queueFamilyInfo = pickQueueFamilyIndex(currentPhysicalDevice, surface); queueFamilyInfo.tag()) {
                 case ErrorTag::searchFail: continue;
-                case ErrorTag::fatalError: return queueFamilyInfo.moveError<PickPhysicalDeviceResult>();
+                case ErrorTag::fatalError: {
+                    APPEND_SOURCE_INFO(queueFamilyInfo);
+                    return MOVE_ERROR(queueFamilyInfo);
+                }
                 case ErrorTag::allOkay: result.queueFamilyInfo = queueFamilyInfo.value();
             }
 
@@ -268,7 +287,7 @@ namespace mars {
             result.physicalDevice = currentPhysicalDevice;
             return result;
         }
-        return {ErrorTag::searchFail, "Failed to find suitable physical device"};
+        FATAL("Failed to find suitable physical device");
     }
 
     struct Square {
@@ -448,12 +467,13 @@ namespace mars {
             //Each frame gets its own 3D camera, while one 2D camera exists
             sizeof(glm::mat4) * (maxConcurrentFrames + 1)); 
         if(!res.okay()) {
-            return res.moveError();
+            APPEND_SOURCE_INFO(res);
+            return MOVE_ERROR(res);
         }
         else cameraMatrices = res.moveValue(); 
         updateCamera();
 
-        return success();
+        return SUCCESS;
     }
 
     Error<noreturn> Renderer::drawFrame(float fov, float aspect, RendererEntities entities) noexcept {
@@ -511,7 +531,7 @@ namespace mars {
         }
         //Fatal error has occurred
         else if(res != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to acquire next swapchain image index"};
+            FATAL("Failed to acquire next swapchain image index");
         }
 
         if(flags & rendererFlags::beganTransferOps) {
@@ -535,9 +555,7 @@ namespace mars {
             .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
             .pInheritanceInfo = nullptr
         };
-        if (vkBeginCommandBuffer(commandBuffer2D, &beginInfo) != VK_SUCCESS) {
-            return fatal(std::format("Failed to begin 2d command buffer {}", currentFrame));
-        }
+        TRY_VK(vkBeginCommandBuffer(commandBuffer2D, &beginInfo), std::format("Failed to begin 2d command buffer {}", currentFrame));
 
         const std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers2D = setup2DMemoryBarriers();
 
@@ -708,7 +726,7 @@ namespace mars {
 
         currentFrame = (currentFrame + 1) % maxConcurrentFrames;
 
-        return success();
+        return SUCCESS;
     }
     Error<noreturn> Renderer::beginTransferOps() noexcept {
         const VkCommandBufferBeginInfo beginInfo = {
@@ -772,28 +790,30 @@ namespace mars {
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         );
         if(!transferBuffer.okay()) {
-            return transferBuffer.moveError();
+            APPEND_SOURCE_INFO(transferBuffer);
+            return MOVE_ERROR(transferBuffer);
         }
         void* memory{};
         if(vkMapMemory(device, transferBuffer.value().memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
             transferBuffer.value().destroy(device);
-            return {ErrorTag::fatalError, "Failed to map device memory while initializing cube mesh vertex data"};
+            FATAL("Failed to map device memory while initializing cube mesh vertex data");
         }
         std::memcpy(memory, reinterpret_cast<void const*>(Cube::vertices.data()), verticesSize);
         vkUnmapMemory(device, transferBuffer.value().memory);
 
         if(vkMapMemory(device, transferBuffer.value().memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
             transferBuffer.value().destroy(device);
-            return {ErrorTag::fatalError, "Failed to map device memory while initializing cube mesh index data"};
+            FATAL("Failed to map device memory while initializing cube mesh index data");
         }
         std::memcpy(memory, reinterpret_cast<void const*>(Cube::indices.data()), indicesSize);
         vkUnmapMemory(device, transferBuffer.value().memory);
 
         if(!(flags & rendererFlags::beganTransferOps)) {
             if(Error<noreturn> res = beginTransferOps(); !res.okay()) {
+                APPEND_SOURCE_INFO(res);
                 transferBuffer.value().destroy(device);
                 cube.buffer.destroy(device);
-                return res;
+                return MOVE_ERROR(res);
             }
         }
         transferBuffers.push(transferBuffer.value());
@@ -810,7 +830,7 @@ namespace mars {
         cube.fov = 0.0f;
         cube.aspect = 0.0f;
 
-        return success();
+        return SUCCESS;
     }
     Error<noreturn> Renderer::createRenderTargets(VkFormat format) noexcept {
         //The 2D render area is the face of the cube, so it has to be square
@@ -860,7 +880,7 @@ namespace mars {
                 format, VK_IMAGE_ASPECT_COLOR_BIT
             ));
         }
-        return success();
+        return SUCCESS;
     }
     Error<noreturn> Renderer::createDepthImages() noexcept {
         const u32 d = cube.dim;
@@ -881,7 +901,7 @@ namespace mars {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT));
 
-        return success();
+        return SUCCESS;
     }
     Error<noreturn> Renderer::createDescriptorSetLayouts() noexcept {
         std::array<VkDescriptorSetLayoutBinding, 2> pushBindings = {
@@ -910,7 +930,7 @@ namespace mars {
             .pBindings = pushBindings.data()
         };
         TRY_VK(vkCreateDescriptorSetLayout(device, &pushLayout, nullptr, &pushSetLayout), "Failed to create descriptor set layout");
-        return success();
+        return SUCCESS;
     }
     Error<noreturn> Renderer::createSampler() noexcept {
         VkPhysicalDeviceProperties2 props{};
@@ -937,22 +957,31 @@ namespace mars {
             .unnormalizedCoordinates = VK_FALSE
         };
         TRY_VK(vkCreateSampler(device, &samplerInfo, nullptr, &sampler), "Failed to create texture sampler");
-        return success();
+        return SUCCESS;
     }
     Error<noreturn> Renderer::recreateSwapchain() noexcept {
         vkDeviceWaitIdle(device);
 
         Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevice, surface); 
-        if(!presentMode.okay()) return presentMode.moveError();
+        if (!presentMode.okay()) {
+            APPEND_SOURCE_INFO(presentMode);
+            return MOVE_ERROR(presentMode);
+        }
 
         VkSurfaceCapabilitiesKHR surfaceCapabilities{};
         TRY_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities), "Failed to get physical device surface capabilities while recreating the swapchain");
 
         Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevice, surface);
-        if(!surfaceFormat.okay()) return surfaceFormat.moveError();
+        if (!surfaceFormat.okay()) {
+            APPEND_SOURCE_INFO(surfaceFormat);
+            return MOVE_ERROR(surfaceFormat);
+        }
 
         Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceCapabilities);
-        if(!imageExtent.okay()) return imageExtent.moveError();
+        if (!imageExtent.okay()) {
+            APPEND_SOURCE_INFO(imageExtent);
+            return MOVE_ERROR(imageExtent);
+        }
         swapchainImageExtent = imageExtent.value();
 
         cube.dim = std::max(swapchainImageExtent.width, swapchainImageExtent.height);
@@ -990,7 +1019,7 @@ namespace mars {
 
         TRY(getSwapchainImages(surfaceFormat.value().format));
 
-        return success();
+        return SUCCESS;
     }
     void Renderer::renderPass3D(u32 imageIndex, VkCommandBuffer commandBuffer) noexcept {
         //Render to the 3D render target, resolve to the swapchain image
@@ -1289,12 +1318,15 @@ namespace mars {
         for(VkFence& fence : fences) {
             TRY_VK(vkCreateFence(device, &fenceInfo, nullptr, &fence), "Failed to create fences!");
         }
-        return success();
+        return SUCCESS;
     }
 
     Error<VkShaderModule> Renderer::createShaderModule(const std::string& filename) const noexcept {
-        auto shader = loadShaderFile(filename);
-        if(!shader.okay()) return shader.moveError<VkShaderModule>();
+        Error<std::vector<char>> shader = loadShaderFile(filename);
+        if (!shader.okay()) {
+            APPEND_SOURCE_INFO(shader);
+            return MOVE_ERROR(shader);
+        }
         const VkShaderModuleCreateInfo moduleInfo = {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .pNext = nullptr,
@@ -1302,7 +1334,7 @@ namespace mars {
             .codeSize = shader.value().size(),
             .pCode = reinterpret_cast<const u32*>(shader.value().data())
         };
-        VkShaderModule mod;
+        VkShaderModule mod{};
         TRY_VK(vkCreateShaderModule(device, &moduleInfo, nullptr, &mod), "Failed to create shader module");
         return mod;
     }
@@ -1480,7 +1512,7 @@ namespace mars {
         if(vkCreatePipelineLayout(device, &pipelineLayoutInfo2D, nullptr, &pipelineLayout2D) != VK_SUCCESS) {
             vkDestroyShaderModule(device, shaderMod2D, nullptr);
             vkDestroyShaderModule(device, shaderMod3D, nullptr);
-            return fatal("Failed to create graphics pipeline layout!");
+            FATAL("Failed to create graphics pipeline layout!");
         }
 
         const VkPushConstantRange pushConstantRanges3D[] = {
@@ -1506,7 +1538,7 @@ namespace mars {
         if(vkCreatePipelineLayout(device, &pipelineLayoutInfo3D, nullptr, &pipelineLayout3D) != VK_SUCCESS) {
             vkDestroyShaderModule(device, shaderMod2D, nullptr);
             vkDestroyShaderModule(device, shaderMod3D, nullptr);
-            return fatal("Failed to create graphics pipeline layout!");
+            FATAL("Failed to create graphics pipeline layout!");
         }
             
         std::array<VkGraphicsPipelineCreateInfo, 2> graphicsPipelineInfos;
@@ -1540,7 +1572,7 @@ namespace mars {
         if(vkCreateGraphicsPipelines(device, nullptr, graphicsPipelineInfos.max_size(), graphicsPipelineInfos.data(), nullptr, graphicsPipelines.data()) != VK_SUCCESS) {
             vkDestroyShaderModule(device, shaderMod2D, nullptr);
             vkDestroyShaderModule(device, shaderMod3D, nullptr);
-            return fatal("Failed to create graphics pipeline!");
+            FATAL("Failed to create graphics pipeline!");
         }
 
         vkDestroyShaderModule(device, shaderMod2D, nullptr);
@@ -1578,11 +1610,9 @@ namespace mars {
         };
         for(u32 i = 0; i < imageCount; i++) {
             imageViewInfo.image = swapchainImages[i];
-            if(vkCreateImageView(device, &imageViewInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, std::format("Failed to create swapchain image view {}!", i)};
-            }
+            TRY_VK(vkCreateImageView(device, &imageViewInfo, nullptr, &swapchainImageViews[i]), std::format("Failed to create swapchain image view {}!", i));
         }
-        return success();
+        return SUCCESS;
     }
 
     Error<noreturn> Renderer::createCommandBuffers() noexcept {
@@ -1592,9 +1622,7 @@ namespace mars {
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
             .queueFamilyIndex = graphicsQueueFamilyIndex
         };
-        if(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to create VkCommandPool!"};
-        }
+        TRY_VK(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool), "Failed to create VkCommandPool!");
         const VkCommandBufferAllocateInfo allocInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = nullptr,
@@ -1602,14 +1630,12 @@ namespace mars {
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             .commandBufferCount = static_cast<u32>(commandBuffers.max_size())
         };
-        if(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to allocate command vertexBuffers!"};
-        }
+        TRY_VK(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()), "Failed to allocate command vertexBuffers!");
         for(u32 i = 0; i < maxConcurrentFrames; i++) {
             transferCommandBuffers[i] = commandBuffers[commandBuffers.size() - 1 - i]; 
         }
         
-        return success();
+        return SUCCESS;
     }
 
     Error<VkExtent2D> Renderer::chooseImageExtent(VkSurfaceCapabilitiesKHR const& capabilities) noexcept {
@@ -1619,7 +1645,7 @@ namespace mars {
         int width = 0; 
         int height = 0;
         if(!SDL_GetWindowSize(window, &width, &height)) {
-            return {ErrorTag::fatalError, SDL_GetError()};
+            FATAL(SDL_GetError());
         }
         return VkExtent2D{
             .width = std::clamp<u32>(width, 
@@ -1653,11 +1679,9 @@ namespace mars {
             .oldSwapchain = nullptr
         };
 
-        if(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to create VkSwapchainKHR!"};
-        }
+        TRY_VK(vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain), "Failed to create VkSwapchainKHR!");
 
-        return success();
+        return SUCCESS;
     }
 
     Error<noreturn> Renderer::createDevice(SurfaceInfo& surfaceInfo) noexcept {
@@ -1666,16 +1690,12 @@ namespace mars {
 
         //Get all the physical devices installed on the system
         u32 physicalDeviceCount = 0;
-        if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to enumerate physical devices!"};
-        }
+        TRY_VK(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr), "Failed to enumerate physical devices!");
         std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
-        if(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices.data()) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to enumerate physical devices!"};
-        }
+        TRY_VK(vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices.data()), "Failed to enumerate physical devices");
 
         //Pick a physical device to use
-        if (const Error<PickPhysicalDeviceResult> pickResult = pickPhysicalDevice(physicalDevices, surface); pickResult.okay()) {
+        if (Error<PickPhysicalDeviceResult> pickResult = pickPhysicalDevice(physicalDevices, surface); pickResult.okay()) {
             PickPhysicalDeviceResult const& res = pickResult.value();
             physicalDevice = res.physicalDevice;
             graphicsQueueFamilyIndex = res.queueFamilyInfo.graphicsIndex;
@@ -1686,7 +1706,10 @@ namespace mars {
         }
         //pickPhysicalDevice just returns searchFail if none of the devices are suitable, but 
         // I want this case to be fatal instead
-        else return {ErrorTag::fatalError, pickResult.message()};
+        else {
+            APPEND_SOURCE_INFO(pickResult);
+            return { ErrorTag::fatalError, pickResult.moveMessage() };
+        }
 
         VkPhysicalDeviceProperties2 props = {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
@@ -1773,9 +1796,7 @@ namespace mars {
             .pEnabledFeatures = nullptr
         };
 
-        if(vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &device) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to create VkDevice!"};
-        }
+        TRY_VK(vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &device), "Failed to create VkDevice!");
 
         //Acquire handles to all the GPU queues we just created
         if(differentQueueFamilies) {
@@ -1805,19 +1826,19 @@ namespace mars {
             TRY_ASSIGN(presentQueues, Slice<VkQueue>::make(queues, graphicsQueueCount));
         }
 
-        return success();
+        return SUCCESS;
     }
 
     Error<noreturn> Renderer::createDebugUtilsMessenger() noexcept {
         vkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
             vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
         if(vkCreateDebugUtilsMessengerEXT == nullptr) {
-            return {ErrorTag::fatalError, "Failed to find function vkCreateDebugUtilsMessengerEXT!"};
+            FATAL("Failed to find function vkCreateDebugUtilsMessengerEXT!");
         }
         vkDestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
             vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
         if(vkDestroyDebugUtilsMessengerEXT == nullptr) {
-            return {ErrorTag::fatalError, "Failed to find function vkDestroyDebugUtilsMessengerEXT!"};
+            FATAL("Failed to find function vkDestroyDebugUtilsMessengerEXT!");
         }
         const VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo = {
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -1834,22 +1855,16 @@ namespace mars {
             .pUserData = nullptr,
         };
 
-        if(vkCreateDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to create vkDebugUtilsMessengerEXT!"};
-        }
-        return success();
+        TRY_VK(vkCreateDebugUtilsMessengerEXT(instance, &debugMessengerInfo, nullptr, &debugMessenger), "Failed to create vkDebugUtilsMessengerEXT!");
+        return SUCCESS;
     }
 
     Error<noreturn> Renderer::createVkInstance(const std::string& appName) noexcept {
         if constexpr(enableValidationLayers) {
             u32 layerPropertyCount = 0;
-            if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to enumerate instance layer properties!"};
-            }
+            TRY_VK(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr), "Failed to enumerate instance layer properties!");
             std::vector<VkLayerProperties> layerProperties(layerPropertyCount);
-            if(vkEnumerateInstanceLayerProperties(&layerPropertyCount, layerProperties.data()) != VK_SUCCESS) {
-                return {ErrorTag::fatalError, "Failed to enumerate instance layer properties!"};
-            }
+            TRY_VK(vkEnumerateInstanceLayerProperties(&layerPropertyCount, layerProperties.data()), "Failed to enumerate instance layer properties!");
             for(char const* layer : validationLayers) {
                 bool foundLayer = false;
                 for(VkLayerProperties const& property : layerProperties) {
@@ -1859,7 +1874,7 @@ namespace mars {
                     }
                 }
                 if(!foundLayer) {
-                    return {ErrorTag::fatalError, std::format("Needed layer \"{}\" not found", layer)};
+                    FATAL(std::format("Needed layer \"{}\" not found", layer));
                 }
             }
         }
@@ -1896,22 +1911,20 @@ namespace mars {
             instanceInfo.ppEnabledLayerNames = validationLayers.data();
         }
 
-        if(vkCreateInstance(&instanceInfo, nullptr, &instance) != VK_SUCCESS) {
-            return {ErrorTag::fatalError, "Failed to create VkInstance!"};
-        }
-        return success();
+        TRY_VK(vkCreateInstance(&instanceInfo, nullptr, &instance), "Failed to create VkInstance!");
+        return SUCCESS;
     }
 
     Error<noreturn> Renderer::createSurface(std::string const& name) noexcept {
         int numDisplays;
         SDL_DisplayID* displays = SDL_GetDisplays(&numDisplays);
         if(displays == nullptr) {
-            return {ErrorTag::fatalError, SDL_GetError()};
+            FATAL(SDL_GetError());
         }
         //Be lazy and just use the first display
         SDL_Rect displayBounds{};
         if(!SDL_GetDisplayBounds(displays[0], &displayBounds)) {
-            return {ErrorTag::fatalError, SDL_GetError()};
+            FATAL(SDL_GetError());
         }
         //SDL_WINDOW_MOUSE_GRABBED : mouse cannot escape window bounds - allows using relative
         // mouse mode
@@ -1921,35 +1934,40 @@ namespace mars {
         //Instead of tracking live mouse inputs and having on-screen cursor, just track
         // changes in mouse position
         if(!SDL_SetWindowRelativeMouseMode(window, true)) {
-            return {ErrorTag::fatalError, SDL_GetError()};
+            FATAL(SDL_GetError());
         }
         if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
-            return {ErrorTag::fatalError, SDL_GetError()};
+            FATAL(SDL_GetError());
         }
         SDL_free(displays);
-        return success();
+        return SUCCESS;
     }
 
     Error<Renderer*> Renderer::make(const std::string& name, ID& squareID) noexcept {
         Renderer* r = new Renderer;
         #define RTRY(proc) \
         if(auto res = proc; !res.okay()) do{\
+            APPEND_SOURCE_INFO(res);\
             delete r;\
-            return res.moveError<Renderer*>();\
+			return MOVE_ERROR(res);\
         } while(false)
 
         if(Error<noreturn> res = r->createVkInstance(name); !res.okay()) {
+            APPEND_SOURCE_INFO(res);
             r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
             delete r;
-            return res.moveError<Renderer*>();
+            return MOVE_ERROR(res);
         }
         if constexpr(enableValidationLayers) RTRY(r->createDebugUtilsMessenger());
+
         RTRY(r->createSurface(name));
+
         SurfaceInfo surfaceInfo{};
         if(Error<noreturn> res = r->createDevice(surfaceInfo); !res.okay()) {
+            APPEND_SOURCE_INFO(res);
             r->flags |= rendererFlags::deviceInvalid;
             delete r;
-            return res.moveError<Renderer*>();
+            return MOVE_ERROR(res);
         }
         RTRY(r->createSwapchain(surfaceInfo));
         RTRY(r->getSwapchainImages(surfaceInfo.format.format));
@@ -1964,14 +1982,15 @@ namespace mars {
         RTRY(r->createCamera());
         if(!SDL_ShowWindow(r->window)) {
             delete r;
-            return {ErrorTag::fatalError, "Failed to show window"};
+            FATAL("Failed to show window");
         }
 
         //Create square mesh
         Error<ID> sq = r->makeMesh(Square::vertices, Square::indices);
         if(!sq.okay()) {
+            APPEND_SOURCE_INFO(sq);
             delete r;
-            return sq.moveError<Renderer*>();
+            return MOVE_ERROR(sq);
         }
         //Give ID number of square mesh back to the game
         else squareID = sq.value();
@@ -2047,15 +2066,19 @@ namespace mars {
         Error<GPUBuffer> buffer = GPUBuffer::make(device, physicalDevice, size, 
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        if(!buffer.okay()) return buffer.moveError<std::size_t>();
+        if (!buffer.okay()) {
+            APPEND_SOURCE_INFO(buffer);
+            return MOVE_ERROR(buffer);
+        }
         GPUBuffer vertexBuffer = buffer.moveValue();
         
         //Initialize transfer buffer
         buffer = GPUBuffer::make(device, physicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         if(!buffer.okay()) {
+            APPEND_SOURCE_INFO(buffer);
             vertexBuffer.destroy(device);
-            return buffer.moveError<std::size_t>();
+            return MOVE_ERROR(buffer);
         }
         GPUBuffer transferBuffer = buffer.moveValue();
 
@@ -2064,7 +2087,7 @@ namespace mars {
         if(vkMapMemory(device, transferBuffer.memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
             vertexBuffer.destroy(device);
             transferBuffer.destroy(device);
-            return fatal<std::size_t>("Failed to map device memory");
+            FATAL("Failed to map device memory");
         }
         std::memcpy(memory, reinterpret_cast<void const*>(vertices.data()), verticesSize);
         vkUnmapMemory(device, transferBuffer.memory);
@@ -2072,7 +2095,7 @@ namespace mars {
         if(vkMapMemory(device, transferBuffer.memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
             vertexBuffer.destroy(device);
             transferBuffer.destroy(device);
-            return {ErrorTag::fatalError, "Failed to map device memory"};
+            FATAL("Failed to map device memory");
         }
         std::memcpy(memory, reinterpret_cast<void const*>(indices.data()), indicesSize);
         vkUnmapMemory(device, transferBuffer.memory);
@@ -2080,9 +2103,10 @@ namespace mars {
         if(!(flags & rendererFlags::beganTransferOps)) {
             Error<noreturn> res = beginTransferOps();
             if(!res.okay()) {
+                APPEND_SOURCE_INFO(res);
                 vertexBuffer.destroy(device);
                 transferBuffer.destroy(device);
-                return res.moveError<std::size_t>();
+                return MOVE_ERROR(res);
             }
         }
 
@@ -2102,7 +2126,7 @@ namespace mars {
         stbi_uc* pixels = nullptr;
         pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         if(pixels == nullptr) {
-            return fatal<ID>(std::format("Failed to find/load texture file at path \"{}\"", texturePath));
+            FATAL(std::format("Failed to find/load texture file at path \"{}\"", texturePath));
         }
         const VkDeviceSize imageSize = texWidth * texHeight * STBI_rgb_alpha; 
         GPUImage textureImage;
@@ -2116,8 +2140,9 @@ namespace mars {
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                 VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT
             ); !image.okay()) {
+            APPEND_SOURCE_INFO(image);
             stbi_image_free(pixels);
-            return image.moveError<std::size_t>();
+            return MOVE_ERROR(image);
         }
         else textureImage = image.moveValue();
 
@@ -2130,9 +2155,10 @@ namespace mars {
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             ); !tb.okay()) {
+            APPEND_SOURCE_INFO(tb);
             stbi_image_free(pixels);
             textureImage.destroy(device);
-            return tb.moveError<ID>();
+            return MOVE_ERROR(tb);
         }
         else transferBuffer = tb.moveValue();
 
@@ -2141,7 +2167,7 @@ namespace mars {
             stbi_image_free(pixels);
             textureImage.destroy(device);
             transferBuffer.destroy(device);
-            return {ErrorTag::fatalError, "Failed to map buffer memory to the host"};
+            FATAL("Failed to map buffer memory to the host");
         }
         std::memcpy(memory, pixels, imageSize);
         vkUnmapMemory(device, transferBuffer.memory);
@@ -2151,9 +2177,10 @@ namespace mars {
         if(!(flags & rendererFlags::beganTransferOps)) {
             Error<noreturn> res = beginTransferOps();
             if(!res.okay()) {
+                APPEND_SOURCE_INFO(res);
                 textureImage.destroy(device);
                 transferBuffer.destroy(device);
-                return res.moveError<ID>();
+                return MOVE_ERROR(res);
             }
         }
         transferBuffers.push(transferBuffer);
@@ -2256,5 +2283,4 @@ namespace mars {
         t.view = textureImage.view;
         return entityManager.insertTexture(t);
     }
-
 }
