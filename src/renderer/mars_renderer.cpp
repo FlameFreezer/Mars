@@ -202,7 +202,7 @@ namespace mars {
             unfoundExtensions.erase(extensionProperty.extensionName);
             //Once we've "ticked off" each name from the set, we know the device supports all the needed
             //	extensions
-            if(unfoundExtensions.empty()) return success();
+            if(unfoundExtensions.empty()) return SUCCESS;
         }
         FATAL("Physical Device did not support needed extensions!");
     }
@@ -737,7 +737,7 @@ namespace mars {
         };
         TRY_VK(vkBeginCommandBuffer(transferCommandBuffers[currentFrame], &beginInfo), "Failed to begin single time command buffer");
         flags |= rendererFlags::beganTransferOps;
-        return success();
+        return SUCCESS;
     }
 
     Error<noreturn> Renderer::doTransferOps() noexcept {
@@ -769,7 +769,7 @@ namespace mars {
             transferBuffers.pop();
             tb.destroy(device);
         }
-        return success();
+        return SUCCESS;
     }
 
     Error<noreturn> Renderer::createCube() noexcept {
@@ -1578,7 +1578,7 @@ namespace mars {
         vkDestroyShaderModule(device, shaderMod2D, nullptr);
         vkDestroyShaderModule(device, shaderMod3D, nullptr);
 
-        return success();
+        return SUCCESS;
     }
     Error<noreturn> Renderer::getSwapchainImages(VkFormat format) noexcept {
         u32 imageCount;

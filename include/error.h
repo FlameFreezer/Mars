@@ -29,11 +29,6 @@ static constexpr std::string typeToString(ErrorTag tag) noexcept {
     std::unreachable();
 }
 
-template<class T>
-void destruct(T& t) {
-    t.~T();
-}
-
 struct ErrorMessage {
     std::string message;
     ErrorMessage* prev{};
@@ -43,99 +38,25 @@ struct ErrorMessage {
 class MessageList {
     ErrorMessage* mHead{};
     ErrorMessage* mTail{};
-    void freeMemory() noexcept {
-        ErrorMessage* current = mHead;
-        while (current) {
-            ErrorMessage* toDelete = current;
-            current = current->next;
-            delete toDelete;
-        }
-    }
-    void copyList(const MessageList& other) noexcept {
-        ErrorMessage* current = other.mHead;
-
-        while (current) {
-            pushBack(current->message);
-            current = current->next;
-        }
-    }
+    void freeMemory() noexcept;
+    void copyList(const MessageList& other) noexcept;
 public:
     MessageList() noexcept = default;
-    ~MessageList() noexcept {
-        freeMemory();
-	}
-    void clear() noexcept {
-        freeMemory();
-        mHead = nullptr;
-        mTail = nullptr;
-    }
-    MessageList(const MessageList& other) noexcept {
-        copyList(other);
-    }
-    MessageList(MessageList&& other) noexcept : mHead(other.mHead), mTail(other.mTail) {
-        other.mHead = nullptr;
-        other.mTail = nullptr;
-    }
-    MessageList& operator=(const MessageList& other) noexcept {
-        clear();
-        copyList(other);
-        return *this;
-    }
-    MessageList& operator=(MessageList&& other) noexcept {
-        clear();
-        mHead = other.mHead;
-        mTail = other.mTail;
-        other.mHead = nullptr;
-        other.mTail = nullptr;
-    }
-    void pushBack(const std::string& message) noexcept {
-        ErrorMessage* back = new ErrorMessage{ .message = message, .prev = mTail };
-        if (!mHead) {
-            mHead = back;
-            mTail = back;
-        }
-        else {
-			mTail->next = back;
-			mTail = back;
-        }
-    }
-    void pushBack(std::string&& message) noexcept {
-        ErrorMessage* back = new ErrorMessage{ .message = std::move(message), .prev = mTail };
-        if (!mHead) {
-            mHead = back;
-            mTail = back;
-        }
-        else {
-			mTail->next = back;
-			mTail = back;
-        }
-    }
-    void pushFront(const std::string& message) noexcept {
-        ErrorMessage* front = new ErrorMessage{ .message = message, .prev = nullptr, .next = mHead };
-        if (!mHead) {
-            mHead = front;
-            mTail = front;
-        }
-        else {
-            mHead->prev = front;
-            mHead = front;
-        }
-    }
-    ErrorMessage* front() noexcept {
-        return mHead;
-    }
-    const ErrorMessage* front() const noexcept {
-        return mHead;
-    }
-    ErrorMessage* back() noexcept {
-        return mTail;
-    }
-    const ErrorMessage* back() const noexcept {
-        return mTail;
-    }
-    bool empty() const noexcept {
-        return mHead == nullptr;
-    }
+    ~MessageList() noexcept;
+    void clear() noexcept;
+    MessageList(const MessageList& other) noexcept;
+    MessageList(MessageList&& other) noexcept;
+    MessageList& operator=(const MessageList& other) noexcept;
+    MessageList& operator=(MessageList&& other) noexcept;
+    void pushBack(const std::string& message) noexcept;
+    void pushBack(std::string&& message) noexcept;
+    void pushFront(const std::string& message) noexcept;
+    void pushFront(std::string&& message) noexcept;
+    ErrorMessage* front() noexcept;
+    const ErrorMessage* front() const noexcept;
+    ErrorMessage* back() noexcept;
+    const ErrorMessage* back() const noexcept;
+    bool empty() const noexcept;
 };
 
 template <class T>
@@ -197,7 +118,7 @@ public:
             mValue.~T();
         }
         else {
-            destruct(mMessage);
+            mMessage.~MessageList();
         }
     }
     //Returns `true` if `this->tag` is of a value not indicating an error during execution.
@@ -295,7 +216,7 @@ public:
     }
     ~Error() noexcept {
         if (!okay()) {
-            destruct(mMessage);
+            mMessage.~MessageList();
         }
     }
     //Cannot move Error Unions which hold references
@@ -396,7 +317,7 @@ public:
 
     ~Error() noexcept {
         if (!okay()) {
-            destruct(mMessage);
+            mMessage.~MessageList();
         }
     }
     //Cannot move Error Unions which hold references
@@ -451,19 +372,6 @@ template<>
 const noreturn& Error<noreturn>::value() const noexcept = delete;
 template<>
 noreturn& Error<noreturn>::value() noexcept = delete;
-
-//Returns an `Error<noreturn>` with `key == allOkay`. Used mainly for the final return value of a function with return type `Error<noreturn>`.
-Error<noreturn> success() noexcept;
-
-//Returns an `Error<T>` with `key == fatalError`.
-template<typename T = noreturn>
-Error<T> fatal(std::string&& message) noexcept {
-    return Error<T>(ErrorTag::fatalError, std::move(message));
-}
-template<typename T = noreturn>
-Error<T> fatal(const std::string& message) noexcept {
-    return Error<T>(ErrorTag::fatalError, message);
-}
 
 #define MOVE_ERROR(err) {err.tag(), err.moveMessage()}
 
