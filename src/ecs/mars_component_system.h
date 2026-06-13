@@ -12,8 +12,8 @@ namespace mars {
     class ComponentSystemParent {
 	protected:
         ID mIDs[maxEntities]{};
-        u64 mIndices[maxEntities];
-        u64 mSize{ 0 };
+        u64 mIndices[maxEntities]{};
+        u64 mSize{};
         void swapErase(ID id) noexcept {
             //Swap the index of the data at id for the data at end
             mIndices[mIDs[mSize]] = mIndices[id];

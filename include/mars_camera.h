@@ -11,15 +11,15 @@
 namespace mars {
     struct Camera {
         static constexpr float autoAspect = 0.0f;
-        glm::vec3 pos;
-        glm::vec3 dir;
-        glm::vec3 up;
-        float fov = 0.0f;
+        glm::vec3 pos = glm::vec3(0.0f, 0.0f, -1.0f);
+        glm::vec3 dir = glm::vec3(0.0f, 0.0f, 1.0f);
+        glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
+        float fov = 45.0f;
         float aspect = autoAspect;
-        float maxY;
-        float nearPlane;
-        float farPlane;
-        float sensitivity;
+        float maxY = 0.9f;
+        float nearPlane = 0.1f;
+        float farPlane = 100.0f;
+        float sensitivity = 0.001f;
         glm::mat4 getMatrix() const noexcept {
             //dir + pos = target (position the camera is looking at)
             const glm::mat4 view = glm::lookAt(pos, dir + pos, up);
@@ -62,7 +62,7 @@ namespace mars {
         glm::vec3 dir = glm::vec3(0.0f, 0.0f, 1.0f);
         glm::vec3 up = glm::vec3(0.0f, -1.0f, 0.0f);
         float fov = 45.0f;
-        float aspect = 0.0f;
+        float aspect = Camera::autoAspect;
         float maxY = 0.9f;
         float nearPlane = 0.1f;
         float farPlane = 100.0f;

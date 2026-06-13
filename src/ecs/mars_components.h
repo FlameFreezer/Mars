@@ -4,7 +4,6 @@
 #include <utility>
 
 #include <glm/glm.hpp>
-#include <vulkan/vulkan.h>
 
 #include "mars_types.h"
 #include "mars_room.h"
@@ -46,8 +45,8 @@ namespace mars {
         circle,
     };
     struct Collide {
-        BoundingShape boundingShape = BoundingShape::rectangle;
         glm::vec2 position = glm::vec2(0.0f);
+        BoundingShape boundingShape = BoundingShape::rectangle;
         union {
             //Only valid if shape is a circle
             float radius;
@@ -64,37 +63,4 @@ namespace mars {
     template<> struct GetComp<Component::physics> {using Type = Physics;};
     template<> struct GetComp<Component::collide> {using Type = Collide;};
     template<> struct GetComp<Component::dynamics> {using Type = Dynamics;};
-
-    //Helper class to help programmers keep transforms and collisions aligned
-    class Position {
-        glm::vec2& mTransform;
-        glm::vec2& mCollide;
-        public:
-        Position(glm::vec2& t, glm::vec2& c) noexcept : mTransform(t), mCollide(c) {}
-        Position operator=(glm::vec2 rhs) noexcept {
-            mTransform = rhs;
-            mCollide = rhs;
-            return *this;
-        }
-        Position operator+=(glm::vec2 rhs) noexcept {
-            mTransform += rhs;
-            mCollide += rhs;
-            return *this;
-        }
-        Position operator-=(glm::vec2 rhs) noexcept {
-            mTransform -= rhs;
-            mCollide -= rhs;
-            return *this;
-        }
-        Position operator*=(float rhs) noexcept {
-            mTransform *= rhs;
-            mCollide *= rhs;
-            return *this;
-        }
-        Position operator/=(float rhs) noexcept {
-            mTransform /= rhs;
-            mCollide /= rhs;
-            return *this;
-        }
-    };
 }
