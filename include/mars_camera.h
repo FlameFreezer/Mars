@@ -4,6 +4,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "error.h"
+#include "jsonparser.h"
+#include "mars_math.h"
+
 namespace mars {
     struct Camera {
         static constexpr float autoAspect = 0.0f;
@@ -121,3 +125,6 @@ namespace mars {
         }
     };
 }
+
+template<>
+Error<mars::Camera> JSON::valueTo(const JSON::Value& value) noexcept;

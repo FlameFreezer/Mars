@@ -372,12 +372,14 @@ template<>
 const noreturn& Error<noreturn>::value() const noexcept = delete;
 template<>
 noreturn& Error<noreturn>::value() noexcept = delete;
+template<>
+noreturn&& Error<noreturn>::moveValue() noexcept = delete;
 
 #define MOVE_ERROR(err) {err.tag(), err.moveMessage()}
 
 #define FATAL(msg) do{\
 std::source_location source{std::source_location::current()};\
-std::string fullMessage {std::format("In file: {}:{}\n\tIn function: {}\n{}: {}", source.file_name(), source.line()-1, source.function_name(), typeToString(ErrorTag::fatalError), msg)};\
+std::string fullMessage {std::format("In file: {}:{}\n\tIn function: {}\n\n{}: {}", source.file_name(), source.line(), source.function_name(), typeToString(ErrorTag::fatalError), msg)};\
 return {ErrorTag::fatalError, fullMessage};\
 } while(false)
 
@@ -385,34 +387,35 @@ return {ErrorTag::fatalError, fullMessage};\
 
 #define APPEND_SOURCE_INFO(errorUnion) do{\
 std::source_location source{std::source_location::current()};\
-std::string nextMsg {std::format("In file: {}:{}\n\tIn function: {}\n", source.file_name(), source.line()-1, source.function_name())};\
+std::string nextMsg {std::format("In file: {}:{}\n\tIn function: {}\n", source.file_name(), source.line(), source.function_name())};\
 errorUnion.message().pushFront(std::move(nextMsg));\
 } while(false)
 
+#define PROPAGATE_ERROR(errorUnion)\
+APPEND_SOURCE_INFO(errorUnion);\
+return MOVE_ERROR(errorUnion)
+
 #define TRY(proc) \
 if(auto procResult = proc; !procResult.okay()) do {\
-    APPEND_SOURCE_INFO(procResult);\
-	return procResult;\
+    PROPAGATE_ERROR(procResult);\
 } while(false)
 
 #define TRY_ASSIGN(name, proc) \
 if(auto procResult = proc; !procResult.okay()) {\
-    APPEND_SOURCE_INFO(procResult);\
-	return MOVE_ERROR(procResult);\
+    PROPAGATE_ERROR(procResult);\
 }\
 else name = procResult.moveValue()
 
 #define TRY_INIT(type, name, proc) \
 type name{};\
 if(auto procResult = proc; !procResult.okay()) {\
-    APPEND_SOURCE_INFO(procResult);\
-	return MOVE_ERROR(procResult);\
+    PROPAGATE_ERROR(procResult);\
 }\
 else name = procResult.moveValue()
 
 #define TRY_RETURN(proc) \
 if(auto procResult = proc; !procResult.okay()) {\
     APPEND_SOURCE_INFO(procResult);\
-    return MOVE_ERROR(procResult);\
+    return procResult;\
 }\
 else return procResult
