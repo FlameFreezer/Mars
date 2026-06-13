@@ -54,11 +54,10 @@ namespace mars {
         //Abstract function which should swap the data at id with the data at the end, then calls
         // swapErase
         virtual void erase(ID id) noexcept = 0;
-
     };
     template<typename C>
     class ComponentSystem : public ComponentSystemParent {
-        C mData[maxEntities];
+        C mData[maxEntities]{};
         public:
         //Unchecked random access of data
         const C& operator[](ID id) const noexcept {
@@ -334,5 +333,10 @@ namespace mars {
         PositionIterator end() noexcept {
             return {mSize, this};
         }
+    };
+    template<>
+    class ComponentSystem<void> : public ComponentSystemParent {
+    public:
+        void erase(ID) noexcept {}
     };
 }

@@ -10,3 +10,11 @@ Error<glm::vec2> JSON::valueTo(const JSON::Value& value) noexcept;
 
 template<>
 Error<glm::vec3> JSON::valueTo(const JSON::Value& value) noexcept;
+
+template<class T> requires std::is_arithmetic<T>::value
+static consteval T bitWidth() {
+	T count = 0;
+	while ((std::numeric_limits<T>::max() ^ (static_cast<T>(1U) << count)) > (static_cast<T>(1U) << count)) count++;
+	return count + 1;
+}
+

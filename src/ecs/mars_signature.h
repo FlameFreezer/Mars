@@ -5,9 +5,11 @@
 
 #include "mars_types.h"
 #include "mars_components.h"
+#include "mars_math.h"
 
 namespace mars {
     using SignatureT = u32;
+    static_assert(numComponents < bitWidth<SignatureT>());
     class Signature {
 		//Null Signature has every component such that storage in component systems is always reserved
         static constexpr SignatureT nullSignatureBits = std::numeric_limits<SignatureT>::max();

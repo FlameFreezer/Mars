@@ -58,13 +58,23 @@ namespace mars {
         ///                 timeLeft() == waitTime()
         /// Returns: void
         void reset() noexcept;
+        /// Retrieves the current status of the timer.
+        /// Returns: TimerStatus     
         TimerStatus status() const noexcept;
+        /// Retrieves the amount of time left on the timer in seconds. Only works if the timer is paused or stopped. Will return innaccurate info while timer is running
+        /// Preconditions:  status() != TimerStatus::running
+        /// Returns: float
         float timeLeft() const noexcept;
+        /// Retrieves the amount of time left on the timer in the system's highest resolution. Only works if the timer is paused or stopped. Will return innaccurate info while timer is running
+        /// Preconditions:  status() != TimerStatus::running
+        /// Returns: systemTime
         std::chrono::steady_clock::time_point::duration::rep timeLeftSystem() const noexcept;
         /// Sets the total wait time to the number of seconds passed. If the timer was paused, this will NOT change the time left on the timer.
         /// Arguments:  waitTime    The amount of time the timer should wait for when start() is called
         /// Returns: void
         void setWaitTime(float waitTime) noexcept;
+        /// Retrieves the total wait time in seconds.
+        /// Returns: float
         float waitTime() const noexcept;
     };
 }

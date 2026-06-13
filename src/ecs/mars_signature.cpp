@@ -9,22 +9,10 @@ namespace mars {
         return 1 << std::to_underlying(c);
     }
 
-    static void implyComponents(Component c, SignatureT& bits) noexcept {
-        //If we already have this component (and thus all of its implied components), exit
-        if(bits & componentToBit(c)) return;
-        bits |= componentToBit(c);
-        switch(c) {
-        case Component::dynamics:
-            implyComponents(Component::physics, bits); 
-            implyComponents(Component::collide, bits);
-            break;
-        default: break;
-        }
-    }
-
     Signature::Signature(std::initializer_list<Component> comps) noexcept : mBits(0) {
         for(Component c : comps) {
-            implyComponents(c, mBits);
+            if (mBits & componentToBit(c)) continue;
+            mBits |= componentToBit(c);
         }
     }
 

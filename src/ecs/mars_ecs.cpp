@@ -6,6 +6,11 @@
 #include "mars_signature.h"
 #include "mars_entity.h"
 
+#include "mars_components.h"
+#ifdef MARS_USER_COMPONENTS
+#include MARS_USER_COMPONENTS
+#endif
+
 namespace mars {
     template<ComponentT c>
     void allocSystem(ComponentSystemParent* systems[]) noexcept {
