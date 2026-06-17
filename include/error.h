@@ -378,17 +378,17 @@ noreturn&& Error<noreturn>::moveValue() noexcept = delete;
 #define MOVE_ERROR(err) {err.tag(), err.moveMessage()}
 
 #define FATAL(msg) do{\
-std::source_location source{std::source_location::current()};\
-std::string fullMessage {std::format("In file: {}:{}\n\tIn function: {}\n\n{}: {}", source.file_name(), source.line(), source.function_name(), typeToString(ErrorTag::fatalError), msg)};\
+    std::source_location source{std::source_location::current()};\
+    std::string fullMessage {std::format("In file: {}:{}\n\tIn function: {}\n\n{}: {}", source.file_name(), source.line(), source.function_name(), typeToString(ErrorTag::fatalError), msg)};\
 return {ErrorTag::fatalError, fullMessage};\
 } while(false)
 
 #define SUCCESS Error<noreturn>{}
 
 #define APPEND_SOURCE_INFO(errorUnion) do{\
-std::source_location source{std::source_location::current()};\
-std::string nextMsg {std::format("In file: {}:{}\n\tIn function: {}\n", source.file_name(), source.line(), source.function_name())};\
-errorUnion.message().pushFront(std::move(nextMsg));\
+	std::source_location source{std::source_location::current()};\
+	std::string nextMsg {std::format("In file: {}:{}\n\tIn function: {}\n", source.file_name(), source.line(), source.function_name())};\
+	errorUnion.message().pushFront(std::move(nextMsg));\
 } while(false)
 
 #define PROPAGATE_ERROR(errorUnion)\

@@ -3,13 +3,13 @@
 #include <array>
 #include <string>
 #include <queue>
+#include <cstddef>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 #include "mars_renderer_flags.h"
 #include "mars_renderer_gpubuffer.h"
@@ -20,7 +20,7 @@
 #include "mars_types.h"
 #include "mars_camera.h"
 
-constexpr u32 maxConcurrentFrames = 2;
+inline constexpr u32 maxConcurrentFrames = 2;
 
 namespace mars {
     struct SurfaceInfo {
@@ -39,8 +39,33 @@ namespace mars {
             return { 0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
         }
 
+        static constexpr std::array<VkVertexInputBindingDescription, 2> getInputBindingDescriptions() noexcept {
+            std::array<VkVertexInputBindingDescription, 2> bindings{};
+            bindings[0] = { 0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX };
+            bindings[1] = { 1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX };
+            return bindings;
+        }
+        static constexpr std::array<VkVertexInputAttributeDescription, 2> getInputAttributeDescriptions2() noexcept {
+            std::array<VkVertexInputAttributeDescription, 2> descs{};
+            // pos : vec3
+            descs[0] = {
+                .location = 0,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .offset = 0
+            };
+            // texCoord : vec2
+            descs[1] = {
+                .location = 1,
+                .binding = 1,
+                .format = VK_FORMAT_R32G32_SFLOAT,
+                .offset = 0
+            };
+            return descs;
+        }
+
         static constexpr std::array<VkVertexInputAttributeDescription, 2> getInputAttributeDescriptions() noexcept {
-            std::array<VkVertexInputAttributeDescription, 2> descs;
+            std::array<VkVertexInputAttributeDescription, 2> descs{};
             // POS
             descs[0] = {
                 .location = 0,

@@ -1233,7 +1233,7 @@ namespace mars {
         );
 
         //Bind the vertex buffers for the meshes
-        HeapArray<VkDeviceSize> offsets;
+        HeapArray<VkDeviceSize> offsets{};
         if(entityManager.sysMesh->size() != 0) {
             offsets.init(entityManager.sysMesh->size(), 0);
             vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<u32>(entityManager.sysMesh->size()), entityManager.sysMesh->handles(), offsets.data());
@@ -1278,8 +1278,11 @@ namespace mars {
                 &entities.modelMatrices[i]);
 
             //Get the index for the current mesh within the array of vertex buffers
-            const u64 meshIndex = entityManager.sysMesh->index(entities.meshIDs[i]);
-            const u64 meshID = entities.meshIDs[i];
+            //This is an i32 to match the parameter for vkCmdDrawIndexed
+            assert(entityManager.sysMesh->index(entities.meshIDs[i]) < std::numeric_limits<i32>::max());
+            const i32 meshIndex = entityManager.sysMesh->index(entities.meshIDs[i]);
+            assert(meshIndex >= 0);
+            const ID meshID = entities.meshIDs[i];
             //Bind the index buffer at the end of the current mesh
             vkCmdBindIndexBuffer(
                 commandBuffer, 
@@ -2089,7 +2092,7 @@ namespace mars {
             transferBuffer.destroy(device);
             FATAL("Failed to map device memory");
         }
-        std::memcpy(memory, reinterpret_cast<void const*>(vertices.data()), verticesSize);
+        std::memcpy(memory, reinterpret_cast<const void*>(vertices.data()), verticesSize);
         vkUnmapMemory(device, transferBuffer.memory);
 
         if(vkMapMemory(device, transferBuffer.memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
@@ -2097,7 +2100,7 @@ namespace mars {
             transferBuffer.destroy(device);
             FATAL("Failed to map device memory");
         }
-        std::memcpy(memory, reinterpret_cast<void const*>(indices.data()), indicesSize);
+        std::memcpy(memory, reinterpret_cast<const void*>(indices.data()), indicesSize);
         vkUnmapMemory(device, transferBuffer.memory);
 
         if(!(flags & rendererFlags::beganTransferOps)) {
