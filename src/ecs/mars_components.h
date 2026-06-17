@@ -24,7 +24,7 @@ namespace mars {
     };
     constexpr ComponentT numComponents = std::to_underlying(Component::maxComponent);
 
-    //TODO: default mesh/texture with ID = 0
+    //TODO: default texture with ID = 0
     struct Draw {
         static constexpr Component component = Component::draw;
         glm::vec2 position = glm::vec2(0.0f);

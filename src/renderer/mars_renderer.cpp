@@ -65,8 +65,8 @@ namespace mars {
         return VK_FALSE;
     }
 
-    Error<std::vector<char>> loadShaderFile(const std::string& filename) noexcept {
-        std::ifstream shaderFile(MARS_SHADERS_PATH + filename, std::ios::binary | std::ios::ate);
+    Error<std::vector<char>> loadShaderFile(std::string_view filename) noexcept {
+        std::ifstream shaderFile(std::format("{}{}", MARS_SHADERS_PATH, filename), std::ios::binary | std::ios::ate);
         if(!shaderFile.is_open()) {
             FATAL("Failed to find shader code!");
         }
@@ -292,10 +292,10 @@ namespace mars {
 
     struct Square {
         static constexpr std::array<Vertex, 4> vertices = {
-            Vertex{glm::vec3(0.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-            Vertex{glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
-            Vertex{glm::vec3(1.0f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
-            Vertex{glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 1.0f)}
+            Vertex{glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec2{0.0f, 0.0f}},
+            Vertex{glm::vec3{1.0f, 0.0f, 0.0f}, glm::vec2{1.0f, 0.0f}},
+            Vertex{glm::vec3{1.0f, 1.0f, 0.0f}, glm::vec2{1.0f, 1.0f}},
+            Vertex{glm::vec3{0.0f, 1.0f, 0.0f}, glm::vec2{0.0f, 1.0f}}
         };
         static constexpr std::array<u32, 6> indices = {
             0, 1, 2,
@@ -1324,7 +1324,7 @@ namespace mars {
         return SUCCESS;
     }
 
-    Error<VkShaderModule> Renderer::createShaderModule(const std::string& filename) const noexcept {
+    Error<VkShaderModule> Renderer::createShaderModule(std::string_view filename) const noexcept {
         Error<std::vector<char>> shader = loadShaderFile(filename);
         if (!shader.okay()) {
             APPEND_SOURCE_INFO(shader);
@@ -1862,7 +1862,7 @@ namespace mars {
         return SUCCESS;
     }
 
-    Error<noreturn> Renderer::createVkInstance(const std::string& appName) noexcept {
+    Error<noreturn> Renderer::createVkInstance(std::string_view appName) noexcept {
         if constexpr(enableValidationLayers) {
             u32 layerPropertyCount = 0;
             TRY_VK(vkEnumerateInstanceLayerProperties(&layerPropertyCount, nullptr), "Failed to enumerate instance layer properties!");
@@ -1893,7 +1893,7 @@ namespace mars {
         VkApplicationInfo const appInfo = {
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
             .pNext = nullptr,
-            .pApplicationName = appName.c_str(),
+            .pApplicationName = appName.data(),
             .applicationVersion = 1,
             .pEngineName = nullptr,
             .engineVersion = 0,
@@ -1918,7 +1918,7 @@ namespace mars {
         return SUCCESS;
     }
 
-    Error<noreturn> Renderer::createSurface(std::string const& name) noexcept {
+    Error<noreturn> Renderer::createSurface(std::string_view name) noexcept {
         int numDisplays;
         SDL_DisplayID* displays = SDL_GetDisplays(&numDisplays);
         if(displays == nullptr) {
@@ -1932,7 +1932,7 @@ namespace mars {
         //SDL_WINDOW_MOUSE_GRABBED : mouse cannot escape window bounds - allows using relative
         // mouse mode
         //SDL_WINDOW_HIDDEN : hide the window before we're ready to display images to it
-        window = SDL_CreateWindow(name.c_str(), displayBounds.w, displayBounds.h, 
+        window = SDL_CreateWindow(name.data(), displayBounds.w, displayBounds.h, 
             SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_HIDDEN);
         //Instead of tracking live mouse inputs and having on-screen cursor, just track
         // changes in mouse position
@@ -2124,10 +2124,10 @@ namespace mars {
         return entityManager.insertMesh(vertexBuffer.handle, vertexBuffer.memory, verticesSize, indicesSize / sizeof(u32));
     }
 
-    Error<ID> Renderer::makeTexture(const std::string& texturePath) noexcept {
+    Error<ID> Renderer::makeTexture(std::string_view texturePath) noexcept {
         int texWidth{0}, texHeight{0}, texChannels{0};
         stbi_uc* pixels = nullptr;
-        pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        pixels = stbi_load(texturePath.data(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         if(pixels == nullptr) {
             FATAL(std::format("Failed to find/load texture file at path \"{}\"", texturePath));
         }

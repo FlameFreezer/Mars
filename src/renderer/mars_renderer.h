@@ -2,6 +2,7 @@
 
 #include <array>
 #include <string>
+#include <string_view>
 #include <queue>
 #include <cstddef>
 
@@ -217,7 +218,7 @@ namespace mars {
 
         Error<noreturn> createSyncObjects() noexcept; 
 
-        Error<VkShaderModule> createShaderModule(const std::string& filename) const noexcept; 
+        Error<VkShaderModule> createShaderModule(std::string_view filename) const noexcept; 
 
         Error<noreturn> createGraphicsPipeline() noexcept; 
 
@@ -233,9 +234,9 @@ namespace mars {
 
         Error<noreturn> createDebugUtilsMessenger() noexcept; 
 
-        Error<noreturn> createVkInstance(const std::string& appName) noexcept; 
+        Error<noreturn> createVkInstance(std::string_view appName) noexcept; 
 
-        Error<noreturn> createSurface(std::string const& name) noexcept; 
+        Error<noreturn> createSurface(std::string_view name) noexcept; 
 
         public:
         rendererFlags::FlagT flags = 0;
@@ -248,7 +249,9 @@ namespace mars {
 
         Error<ID> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept; 
 
-        Error<ID> makeTexture(const std::string& texturePath) noexcept;
+        Error<ID> makeTexture(std::string_view texturePath) noexcept;
+
+        Error<noreturn> loadTilemap(std::string_view tilemapPath) noexcept;
     };
 }
 
