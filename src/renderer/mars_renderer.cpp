@@ -1232,13 +1232,6 @@ namespace mars {
             &writeCamera
         );
 
-        //Bind the vertex buffers for the meshes
-        HeapArray<VkDeviceSize> offsets{};
-        if(entityManager.sysMesh->size() != 0) {
-            offsets.init(entityManager.sysMesh->size(), 0);
-            vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<u32>(entityManager.sysMesh->size()), entityManager.sysMesh->handles(), offsets.data());
-        }
-
         //Iterate through every drawable entity
         for(u64 i = 0; i < entities.size; i++) {
             //Push the descriptor for the texture
@@ -1283,6 +1276,10 @@ namespace mars {
             const i32 meshIndex = entityManager.sysMesh->index(entities.meshIDs[i]);
             assert(meshIndex >= 0);
             const ID meshID = entities.meshIDs[i];
+
+            //Bind the vertex buffer for the mesh
+            const VkDeviceSize offsets[] = { 0 };
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &entityManager.sysMesh->handles()[meshIndex], offsets);
             //Bind the index buffer at the end of the current mesh
             vkCmdBindIndexBuffer(
                 commandBuffer, 
