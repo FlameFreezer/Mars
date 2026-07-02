@@ -1,8 +1,6 @@
 #pragma once
 
-#include <cstdint>
-
-using u64 = uint64_t;
+#include "mars_types.h"
 
 namespace mars {
     #ifdef MARS_ECS_MAX_ENTITIES

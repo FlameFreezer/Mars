@@ -17,9 +17,15 @@ set(SDL_SHARED True)
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 
-option(MARS_ECS_MAX_ENTITIES "Maximum number of entities which can be stored by the Entity Component System" OFF)
-option(MARS_RENDERER_MAX_MESHES "Maximum number of meshes which can be loaded by the renderer" OFF)
-option(MARS_RENDERER_MAX_TEXTURES "Maximum number of textures which can be loaded by the renderer" OFF)
+if(NOT DEFINED ${MARS_ECS_MAX_ENTITIES})
+    set(MARS_ECS_MAX_ENTITIES 512)
+endif()
+if(NOT DEFINED ${MARS_RENDERER_MAX_MESHES})
+    set(MARS_RENDERER_MAX_MESHES 128)
+endif()
+if(NOT DEFINED ${MARS_RENDERER_MAX_TEXTURES})
+    set(MARS_RENDERER_MAX_TEXTURES 256)
+endif()
 
 # Shader Compilation
 set(MARS_SHADER_PATH "${PROJECT_SOURCE_DIR}/shaders")
@@ -66,16 +72,9 @@ file(GLOB_RECURSE
 target_sources(Mars PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv")
 
 target_compile_definitions(Mars PUBLIC MARS_SHADERS_PATH="${CMAKE_BINARY_DIR}/$<CONFIGURATION>/")
-
-if(${MARS_ECS_MAX_ENTITIES})
-    target_compile_definitions(Mars PUBLIC MARS_ECS_MAX_ENTITIES=${MARS_ECS_MAX_ENTITIES})
-endif()
-if(${MARS_RENDERER_MAX_MESHES})
-    target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_MESHES=${MARS_RENDERER_MAX_MESHES})
-endif()
-if(${MARS_RENDERER_MAX_TEXTURES})
-    target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_TEXTURES=${MARS_RENDERER_MAX_TEXTURES})
-endif()
+target_compile_definitions(Mars PUBLIC MARS_ECS_MAX_ENTITIES=${MARS_ECS_MAX_ENTITIES})
+target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_MESHES=${MARS_RENDERER_MAX_MESHES})
+target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_TEXTURES=${MARS_RENDERER_MAX_TEXTURES})
 
 # Link libraries to mars
 target_link_libraries(Mars PRIVATE SDL3::SDL3 glm::glm)
