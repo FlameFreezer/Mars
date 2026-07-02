@@ -66,7 +66,7 @@ namespace mars {
     }
 
     Error<std::vector<char>> loadShaderFile(std::string_view filename) noexcept {
-        std::ifstream shaderFile{std::format("{}{}", MARS_SHADERS_PATH, filename), std::ios::binary | std::ios::ate};
+        std::ifstream shaderFile(std::format("{}{}", MARS_SHADERS_PATH, filename), std::ios::binary | std::ios::ate);
         if(!shaderFile.is_open()) {
             FATAL("Failed to find shader code!");
         }
@@ -534,7 +534,6 @@ namespace mars {
             FATAL("Failed to acquire next swapchain image index");
         }
 
-        //TODO: remove this!
         if(flags & rendererFlags::beganTransferOps) {
             TRY(doTransferOps());
         }
@@ -548,12 +547,6 @@ namespace mars {
         //Reset command buffers for the current frame, both for the 2D and 3D scene
         TRY_VK(vkResetCommandBuffer(commandBuffer2D, 0), "Failed to reset command buffer");
         TRY_VK(vkResetCommandBuffer(commandBuffer3D, 0), "Failed to reset command buffer");
-        
-        //Wait on fence for loading operations
-        TRY_VK(
-            vkWaitForFences(device, 1, &fences.back(), VK_TRUE, std::numeric_limits<u64>::max()), 
-            "Failed to wait for fence!");
-        TRY_VK(vkResetCommandBuffer(transferCommandBuffers.back(), 0), "Failed to reset command buffer");
 
         //Render 2D scene
         const VkCommandBufferBeginInfo beginInfo = {
@@ -1641,8 +1634,7 @@ namespace mars {
             .commandBufferCount = static_cast<u32>(commandBuffers.max_size())
         };
         TRY_VK(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()), "Failed to allocate command vertexBuffers!");
-        //TODO: remove multiple transfer command buffers
-        for(u32 i = 0; i < maxConcurrentFrames + 1; i++) {
+        for(u32 i = 0; i < maxConcurrentFrames; i++) {
             transferCommandBuffers[i] = commandBuffers[commandBuffers.size() - 1 - i]; 
         }
         
@@ -2011,7 +2003,6 @@ namespace mars {
         #undef RTRY
     }
 
-    //Destructor
     Renderer::~Renderer() noexcept {
         if(!(flags & rendererFlags::deviceInvalid)) [[likely]] {
             vkDeviceWaitIdle(device);
@@ -2019,8 +2010,6 @@ namespace mars {
             for(VkImageView view : swapchainImageViews) {
                 vkDestroyImageView(device, view, nullptr);
             }
-            mVertexBuffer.destroy(device);
-            mStagingBuffer.destroy(device);
             cube.buffer.destroy(device);
             entityManager.sysMesh->destroySystem(device);
             for(u64 i = 0; i < entityManager.sysTexture->size(); i++) {
@@ -2296,102 +2285,5 @@ namespace mars {
         t.memory = textureImage.memory;
         t.view = textureImage.view;
         return entityManager.insertTexture(t);
-    }
-
-    Error<GPUBuffer> Renderer::createVertexBuffer(VkDeviceSize size) noexcept {
-        TRY_RETURN(GPUBuffer::make(device, physicalDevice, size,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-    }
-
-    Error<GPUBuffer> Renderer::createStagingBuffer(VkDeviceSize size) noexcept {
-        TRY_RETURN(GPUBuffer::make(device, physicalDevice, size,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
-    }
-
-    Error<noreturn> Renderer::loadTilemap(std::string_view tilemapPath) noexcept {
-        //TOTO: actually load a tilemap
-        return SUCCESS;
-    }
-
-    Error<noreturn> Renderer::beginLoading() noexcept {
-        TRY_VK(vkResetFences(device, 1, &fences.back()), "Failed to reset fence!");
-        mLoadedVertices.clear();
-        mLoadedIndices.clear();
-
-        //Always load the default square mesh
-        mVertexBufferAllocationSize = Square::indices.max_size() * sizeof(u32) + Square::vertices.max_size() * sizeof(Vertex);
-        for (const Vertex& vertex : Square::vertices) {
-            mLoadedVertices.push_back(vertex);
-        }
-        for (u32 index : Square::indices) {
-            mLoadedIndices.push_back(index);
-        }
-
-        return SUCCESS;
-    }
-
-    Error<noreturn> Renderer::endLoading() noexcept {
-        //Store the allocation size, then reset the accumulator to zero
-        const VkDeviceSize allocSize = mVertexBufferAllocationSize;
-        //Allocate the buffer and its staging buffer
-        mVertexBuffer.destroy(device);
-		TRY_ASSIGN(mVertexBuffer, createVertexBuffer(allocSize));
-        mStagingBuffer.destroy(device);
-        TRY_ASSIGN(mStagingBuffer, createStagingBuffer(allocSize));
-
-        //Copy vertex data into the staging buffer
-        void* memory{};
-        const VkDeviceSize verticesSize = mLoadedVertices.size() * sizeof(Vertex);
-        TRY_VK(vkMapMemory(device, mStagingBuffer.memory, 0, verticesSize, 0, &memory), "Failed to map device memory");
-        std::memcpy(memory, reinterpret_cast<const void*>(mLoadedVertices.data()), verticesSize);
-        vkUnmapMemory(device, mStagingBuffer.memory);
-
-        const VkDeviceSize indicesSize = mLoadedIndices.size() * sizeof(u32);
-        TRY_VK(vkMapMemory(device, mStagingBuffer.memory, verticesSize, indicesSize, 0, &memory), "Failed to map device memory");
-        std::memcpy(memory, reinterpret_cast<const void*>(mLoadedIndices.data()), indicesSize);
-	    vkUnmapMemory(device, mStagingBuffer.memory);
-
-        //Load the copy command to move data from the staging buffer to the vertex buffer
-        const VkCommandBufferBeginInfo beginInfo = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 
-            .pNext = nullptr,
-            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-            .pInheritanceInfo = nullptr
-        };
-        //TODO: stop having different transfer command buffers for each frame, just reference one at the end of our command buffers array
-        TRY_VK(vkBeginCommandBuffer(transferCommandBuffers.back(), &beginInfo), "Failed to begin single time command buffer");
-
-        const VkBufferCopy region{
-            .srcOffset = 0,
-            .dstOffset = 0,
-            .size = allocSize
-        };
-        vkCmdCopyBuffer(transferCommandBuffers.back(), mStagingBuffer.handle, mVertexBuffer.handle, 1, &region);
-
-        TRY_VK(vkEndCommandBuffer(transferCommandBuffers.back()), "Failed to end command buffer");
-
-        //Submit the copy command
-        const VkCommandBufferSubmitInfo commandInfo = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-            .pNext = nullptr,
-            .commandBuffer = transferCommandBuffers.back(),
-            .deviceMask = 0
-        };
-        const VkSubmitInfo2 submitInfo = {
-            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-            .pNext = nullptr,
-            .flags = 0,
-            .waitSemaphoreInfoCount = 0,
-            .pWaitSemaphoreInfos = nullptr,
-            .commandBufferInfoCount = 1,
-            .pCommandBufferInfos = &commandInfo,
-            .signalSemaphoreInfoCount = 0,
-            .pSignalSemaphoreInfos = nullptr
-        };
-        TRY_VK(vkQueueSubmit2(graphicsQueues[0], 1, &submitInfo, fences.back()), "Failed to submit to queue");
-
-        return SUCCESS;
     }
 }

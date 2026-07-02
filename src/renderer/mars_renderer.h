@@ -94,10 +94,10 @@ namespace mars {
     constexpr glm::vec3 bottomrightback{1.0f, 1.0f, 1.0f};
     struct Cube {
         GPUBuffer buffer;
-        u32 dim{};
+        u32 dim;
         glm::mat4 matrix;
-        float fov{};
-        float aspect{};
+        float fov;
+        float aspect;
         static constexpr std::array<Vertex, 24> vertices = {
             //FRONT FACE
             Vertex{topleft, glm::vec2(0.0f, 0.0f)},
@@ -164,15 +164,10 @@ namespace mars {
         GPUImage depthImage2D;
         GPUImage depthImage3D;
         //Each frame needs a command buffer for the 2D and 3D scenes, and one reserved for transfer
-    	std::array<VkCommandBuffer, (2 * maxConcurrentFrames) + maxConcurrentFrames + 1> commandBuffers;
-        std::array<VkCommandBuffer, maxConcurrentFrames + 1> transferCommandBuffers;
-        //One fence for each frame and one for the vertex data loading
-        std::array<VkFence, maxConcurrentFrames + 1> fences;
+    	std::array<VkCommandBuffer, (2 * maxConcurrentFrames) + maxConcurrentFrames> commandBuffers;
+        std::array<VkCommandBuffer, maxConcurrentFrames> transferCommandBuffers;
+        std::array<VkFence, maxConcurrentFrames> fences;
         std::array<VkPipeline, 2> graphicsPipelines;
-        GPUBuffer mVertexBuffer;
-        GPUBuffer mStagingBuffer;
-        std::vector<u32> mLoadedIndices;
-        std::vector<Vertex> mLoadedVertices;
         VkDescriptorSetLayout pushSetLayout = nullptr;
         VkInstance instance = nullptr;
         SDL_Window* window = nullptr;
@@ -190,7 +185,6 @@ namespace mars {
         u32 graphicsQueueFamilyIndex = 0;
         u32 presentQueueFamilyIndex = 0;
         VkSampleCountFlagBits msaaSampleCount;
-        VkDeviceSize mVertexBufferAllocationSize = 0;
 
         std::array<VkImageMemoryBarrier2, 3> setup3DMemoryBarriers(u32 imageIndex) noexcept;
 
@@ -244,15 +238,11 @@ namespace mars {
 
         Error<noreturn> createSurface(std::string_view name) noexcept; 
 
-        Error<GPUBuffer> createVertexBuffer(VkDeviceSize size) noexcept;
-
-        Error<GPUBuffer> createStagingBuffer(VkDeviceSize size) noexcept;
-
         public:
         rendererFlags::FlagT flags = 0;
 
         static Error<Renderer*> make(const std::string& name, ID& squareID) noexcept; 
-
+        //Destructor
         ~Renderer() noexcept; 
 
         Error<noreturn> draw(Camera camera, RendererEntities entities) noexcept; 
@@ -262,10 +252,6 @@ namespace mars {
         Error<ID> makeTexture(std::string_view texturePath) noexcept;
 
         Error<noreturn> loadTilemap(std::string_view tilemapPath) noexcept;
-
-        Error<noreturn> beginLoading() noexcept;
-
-        Error<noreturn> endLoading() noexcept;
     };
 }
 
