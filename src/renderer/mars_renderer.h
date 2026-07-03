@@ -150,7 +150,10 @@ namespace mars {
     class Renderer {
         RendererEntityManager entityManager;
         Cube cube;
-        UniformBuffer<glm::mat4> cameraMatrices;
+
+        UniformBuffer<glm::mat4> mCamera2D;
+        UniformBuffer<glm::mat4> mCamera3D;
+
     	HeapArray<VkImage> swapchainImages;
     	HeapArray<VkImageView> swapchainImageViews;	
         HeapArray<GPUImage> renderTargets2D;
@@ -190,7 +193,7 @@ namespace mars {
 
         std::array<VkImageMemoryBarrier2, 3> setup2DMemoryBarriers() const noexcept;
 
-        void updateCamera() noexcept;
+        void updateCamera2D() noexcept;
 
         Error<noreturn> createCamera() noexcept;
 

@@ -438,7 +438,7 @@ namespace mars {
         return imageMemoryBarriers2D;
     }
 
-    void Renderer::updateCamera() noexcept {
+    void Renderer::updateCamera2D() noexcept {
         glm::mat4 constexpr identity = glm::mat4(1.0f);
         //Calculate size of overscan (region of the cube not visible)
         float overscanSize = 0.0f;
@@ -459,19 +459,27 @@ namespace mars {
         const glm::mat4 s = glm::scale(identity, glm::vec3(scale, scale, 1.0f));
         //Moves scene into canonical vulkan viewing volume with range [-1,1]
         const glm::mat4 t = glm::translate(identity, glm::vec3(-1.0f, -1.0f, 0.0f));
-        cameraMatrices.mappedMemory[0] = t * s * overscan;
+        *mCamera2D.mappedMemory = t * s * overscan;
     }
 
     Error<noreturn> Renderer::createCamera() noexcept {
-        Error<UniformBuffer<glm::mat4>> res = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
-            //Each frame gets its own 3D camera, while one 2D camera exists
-            sizeof(glm::mat4) * (maxConcurrentFrames + 1)); 
-        if(!res.okay()) {
-            APPEND_SOURCE_INFO(res);
-            return MOVE_ERROR(res);
+        Error<UniformBuffer<glm::mat4>> cam2D = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
+            sizeof(glm::mat4)); 
+        if (!cam2D.okay()) {
+            APPEND_SOURCE_INFO(cam2D);
+            return MOVE_ERROR(cam2D);
         }
-        else cameraMatrices = res.moveValue(); 
-        updateCamera();
+        else mCamera2D = cam2D.moveValue();
+
+        Error<UniformBuffer<glm::mat4>> cam3D = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
+            sizeof(glm::mat4)); 
+        if (!cam3D.okay()) {
+            APPEND_SOURCE_INFO(cam3D);
+            return MOVE_ERROR(cam3D);
+        }
+        else mCamera3D = cam3D.moveValue();
+
+        updateCamera2D();
 
         return SUCCESS;
     }
@@ -986,7 +994,7 @@ namespace mars {
 
         cube.dim = std::max(swapchainImageExtent.width, swapchainImageExtent.height);
 
-        updateCamera();
+        updateCamera2D();
 
         VkSwapchainKHR newSwapchain;
         const VkSwapchainCreateInfoKHR swapchainInfo = {
@@ -1083,9 +1091,8 @@ namespace mars {
 
         //Write the 3D camera to the push descriptor
         const VkDescriptorBufferInfo camera3DBufferInfo = {
-            .buffer = cameraMatrices.buffer.handle,
-            //Offset correctly for the current frame's camera
-            .offset = sizeof(glm::mat4) * (1 + currentFrame),
+            .buffer = mCamera3D.buffer.handle,
+            .offset = 0,
             .range = sizeof(glm::mat4)
         };
         const VkWriteDescriptorSet writeCamera = {
@@ -1207,7 +1214,7 @@ namespace mars {
 
         //Write the 2D camera to the push descriptor
         const VkDescriptorBufferInfo camera2DBufferInfo = {
-            .buffer = cameraMatrices.buffer.handle,
+            .buffer = mCamera2D.buffer.handle,
             .offset = 0,
             .range = sizeof(glm::mat4)
         };
@@ -2037,7 +2044,8 @@ namespace mars {
             vkDestroyPipelineLayout(device, pipelineLayout2D, nullptr);
             vkDestroyPipelineLayout(device, pipelineLayout3D, nullptr);
             for(VkPipeline pipeline : graphicsPipelines) vkDestroyPipeline(device, pipeline, nullptr);
-            cameraMatrices.destroy(device);
+            mCamera2D.destroy(device);
+            mCamera3D.destroy(device);
             vkDestroyDevice(device, nullptr);
         }
         if(!(flags & rendererFlags::instanceInvalid)) [[likely]] {
@@ -2054,7 +2062,7 @@ namespace mars {
         if(camera.aspect == Camera::autoAspect) {
             camera.aspect = static_cast<float>(swapchainImageExtent.width) / swapchainImageExtent.height;
         }
-        cameraMatrices.mappedMemory[1 + currentFrame] = camera.getMatrix();
+        *mCamera3D.mappedMemory = camera.getMatrix();
         return drawFrame(camera.fov, camera.aspect, entities);
     }
 

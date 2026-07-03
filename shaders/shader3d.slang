@@ -16,7 +16,7 @@ struct PushDescriptors {
 ParameterBlock<PushDescriptors> push;
 
 [shader("vertex")]
-func vertMain(input : VertexIn, uniform model: float4x4) -> VertexOut {
+func vertMain(VertexIn input, uniform float4x4 model) -> VertexOut {
     VertexOut output;
     output.position = mul(push.camera, mul(model, float4(input.position, 1.0f)));
     output.texCoord = input.texCoord;
@@ -24,6 +24,6 @@ func vertMain(input : VertexIn, uniform model: float4x4) -> VertexOut {
 }
 
 [shader("fragment")]
-func fragMain(input : VertexOut) -> float4 {
+func fragMain(VertexOut input) -> float4 {
     return push.texture.Sample(input.texCoord);
 }
