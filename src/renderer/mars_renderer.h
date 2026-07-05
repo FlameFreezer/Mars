@@ -188,9 +188,13 @@ namespace mars {
         u32 presentQueueFamilyIndex = 0;
         VkSampleCountFlagBits msaaSampleCount;
 
+        SurfaceInfo mSurfaceInfo{};
+
         std::array<VkImageMemoryBarrier2, 3> setup3DMemoryBarriers(u32 imageIndex) noexcept;
 
         std::array<VkImageMemoryBarrier2, 3> setup2DMemoryBarriers() const noexcept;
+
+        Error<noreturn> querySurfaceInfo() noexcept;
 
         void updateCamera2D() noexcept;
 
@@ -204,7 +208,7 @@ namespace mars {
 
         Error<noreturn> createCube() noexcept; 
 
-        Error<noreturn> createRenderTargets(VkFormat format) noexcept; 
+        Error<noreturn> createRenderTargets() noexcept; 
 
         Error<noreturn> createDepthImages() noexcept; 
 
@@ -224,15 +228,15 @@ namespace mars {
 
         Error<noreturn> createGraphicsPipeline() noexcept; 
 
-        Error<noreturn> getSwapchainImages(VkFormat format) noexcept; 
+        Error<noreturn> getSwapchainImages() noexcept; 
 
         Error<noreturn> createCommandBuffers() noexcept; 
 
         Error<VkExtent2D> chooseImageExtent(VkSurfaceCapabilitiesKHR const& capabilities) noexcept; 
 
-        Error<noreturn> createSwapchain(SurfaceInfo const& surfaceInfo) noexcept; 
+        Error<noreturn> createSwapchain() noexcept; 
 
-        Error<noreturn> createDevice(SurfaceInfo& surfaceInfo) noexcept; 
+        Error<noreturn> createDevice() noexcept; 
 
         Error<noreturn> createDebugUtilsMessenger() noexcept; 
 

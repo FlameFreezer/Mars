@@ -50,7 +50,6 @@ namespace mars {
         SurfaceInfo surfaceInfo;
     };
 
-
     PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = nullptr;
     PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = nullptr;
 
@@ -302,6 +301,13 @@ namespace mars {
             0, 2, 3
         };
     };
+
+    Error<noreturn> Renderer::querySurfaceInfo() noexcept {
+        TRY_ASSIGN(mSurfaceInfo.presentMode, choosePresentMode(physicalDevice, surface));
+        TRY_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &mSurfaceInfo.capabilities), "Failed to get physical device surface capabilities while recreating the swapchain");
+        TRY_ASSIGN(mSurfaceInfo.format, checkDeviceSurfaceFormats(physicalDevice, surface));
+        return SUCCESS;
+    }
     std::array<VkImageMemoryBarrier2, 3> Renderer::setup3DMemoryBarriers(u32 imageIndex) noexcept {
         std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D{};
         //Transition image layout for color writing
@@ -534,6 +540,10 @@ namespace mars {
             depthImage2D.destroy(device);
             depthImage3D.destroy(device);
             TRY(createDepthImages());
+            for (GPUImage& target : renderTargets2D) target.destroy(device);
+            for (GPUImage& target : renderTargets3D) target.destroy(device);
+            for (GPUImage& texture : textures2DScene) texture.destroy(device);
+            TRY(createRenderTargets());
             flags &= ~rendererFlags::recreateSwapchain;
             return drawFrame(fov, aspect, entities);
         }
@@ -840,7 +850,7 @@ namespace mars {
 
         return SUCCESS;
     }
-    Error<noreturn> Renderer::createRenderTargets(VkFormat format) noexcept {
+    Error<noreturn> Renderer::createRenderTargets() noexcept {
         //The 2D render area is the face of the cube, so it has to be square
         const u32 d = cube.dim;
         //create 2D render targets
@@ -855,7 +865,7 @@ namespace mars {
                 //this will be resolved to the textures
                 VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                format, VK_IMAGE_ASPECT_COLOR_BIT
+                mSurfaceInfo.format.format, VK_IMAGE_ASPECT_COLOR_BIT
             ));
         }
         //create 2D textures - for mapping to the cube
@@ -870,7 +880,7 @@ namespace mars {
                 // thus, initially a color attachment
                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                format, VK_IMAGE_ASPECT_COLOR_BIT
+                mSurfaceInfo.format.format, VK_IMAGE_ASPECT_COLOR_BIT
             ));
         }
         //create 3D render targets
@@ -885,7 +895,7 @@ namespace mars {
                 //this will be resolved to the swapchain images
                 VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                format, VK_IMAGE_ASPECT_COLOR_BIT
+                mSurfaceInfo.format.format, VK_IMAGE_ASPECT_COLOR_BIT
             ));
         }
         return SUCCESS;
@@ -970,22 +980,9 @@ namespace mars {
     Error<noreturn> Renderer::recreateSwapchain() noexcept {
         vkDeviceWaitIdle(device);
 
-        Error<VkPresentModeKHR> presentMode = choosePresentMode(physicalDevice, surface); 
-        if (!presentMode.okay()) {
-            APPEND_SOURCE_INFO(presentMode);
-            return MOVE_ERROR(presentMode);
-        }
+        TRY(querySurfaceInfo());
 
-        VkSurfaceCapabilitiesKHR surfaceCapabilities{};
-        TRY_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities), "Failed to get physical device surface capabilities while recreating the swapchain");
-
-        Error<VkSurfaceFormatKHR> surfaceFormat = checkDeviceSurfaceFormats(physicalDevice, surface);
-        if (!surfaceFormat.okay()) {
-            APPEND_SOURCE_INFO(surfaceFormat);
-            return MOVE_ERROR(surfaceFormat);
-        }
-
-        Error<VkExtent2D> imageExtent = chooseImageExtent(surfaceCapabilities);
+        Error<VkExtent2D> imageExtent = chooseImageExtent(mSurfaceInfo.capabilities);
         if (!imageExtent.okay()) {
             APPEND_SOURCE_INFO(imageExtent);
             return MOVE_ERROR(imageExtent);
@@ -1002,9 +999,9 @@ namespace mars {
             .pNext = nullptr,
             .flags = 0,
             .surface = surface,
-            .minImageCount = surfaceCapabilities.minImageCount + 1,
-            .imageFormat = surfaceFormat.value().format,
-            .imageColorSpace = surfaceFormat.value().colorSpace,
+            .minImageCount = mSurfaceInfo.capabilities.minImageCount + 1,
+            .imageFormat = mSurfaceInfo.format.format,
+            .imageColorSpace = mSurfaceInfo.format.colorSpace,
             .imageExtent = swapchainImageExtent,
             .imageArrayLayers = 1,
             .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -1013,7 +1010,7 @@ namespace mars {
             .pQueueFamilyIndices = nullptr,
             .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
             .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            .presentMode = presentMode.value(),
+            .presentMode = mSurfaceInfo.presentMode,
             .clipped = VK_TRUE,
             .oldSwapchain = swapchain
         };
@@ -1025,7 +1022,7 @@ namespace mars {
         swapchainImageViews.clear();
         swapchainImages.clear();
 
-        TRY(getSwapchainImages(surfaceFormat.value().format));
+        TRY(getSwapchainImages());
 
         return SUCCESS;
     }
@@ -1587,7 +1584,7 @@ namespace mars {
 
         return SUCCESS;
     }
-    Error<noreturn> Renderer::getSwapchainImages(VkFormat format) noexcept {
+    Error<noreturn> Renderer::getSwapchainImages() noexcept {
         u32 imageCount;
         TRY_VK(vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr), "Failed to get swapchain images!");
         swapchainImages.resize(imageCount);
@@ -1600,7 +1597,7 @@ namespace mars {
             .flags = 0,
             .image = nullptr, //This will be updated for each image in a loop later
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = format,
+            .format = mSurfaceInfo.format.format,
             .components = {
                 VK_COMPONENT_SWIZZLE_IDENTITY, 
                 VK_COMPONENT_SWIZZLE_IDENTITY, 
@@ -1662,17 +1659,17 @@ namespace mars {
         };
     }
 
-    Error<noreturn> Renderer::createSwapchain(SurfaceInfo const& surfaceInfo) noexcept {
-        TRY_ASSIGN(swapchainImageExtent, chooseImageExtent(surfaceInfo.capabilities));
+    Error<noreturn> Renderer::createSwapchain() noexcept {
+        TRY_ASSIGN(swapchainImageExtent, chooseImageExtent(mSurfaceInfo.capabilities));
 
         const VkSwapchainCreateInfoKHR swapchainInfo = {
             .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .pNext = nullptr,
             .flags = 0,
             .surface = surface,
-            .minImageCount = surfaceInfo.capabilities.minImageCount + 1,
-            .imageFormat = surfaceInfo.format.format,
-            .imageColorSpace = surfaceInfo.format.colorSpace,
+            .minImageCount = mSurfaceInfo.capabilities.minImageCount + 1,
+            .imageFormat = mSurfaceInfo.format.format,
+            .imageColorSpace = mSurfaceInfo.format.colorSpace,
             .imageExtent = swapchainImageExtent,
             .imageArrayLayers = 1,
             .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -1681,7 +1678,7 @@ namespace mars {
             .pQueueFamilyIndices = nullptr,
             .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
             .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            .presentMode = surfaceInfo.presentMode,
+            .presentMode = mSurfaceInfo.presentMode,
             .clipped = VK_TRUE,
             .oldSwapchain = nullptr
         };
@@ -1691,7 +1688,7 @@ namespace mars {
         return SUCCESS;
     }
 
-    Error<noreturn> Renderer::createDevice(SurfaceInfo& surfaceInfo) noexcept {
+    Error<noreturn> Renderer::createDevice() noexcept {
         u32 graphicsQueueCount = 0;
         u32 presentQueueCount = 0;
 
@@ -1703,13 +1700,13 @@ namespace mars {
 
         //Pick a physical device to use
         if (Error<PickPhysicalDeviceResult> pickResult = pickPhysicalDevice(physicalDevices, surface); pickResult.okay()) {
-            PickPhysicalDeviceResult const& res = pickResult.value();
+            const PickPhysicalDeviceResult& res = pickResult.value();
             physicalDevice = res.physicalDevice;
             graphicsQueueFamilyIndex = res.queueFamilyInfo.graphicsIndex;
             presentQueueFamilyIndex = res.queueFamilyInfo.presentIndex;
             graphicsQueueCount = res.queueFamilyInfo.graphicsCount;
             presentQueueCount = res.queueFamilyInfo.presentCount;
-            surfaceInfo = res.surfaceInfo;
+            mSurfaceInfo = res.surfaceInfo;
         }
         //pickPhysicalDevice just returns searchFail if none of the devices are suitable, but 
         // I want this case to be fatal instead
@@ -1938,8 +1935,8 @@ namespace mars {
         //SDL_WINDOW_MOUSE_GRABBED : mouse cannot escape window bounds - allows using relative
         // mouse mode
         //SDL_WINDOW_HIDDEN : hide the window before we're ready to display images to it
-        window = SDL_CreateWindow(name.data(), displayBounds.w, displayBounds.h, 
-            SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_HIDDEN);
+        window = SDL_CreateWindow(name.data(), 800, 600, 
+            SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
         //Instead of tracking live mouse inputs and having on-screen cursor, just track
         // changes in mouse position
         if(!SDL_SetWindowRelativeMouseMode(window, true)) {
@@ -1975,19 +1972,18 @@ namespace mars {
 
         RTRY(r->createSurface(name));
 
-        SurfaceInfo surfaceInfo{};
-        if(Error<noreturn> res = r->createDevice(surfaceInfo); !res.okay()) {
+        if(Error<noreturn> res = r->createDevice(); !res.okay()) {
             APPEND_SOURCE_INFO(res);
             r->flags &= ~rendererFlags::deviceInvalid;
             delete r;
             return MOVE_ERROR(res);
         }
-        RTRY(r->createSwapchain(surfaceInfo));
-        RTRY(r->getSwapchainImages(surfaceInfo.format.format));
+        RTRY(r->createSwapchain());
+        RTRY(r->getSwapchainImages());
         RTRY(r->createCommandBuffers());
         RTRY(r->createCube());
         RTRY(r->createSampler());
-        RTRY(r->createRenderTargets(surfaceInfo.format.format));
+        RTRY(r->createRenderTargets());
         RTRY(r->createDepthImages());
         RTRY(r->createSyncObjects());
         RTRY(r->createDescriptorSetLayouts());
