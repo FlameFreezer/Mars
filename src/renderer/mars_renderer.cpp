@@ -2057,6 +2057,8 @@ namespace mars {
     }
 
     Error<noreturn> Renderer::draw(const Camera& camera, RendererEntities entities) noexcept {
+        //Don't draw if the window is minimized
+        if (flags & rendererFlags::windowMinimized) return SUCCESS;
         float aspect = camera.aspect;
         if(aspect == Camera::autoAspect) {
             aspect = static_cast<float>(swapchainImageExtent.width) / swapchainImageExtent.height;
