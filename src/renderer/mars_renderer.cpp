@@ -1931,8 +1931,8 @@ namespace mars {
         //SDL_WINDOW_MOUSE_GRABBED : mouse cannot escape window bounds - allows using relative
         // mouse mode
         //SDL_WINDOW_HIDDEN : hide the window before we're ready to display images to it
-        window = SDL_CreateWindow(name.data(), 800, 600, 
-            SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+        window = SDL_CreateWindow(name.data(), displayBounds.w, displayBounds.h, 
+            SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS);
         //Instead of tracking live mouse inputs and having on-screen cursor, just track
         // changes in mouse position
         if(!SDL_SetWindowRelativeMouseMode(window, true)) {
