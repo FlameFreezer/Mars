@@ -2058,12 +2058,18 @@ namespace mars {
         }
     }
 
-    Error<noreturn> Renderer::draw(Camera camera, RendererEntities entities) noexcept {
-        if(camera.aspect == Camera::autoAspect) {
-            camera.aspect = static_cast<float>(swapchainImageExtent.width) / swapchainImageExtent.height;
+    Error<noreturn> Renderer::draw(const Camera& camera, RendererEntities entities) noexcept {
+        float aspect = camera.aspect;
+        if(aspect == Camera::autoAspect) {
+            aspect = static_cast<float>(swapchainImageExtent.width) / swapchainImageExtent.height;
         }
-        *mCamera3D.mappedMemory = camera.getMatrix();
-        return drawFrame(camera.fov, camera.aspect, entities);
+		//dir + pos = target (position the camera is looking at)
+		const glm::mat4 view = glm::lookAt(camera.pos, camera.dir + camera.pos, camera.up);
+		glm::mat4 proj = glm::perspective(camera.fov, aspect, camera.nearPlane, camera.farPlane);
+		proj[1][1] *= -1.0f;
+		*mCamera3D.mappedMemory = proj * view;
+
+        return drawFrame(camera.fov, aspect, entities);
     }
 
     Error<ID> Renderer::makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept {

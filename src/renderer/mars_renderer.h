@@ -248,7 +248,7 @@ namespace mars {
         //Destructor
         ~Renderer() noexcept; 
 
-        Error<noreturn> draw(Camera camera, RendererEntities entities) noexcept; 
+        Error<noreturn> draw(const Camera& camera, RendererEntities entities) noexcept; 
 
         Error<ID> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept; 
 
