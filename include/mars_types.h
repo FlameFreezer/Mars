@@ -19,3 +19,8 @@ using ID = u64;
 constexpr ID nullID = 0;
 
 class noreturn{};
+
+struct Rect {
+	float x{};
+	float y{};
+};

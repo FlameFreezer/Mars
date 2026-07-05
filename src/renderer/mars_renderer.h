@@ -173,7 +173,6 @@ namespace mars {
         std::array<VkPipeline, 2> graphicsPipelines;
         VkDescriptorSetLayout pushSetLayout = nullptr;
         VkInstance instance = nullptr;
-        SDL_Window* window = nullptr;
         VkDebugUtilsMessengerEXT debugMessenger = nullptr;
         VkSurfaceKHR surface = nullptr;
         VkDevice device = nullptr;
@@ -242,6 +241,7 @@ namespace mars {
         Error<noreturn> createSurface(std::string_view name) noexcept; 
 
         public:
+        SDL_Window* window = nullptr;
         rendererFlags::FlagT flags = 0;
 
         static Error<Renderer*> make(const std::string& name, ID& squareID) noexcept; 

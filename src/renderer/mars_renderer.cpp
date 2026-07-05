@@ -1924,6 +1924,7 @@ namespace mars {
 
     Error<noreturn> Renderer::createSurface(std::string_view name) noexcept {
         int numDisplays;
+        //displays owns the list
         SDL_DisplayID* displays = SDL_GetDisplays(&numDisplays);
         if(displays == nullptr) {
             FATAL(SDL_GetError());
@@ -1931,27 +1932,32 @@ namespace mars {
         //Be lazy and just use the first display
         SDL_Rect displayBounds{};
         if(!SDL_GetDisplayBounds(displays[0], &displayBounds)) {
+            SDL_free(displays);
             FATAL(SDL_GetError());
         }
         //SDL_WINDOW_MOUSE_GRABBED : mouse cannot escape window bounds - allows using relative
         // mouse mode
         //SDL_WINDOW_HIDDEN : hide the window before we're ready to display images to it
         window = SDL_CreateWindow(name.data(), displayBounds.w, displayBounds.h, 
-            SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_HIDDEN);
+            SDL_WINDOW_VULKAN | SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_HIDDEN);
         //Instead of tracking live mouse inputs and having on-screen cursor, just track
         // changes in mouse position
         if(!SDL_SetWindowRelativeMouseMode(window, true)) {
+            SDL_free(displays);
             FATAL(SDL_GetError());
         }
         if(!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
+            SDL_free(displays);
             FATAL(SDL_GetError());
         }
+        //Free the array of displays
         SDL_free(displays);
         return SUCCESS;
     }
 
     Error<Renderer*> Renderer::make(const std::string& name, ID& squareID) noexcept {
         Renderer* r = new Renderer;
+        r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
         #define RTRY(proc) \
         if(auto res = proc; !res.okay()) do{\
             APPEND_SOURCE_INFO(res);\
@@ -1961,7 +1967,7 @@ namespace mars {
 
         if(Error<noreturn> res = r->createVkInstance(name); !res.okay()) {
             APPEND_SOURCE_INFO(res);
-            r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
+            r->flags &= ~rendererFlags::instanceInvalid;
             delete r;
             return MOVE_ERROR(res);
         }
@@ -1972,7 +1978,7 @@ namespace mars {
         SurfaceInfo surfaceInfo{};
         if(Error<noreturn> res = r->createDevice(surfaceInfo); !res.okay()) {
             APPEND_SOURCE_INFO(res);
-            r->flags |= rendererFlags::deviceInvalid;
+            r->flags &= ~rendererFlags::deviceInvalid;
             delete r;
             return MOVE_ERROR(res);
         }

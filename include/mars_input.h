@@ -66,10 +66,14 @@ namespace mars {
     template<class ActionIndex>
     class Input {
         std::vector<Mapping> mMappings{};
-        bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
-        bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = {false};
-        i16 mPrevAxisState[SDL_GAMEPAD_AXIS_COUNT] = {0};
-        i16 mAxisState[SDL_GAMEPAD_AXIS_COUNT] = {0};
+        bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
+        bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
+        i16 mPrevAxisState[SDL_GAMEPAD_AXIS_COUNT] = { 0 };
+        i16 mAxisState[SDL_GAMEPAD_AXIS_COUNT] = { 0 };
+        float mMouseX{};
+        float mMouseY{};
+        float mMouseDx{};
+        float mMouseDy{};
         SDL_Gamepad* mGamepad = nullptr;
         bool* mPrevKeyState = nullptr;
         const bool* mKeyState = nullptr;
@@ -204,6 +208,14 @@ namespace mars {
                     mAxisState[i] = SDL_GetGamepadAxis(mGamepad, static_cast<SDL_GamepadAxis>(i));
                 }
             }
+            SDL_GetMouseState(&mMouseX, &mMouseY);
+            SDL_GetRelativeMouseState(&mMouseDx, &mMouseDy);
+        }
+        Rect getMousePosition() const noexcept {
+            return { mMouseX, mMouseY };
+        }
+        Rect getMouseDelta() const noexcept {
+            return { mMouseDx, mMouseDy };
         }
         bool isKeyDown(SDL_Scancode scancode) const noexcept {
             return mKeyState[scancode];
