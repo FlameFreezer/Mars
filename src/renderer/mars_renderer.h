@@ -194,8 +194,6 @@ namespace mars {
 
         std::array<VkImageMemoryBarrier2, 3> setup2DMemoryBarriers() const noexcept;
 
-        Error<noreturn> querySurfaceInfo() noexcept;
-
         void updateCamera2D() noexcept;
 
         Error<noreturn> createCamera() noexcept;

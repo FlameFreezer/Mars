@@ -302,11 +302,12 @@ namespace mars {
         };
     };
 
-    Error<noreturn> Renderer::querySurfaceInfo() noexcept {
-        TRY_ASSIGN(mSurfaceInfo.presentMode, choosePresentMode(physicalDevice, surface));
-        TRY_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &mSurfaceInfo.capabilities), "Failed to get physical device surface capabilities while recreating the swapchain");
-        TRY_ASSIGN(mSurfaceInfo.format, checkDeviceSurfaceFormats(physicalDevice, surface));
-        return SUCCESS;
+    static Error<SurfaceInfo> querySurfaceInfo(VkPhysicalDevice device, VkSurfaceKHR surface) noexcept {
+        SurfaceInfo surfaceInfo{};
+        TRY_ASSIGN(surfaceInfo.presentMode, choosePresentMode(device, surface));
+        TRY_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &surfaceInfo.capabilities), "Failed to get physical device surface capabilities while recreating the swapchain");
+        TRY_ASSIGN(surfaceInfo.format, checkDeviceSurfaceFormats(device, surface));
+        return surfaceInfo;
     }
     std::array<VkImageMemoryBarrier2, 3> Renderer::setup3DMemoryBarriers(u32 imageIndex) noexcept {
         std::array<VkImageMemoryBarrier2, 3> imageMemoryBarriers3D{};
@@ -980,14 +981,9 @@ namespace mars {
     Error<noreturn> Renderer::recreateSwapchain() noexcept {
         vkDeviceWaitIdle(device);
 
-        TRY(querySurfaceInfo());
+        TRY_ASSIGN(mSurfaceInfo, querySurfaceInfo(physicalDevice, surface));
 
-        Error<VkExtent2D> imageExtent = chooseImageExtent(mSurfaceInfo.capabilities);
-        if (!imageExtent.okay()) {
-            APPEND_SOURCE_INFO(imageExtent);
-            return MOVE_ERROR(imageExtent);
-        }
-        swapchainImageExtent = imageExtent.value();
+        TRY_ASSIGN(swapchainImageExtent, chooseImageExtent(mSurfaceInfo.capabilities));
 
         cube.dim = std::max(swapchainImageExtent.width, swapchainImageExtent.height);
 
