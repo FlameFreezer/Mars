@@ -13,7 +13,7 @@ namespace mars {
         stopped
     };
 
-    class Timer {
+    class PreciseTimer {
         std::mutex mtx;
         std::thread mThread;
         std::chrono::steady_clock::time_point::duration mTime {0};
@@ -22,9 +22,9 @@ namespace mars {
         TimerStatus mStatus = TimerStatus::stopped;
         void startInternal(std::unique_lock<std::mutex>&& l) noexcept;
         public:
-        Timer() = default;
-        Timer(float waitTimeS);
-        ~Timer() noexcept;
+        PreciseTimer() = default;
+        PreciseTimer(float waitTimeS);
+        ~PreciseTimer() noexcept;
         /// Starts the timer from time t = 0. Does nothing if the timer is already running.
         /// Preconditions:  status() != TimerStatus::running
         /// Postconditions: status() == TimerStatus::running

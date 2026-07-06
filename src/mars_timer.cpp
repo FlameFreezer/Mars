@@ -2,7 +2,7 @@
 #include <chrono>
 
 namespace mars {
-    void Timer::startInternal(std::unique_lock<std::mutex>&& l) noexcept {
+    void PreciseTimer::startInternal(std::unique_lock<std::mutex>&& l) noexcept {
         if(mStatus == TimerStatus::running) return;
         mStatus = TimerStatus::running;
         mTimeLeft = mTime;
@@ -20,19 +20,19 @@ namespace mars {
         });
         mStartTime = std::chrono::steady_clock::now();
     }
-    Timer::Timer(float waitTimeS) {
+    PreciseTimer::PreciseTimer(float waitTimeS) {
         const std::chrono::duration<float, std::chrono::seconds::period> s(waitTimeS);
         mTime = std::chrono::duration_cast<std::chrono::steady_clock::duration>(s);
         mTimeLeft = mTime;
     }
-    Timer::~Timer() noexcept {
+    PreciseTimer::~PreciseTimer() noexcept {
         if(mThread.joinable()) mThread.detach();
     }
-    void Timer::start() noexcept {
+    void PreciseTimer::start() noexcept {
         std::unique_lock<std::mutex> l(mtx);
         startInternal(std::move(l));
     }
-    void Timer::start(float waitTimeS) noexcept {
+    void PreciseTimer::start(float waitTimeS) noexcept {
         const std::chrono::duration<float, std::chrono::seconds::period> s(waitTimeS);
         std::unique_lock<std::mutex> l(mtx);
         if(mStatus == TimerStatus::running) return;
@@ -40,13 +40,13 @@ namespace mars {
         mTimeLeft = mTime;
         startInternal(std::move(l));
     }
-    void Timer::stop() noexcept {
+    void PreciseTimer::stop() noexcept {
         mThread.detach();
         std::unique_lock<std::mutex> l(mtx);
         mStatus = TimerStatus::stopped;
         mTimeLeft = std::chrono::steady_clock::duration{0};
     }
-    void Timer::pause() noexcept {
+    void PreciseTimer::pause() noexcept {
         mThread.detach();
         std::unique_lock<std::mutex> l(mtx);
         //If the timer was stopped by the thread before we could pause it, do nothing
@@ -54,7 +54,7 @@ namespace mars {
         mStatus = TimerStatus::paused;
         mTimeLeft = std::chrono::steady_clock::now() - mStartTime;
     }
-    void Timer::resume() noexcept {
+    void PreciseTimer::resume() noexcept {
         std::unique_lock<std::mutex> l(mtx);
         if((mStatus != TimerStatus::paused)) return;
         mStatus = TimerStatus::running;
@@ -70,22 +70,22 @@ namespace mars {
             }
         });
     }
-    void Timer::reset() noexcept {
+    void PreciseTimer::reset() noexcept {
         std::unique_lock<std::mutex> l(mtx);
         if(mStatus == TimerStatus::running) return;
         mStatus = TimerStatus::stopped;
         mTimeLeft = mTime;
     }
-    TimerStatus Timer::status() const noexcept {
+    TimerStatus PreciseTimer::status() const noexcept {
         return mStatus;
     }
-    float Timer::timeLeft() const noexcept {
+    float PreciseTimer::timeLeft() const noexcept {
         return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(mTimeLeft).count();
     }
-    std::chrono::steady_clock::time_point::duration::rep Timer::timeLeftSystem() const noexcept {
+    std::chrono::steady_clock::time_point::duration::rep PreciseTimer::timeLeftSystem() const noexcept {
         return mTimeLeft.count();
     }
-    void Timer::setWaitTime(float waitTime) noexcept {
+    void PreciseTimer::setWaitTime(float waitTime) noexcept {
         const std::chrono::duration<float, std::chrono::seconds::period> s(waitTime);
         std::unique_lock<std::mutex> l(mtx);
         mTime = std::chrono::duration_cast<std::chrono::steady_clock::time_point::duration>(s);
@@ -93,7 +93,7 @@ namespace mars {
             mTimeLeft = mTime;
         }
     }
-    float Timer::waitTime() const noexcept {
+    float PreciseTimer::waitTime() const noexcept {
         return std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(mTime).count();
     }
 
