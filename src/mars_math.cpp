@@ -8,15 +8,15 @@ Error<glm::vec2> JSON::valueTo(const JSON::Value& value) noexcept {
     case JSON::Type::jarray: {
 		const JSON::Array& vector = value.getArray().value();
 		glm::vec2 result{};
-		TRY_ASSIGN(result.x, vector[0].getNumberAs<float>());
-		TRY_ASSIGN(result.y, vector[1].getNumberAs<float>());
+        TRY_ASSIGN(result.x, JSON::valueTo<float>(vector[0]));
+        TRY_ASSIGN(result.y, JSON::valueTo<float>(vector[1]));
 		return result;
     }
     case JSON::Type::jobject: {
         const JSON::Object& vector = value.getObject().value();
         glm::vec2 result{};
-        TRY_ASSIGN(result.x, vector.at("x").getNumberAs<float>());
-        TRY_ASSIGN(result.y, vector.at("y").getNumberAs<float>());
+        TRY_ASSIGN(result.x, JSON::valueTo<float>(vector.at("x")));
+        TRY_ASSIGN(result.y, JSON::valueTo<float>(vector.at("y")));
         return result;
     }
     default: 
@@ -30,17 +30,17 @@ Error<glm::vec3> JSON::valueTo(const JSON::Value& value) noexcept {
     case JSON::Type::jarray: {
 		const JSON::Array& vector = value.getArray().value();
 		glm::vec3 result{};
-		TRY_ASSIGN(result.x, vector[0].getNumberAs<float>());
-		TRY_ASSIGN(result.y, vector[1].getNumberAs<float>());
-		TRY_ASSIGN(result.z, vector[2].getNumberAs<float>());
+        TRY_ASSIGN(result.x, JSON::valueTo<float>(vector[0]));
+        TRY_ASSIGN(result.y, JSON::valueTo<float>(vector[1]));
+        TRY_ASSIGN(result.z, JSON::valueTo<float>(vector[2]));
 		return result;
     }
     case JSON::Type::jobject: {
         const JSON::Object& vector = value.getObject().value();
         glm::vec3 result{};
-        TRY_ASSIGN(result.x, vector.at("x").getNumberAs<float>());
-        TRY_ASSIGN(result.y, vector.at("y").getNumberAs<float>());
-        TRY_ASSIGN(result.z, vector.at("z").getNumberAs<float>());
+        TRY_ASSIGN(result.x, JSON::valueTo<float>(vector.at("x")));
+        TRY_ASSIGN(result.y, JSON::valueTo<float>(vector.at("y")));
+        TRY_ASSIGN(result.z, JSON::valueTo<float>(vector.at("z")));
         return result;
     }
     default: 

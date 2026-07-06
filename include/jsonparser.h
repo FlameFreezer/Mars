@@ -50,17 +50,9 @@ namespace JSON {
     };
 
     class Value {
+        public:
         using Array = std::vector<Value>;
         using Object = std::unordered_map<std::string, Value>;
-        Type mType = Type::jnull;
-        union {
-            bool mBoolean {false};
-            std::string mString;
-            Number mNumber;
-            Array mArray;
-            Object mObject;
-        };
-        public:
         Value() noexcept = default;
         explicit Value(bool b) noexcept;        
         explicit Value(int i) noexcept;
@@ -78,13 +70,6 @@ namespace JSON {
         ~Value() noexcept;        
         Type getType() const noexcept;        
         Error<bool> getBool() const noexcept;
-        template<typename T> requires std::is_arithmetic<T>::value
-        Error<T> getNumberAs() const noexcept {
-            if(mType != Type::jnumber) {
-                FATAL(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(mType)));
-            }
-            return mNumber.to<T>();
-        }
         Error<const Number&> getNumber() const noexcept;
         Error<Number&> getNumber() noexcept;
         Error<const std::string&> getString() const noexcept;
@@ -93,6 +78,15 @@ namespace JSON {
         Error<Array&> getArray() noexcept;
         Error<const Object&> getObject() const noexcept;
         Error<Object&> getObject() noexcept;
+    private:
+        Type mType = Type::jnull;
+        union {
+            bool mBoolean {false};
+            std::string mString;
+            Number mNumber;
+            Array mArray;
+            Object mObject;
+        };
     };
 
     template<class T>
@@ -106,11 +100,14 @@ namespace JSON {
 
     template<class T> requires std::is_arithmetic<T>::value
     Error<T> valueTo(const Value& value) noexcept {
-        TRY_RETURN(value.getNumberAs<T>());
+		if(value.getType() != Type::jnumber) {
+			FATAL(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(value.getType())));
+		}
+        return value.getNumber().value().to<T>();
     }
 
-    using Object = std::unordered_map<std::string, Value>;
-    using Array = std::vector<Value>;
+    using Object = Value::Object;
+    using Array = Value::Array;
 
     Error<Value> parse(const std::string& text) noexcept;
     std::string serialize(const Value& v) noexcept;

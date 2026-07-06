@@ -160,7 +160,7 @@ namespace mars {
                         if(stickValue.getType() != JSON::Type::jnumber) {
                             FATAL("Joystick values should be numbers");
                         }
-                        resultMapping.axisValues[resultMapping.numAxes] = stickValue.getNumberAs<float>().value();
+                        resultMapping.axisValues[resultMapping.numAxes] = JSON::valueTo<float>(stickValue).value();
                         resultMapping.numAxes++;
                     }
                 }
