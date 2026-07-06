@@ -10,5 +10,6 @@ namespace mars {
         constexpr FlagT deviceInvalid = 1 << 2;
         constexpr FlagT beganTransferOps = 1 << 3;
         constexpr FlagT windowMinimized = 1 << 4;
+        constexpr FlagT rendererDestroyed = 1 << 5;
     }
 }

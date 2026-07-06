@@ -1948,64 +1948,54 @@ namespace mars {
         return SUCCESS;
     }
 
-    Error<Renderer*> Renderer::make(const std::string& name, ID& squareID) noexcept {
-        Renderer* r = new Renderer;
+    Error<std::unique_ptr<Renderer>> Renderer::make(const std::string& name, ID& squareID) noexcept {
+        std::unique_ptr<Renderer> r{ std::make_unique<Renderer>() };
         r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
-        #define RTRY(proc) \
-        if(auto res = proc; !res.okay()) do{\
-            APPEND_SOURCE_INFO(res);\
-            delete r;\
-			return MOVE_ERROR(res);\
-        } while(false)
 
         if(Error<noreturn> res = r->createVkInstance(name); !res.okay()) {
             APPEND_SOURCE_INFO(res);
             r->flags &= ~rendererFlags::instanceInvalid;
-            delete r;
             return MOVE_ERROR(res);
         }
-        if constexpr(enableValidationLayers) RTRY(r->createDebugUtilsMessenger());
+        if constexpr (enableValidationLayers) {
+            TRY(r->createDebugUtilsMessenger());
+        }
 
-        RTRY(r->createSurface(name));
+        TRY(r->createSurface(name));
 
         if(Error<noreturn> res = r->createDevice(); !res.okay()) {
             APPEND_SOURCE_INFO(res);
             r->flags &= ~rendererFlags::deviceInvalid;
-            delete r;
             return MOVE_ERROR(res);
         }
-        RTRY(r->createSwapchain());
-        RTRY(r->getSwapchainImages());
-        RTRY(r->createCommandBuffers());
-        RTRY(r->createCube());
-        RTRY(r->createSampler());
-        RTRY(r->createRenderTargets());
-        RTRY(r->createDepthImages());
-        RTRY(r->createSyncObjects());
-        RTRY(r->createDescriptorSetLayouts());
-        RTRY(r->createGraphicsPipeline());
-        RTRY(r->createCamera());
+        TRY(r->createSwapchain());
+        TRY(r->getSwapchainImages());
+        TRY(r->createCommandBuffers());
+        TRY(r->createCube());
+        TRY(r->createSampler());
+        TRY(r->createRenderTargets());
+        TRY(r->createDepthImages());
+        TRY(r->createSyncObjects());
+        TRY(r->createDescriptorSetLayouts());
+        TRY(r->createGraphicsPipeline());
+        TRY(r->createCamera());
         if(!SDL_ShowWindow(r->window)) {
-            delete r;
             FATAL("Failed to show window");
         }
 
         //Create square mesh
         Error<ID> sq = r->makeMesh(Square::vertices, Square::indices);
         if(!sq.okay()) {
-            APPEND_SOURCE_INFO(sq);
-            delete r;
-            return MOVE_ERROR(sq);
+            PROPAGATE_ERROR(sq);
         }
         //Give ID number of square mesh back to the game
         else squareID = sq.value();
 
         r->currentFrame = 0;
         return r;
-        #undef RTRY
     }
 
-    Renderer::~Renderer() noexcept {
+    void Renderer::destroy() noexcept {
         if(!(flags & rendererFlags::deviceInvalid)) [[likely]] {
             vkDeviceWaitIdle(device);
             vkDestroySwapchainKHR(device, swapchain, nullptr);
@@ -2054,6 +2044,12 @@ namespace mars {
             }
             vkDestroyInstance(instance, nullptr);
         }
+        flags |= rendererFlags::rendererDestroyed;
+    }
+
+    Renderer::~Renderer() noexcept {
+        if (flags & rendererFlags::rendererDestroyed) return;
+        destroy();
     }
 
     Error<noreturn> Renderer::draw(const Camera& camera, RendererEntities entities) noexcept {

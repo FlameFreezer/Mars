@@ -41,11 +41,3 @@ if(auto procResult = proc; !procResult.okay()) {\
     return MOVE_ERROR(procResult);\
 }\
 else return procResult
-
-#define RTRY(proc) \
-if(auto res = proc; !res.okay()) do{\
-	APPEND_SOURCE_INFO(res);\ 
-	delete r;\
-	return MOVE_ERROR(res);\
-} while(false)
-

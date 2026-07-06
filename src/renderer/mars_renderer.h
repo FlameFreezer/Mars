@@ -5,6 +5,7 @@
 #include <string_view>
 #include <queue>
 #include <cstddef>
+#include <memory>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -188,6 +189,8 @@ namespace mars {
         u32 presentQueueFamilyIndex = 0;
         VkSampleCountFlagBits msaaSampleCount;
 
+        SDL_Window* window = nullptr;
+
         SurfaceInfo mSurfaceInfo{};
 
         std::array<VkImageMemoryBarrier2, 3> setup3DMemoryBarriers(u32 imageIndex) noexcept;
@@ -243,12 +246,13 @@ namespace mars {
         Error<noreturn> createSurface(std::string_view name) noexcept; 
 
         public:
-        SDL_Window* window = nullptr;
         rendererFlags::FlagT flags = 0;
 
-        static Error<Renderer*> make(const std::string& name, ID& squareID) noexcept; 
+        static Error<std::unique_ptr<Renderer>> make(const std::string& name, ID& squareID) noexcept; 
         //Destructor
         ~Renderer() noexcept; 
+
+        void destroy() noexcept;
 
         Error<noreturn> draw(const Camera& camera, RendererEntities entities) noexcept; 
 
