@@ -4,46 +4,46 @@
 
 template<>
 Error<mars::Camera> JSON::valueTo(const JSON::Value& value) noexcept {
-    mars::CameraBuilder cb{};
+    mars::CameraBuilder cameraBuilder {};
     if (value.getType() != JSON::Type::jobject) {
         FATAL(std::format("Expected a JSON object, got {}", JSON::typeToString(value.getType())));
     }
     const JSON::Object& camData = value.getObject().value();
     if (camData.contains("position")) {
         TRY_INIT(glm::vec3, pos, JSON::valueTo<glm::vec3>(camData.at("position")));
-        cb.setPos(pos);
+        cameraBuilder.setPos(pos);
     }
     if (camData.contains("direction")) {
         TRY_INIT(glm::vec3, dir, JSON::valueTo<glm::vec3>(camData.at("direction")));
-        cb.setDir(dir);
+        cameraBuilder.setDir(dir);
     }
     if (camData.contains("upVector")) {
         TRY_INIT(glm::vec3, up, JSON::valueTo<glm::vec3>(camData.at("upVector")));
-        cb.setUp(up);
+        cameraBuilder.setUp(up);
     }
     if (camData.contains("fov")) {
         TRY_INIT(float, fov, JSON::valueTo<float>(camData.at("fov")));
-        cb.setFov(fov);
+        cameraBuilder.setFov(fov);
     }
     if (camData.contains("aspect")) {
         TRY_INIT(float, aspect, JSON::valueTo<float>(camData.at("aspect")));
-        cb.setAspect(aspect);
+        cameraBuilder.setAspect(aspect);
     }
     if (camData.contains("sensitivity")) {
         TRY_INIT(float, sensitivity, JSON::valueTo<float>(camData.at("sensitivity")));
-        cb.setSensitivity(sensitivity);
+        cameraBuilder.setSensitivity(sensitivity);
     }
     if (camData.contains("maxY")) {
         TRY_INIT(float, maxY, JSON::valueTo<float>(camData.at("maxY")));
-        cb.setMaxY(maxY);
+        cameraBuilder.setMaxY(maxY);
     }
     if (camData.contains("nearPlane")) {
         TRY_INIT(float, near, JSON::valueTo<float>(camData.at("nearPlane")));
-        cb.setNearPlane(near);
+        cameraBuilder.setNearPlane(near);
     }
     if (camData.contains("farPlane")) {
         TRY_INIT(float, far, JSON::valueTo<float>(camData.at("farPlane")));
-        cb.setFarPlane(far);
+        cameraBuilder.setFarPlane(far);
     }
-    return cb.build();
+    return cameraBuilder.build();
 }

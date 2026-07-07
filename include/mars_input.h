@@ -247,6 +247,7 @@ namespace mars {
                     mAxisState[i] = SDL_GetGamepadAxis(mGamepad, static_cast<SDL_GamepadAxis>(i));
                 }
             }
+            SDL_free(gamepads);
             SDL_GetMouseState(&mMouseX, &mMouseY);
             SDL_GetRelativeMouseState(&mMouseDx, &mMouseDy);
 

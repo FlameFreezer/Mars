@@ -203,33 +203,33 @@ Error<mars::Camera2D> JSON::valueTo(const JSON::Value& value) noexcept {
 	if (value.getType() != JSON::Type::jobject) {
 		FATAL(std::format("When constructing mars::Camera2D, expected {}, got {}", JSON::typeToString(JSON::Type::jobject), JSON::typeToString(value.getType())));
 	}
-	mars::Camera2DBuilder cb{};
+	mars::Camera2DBuilder cameraBuilder{};
 	const JSON::Object& json{ value.getObject().value()};
 
 	if (json.contains("position")) {
 		TRY_INIT(glm::vec2, pos, JSON::valueTo<glm::vec2>(json.at("position")));
-		cb.setPosition(pos);
+		cameraBuilder.setPosition(pos);
 	}
 	if (json.contains("scale")) {
 		TRY_INIT(glm::vec2, scale, JSON::valueTo<glm::vec2>(json.at("scale")));
-		cb.setScale(scale);
+		cameraBuilder.setScale(scale);
 	}
 	if (json.contains("deadzone")) {
 		TRY_INIT(glm::vec2, deadzone, JSON::valueTo<glm::vec2>(json.at("deadzone")));
-		cb.setDeadzone(deadzone);
+		cameraBuilder.setDeadzone(deadzone);
 	}
 	if (json.contains("targetPosition")) {
 		TRY_INIT(glm::vec2, targetPosition, JSON::valueTo<glm::vec2>(json.at("targetPosition")));
-		cb.setTargetPosition(targetPosition);
+		cameraBuilder.setTargetPosition(targetPosition);
 	}
 	if (json.contains("followLead")) {
 		TRY_INIT(glm::vec2, followLead, JSON::valueTo<glm::vec2>(json.at("followLead")));
-		cb.setFollowLead(followLead);
+		cameraBuilder.setFollowLead(followLead);
 	}
 	if (json.contains("followSpeed")) {
 		TRY_INIT(float, followSpeed, JSON::valueTo<float>(json.at("followSpeed")));
-		cb.setFollowSpeed(followSpeed);
+		cameraBuilder.setFollowSpeed(followSpeed);
 	}
-	return cb.build();
+	return cameraBuilder.build();
 }
 
