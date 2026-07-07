@@ -240,44 +240,41 @@ namespace JSON {
         }
     }
     Error<Value> parseNull(std::istringstream& txt) noexcept {
-        static const char* nullstr = "null";
-        static const std::size_t len = strlen(nullstr);
-        std::string buff{};
-        buff.reserve(len);
-        txt.read(buff.data(), buff.capacity());
-        if (txt.gcount() < len) {
+        //null is 4 long + null term
+        char buff[5];
+        buff[4] = '\0';
+        txt.read(buff, 4);
+        if (txt.gcount() < 4) {
             FATAL("Failed to parse null");
         }
-        if (strcmp(buff.data(), nullstr) != 0) {
-            FATAL(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff)));
+        if (strcmp(buff, "null") != 0) {
+            FATAL(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff, 4)));
         }
         return Value{}; 
     }
     Error<Value> parseTrue(std::istringstream& txt) noexcept {
-        static const char* truestr = "true";
-        static const std::size_t len = strlen(truestr);
-        std::string buff{};
-        buff.reserve(len);
-        txt.read(buff.data(), buff.capacity());
-        if (txt.gcount() < len) {
+        //true is 4 long + null term
+        char buff[5];
+        buff[4] = '\0';
+        txt.read(buff, 4);
+        if (txt.gcount() < 4) {
             FATAL("Failed to parse true");
         }
-        if (strcmp(buff.data(), truestr) != 0) {
-            FATAL(std::format("Failed to parse true: \"{}\" is not true", std::string_view(buff)));
+        if (strcmp(buff, "true") != 0) {
+            FATAL(std::format("Failed to parse true: \"{}\" is not true", std::string_view(buff, 4)));
         }
         return Value{true}; 
     }
     Error<Value> parseFalse(std::istringstream& txt) noexcept {
-        static const char* falsestr = "false";
-        static const std::size_t len = strlen(falsestr);
-        std::string buff{};
-        buff.reserve(len);
-        txt.read(buff.data(), buff.capacity());
-        if (txt.gcount() < len) {
+        //false is 5 long + null term
+        char buff[6];
+        buff[5] = '\0';
+        txt.read(buff, 5);
+        if (txt.gcount() < 5) {
             FATAL("Failed to parse false");
         }
-        if (strcmp(buff.data(), falsestr) != 0) {
-            FATAL(std::format("Failed to parse false: \"{}\" is not false", std::string_view(buff)));
+        if (strcmp(buff, "false") != 0) {
+            FATAL(std::format("Failed to parse false: \"{}\" is not false", std::string_view(buff, 5)));
         }
         return Value{false}; 
     }

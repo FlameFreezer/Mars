@@ -100,6 +100,7 @@ namespace mars {
         mWaitTime = std::chrono::duration_cast<std::chrono::steady_clock::duration>(s);
         mTimeLeft = mWaitTime;
     }
+    Timer::Timer(const Timer& other) noexcept : mtx(), mWaitTime(other.mWaitTime), mTimeLeft(other.mTimeLeft), mStartTime(other.mStartTime), mStatus(other.mStatus) {}
     void Timer::updateInternal(std::chrono::steady_clock::time_point::duration deltaTime) noexcept {
         std::unique_lock<std::mutex> l{ mtx };
         if (mStatus == TimerStatus::running) {

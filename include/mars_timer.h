@@ -89,8 +89,21 @@ namespace mars {
         public:
         Timer() noexcept = default;
         Timer(float waitTimeS) noexcept;
+        Timer(const Timer& other) noexcept;
         void update(std::chrono::steady_clock::time_point::duration deltaTime) noexcept;
         void update(float deltaTimeS) noexcept;
+        template<class DeltaType>
+        void update(DeltaType deltaTime) noexcept {
+            if (mStatus != TimerStatus::running) return;
+            std::chrono::steady_clock::duration dt = std::chrono::duration_cast<std::chrono::steady_clock::duration>(deltaTime);
+            if (dt >= mTimeLeft) {
+                mTimeLeft = mTimeLeft.zero();
+            }
+            else mTimeLeft -= dt;
+            if (mTimeLeft == mTimeLeft.zero()) {
+                mStatus = TimerStatus::stopped;
+            }
+        }
         /// Starts the timer from time t = 0. Does nothing if the timer is already running.
         /// Preconditions:  status() != TimerStatus::running
         /// Postconditions: status() == TimerStatus::running

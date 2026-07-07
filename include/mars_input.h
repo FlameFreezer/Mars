@@ -13,6 +13,7 @@
 #include "mars_types.h"
 #include "mars_heaparray.h"
 #include "jsonparser.h"
+#include "mars_timer.h"
 
 static std::unordered_map<std::string, SDL_Scancode> initScancodeMap() noexcept {
     std::unordered_map<std::string, SDL_Scancode> map;
@@ -61,6 +62,15 @@ namespace mars {
         float axisValues[maxAxes] = { 0.0f };
         u8 numAxes = 0;
         bool isValid = false;
+        bool isBuffered = false;
+        u32 bufferIndex{};
+    };
+
+    template<class ActionIndex>
+    struct ActionBuffer {
+        bool isActive{ false };
+        mars::Timer timer{};
+        ActionIndex action{};
     };
 
     template<class ActionIndex>
@@ -76,8 +86,10 @@ namespace mars {
         float mMouseDy{};
         SDL_Gamepad* mGamepad = nullptr;
         bool* mPrevKeyState = nullptr;
+        bool* mCurrentKeyState = nullptr;
         const bool* mKeyState = nullptr;
         int mNumKeys = 0;
+        std::vector<ActionBuffer<ActionIndex>> mActionBuffers{};
 
 		const std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
 		const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
@@ -90,14 +102,17 @@ namespace mars {
                 mGamepad = SDL_OpenGamepad(gamepads[0]);
             }
             mKeyState = SDL_GetKeyboardState(&mNumKeys);
+            mCurrentKeyState = new bool[mNumKeys];
             mPrevKeyState = new bool[mNumKeys];
             for(int i = 0; i < mNumKeys; i++) mPrevKeyState[i] = false;
+            std::memcpy(mCurrentKeyState, mKeyState, mNumKeys);
         }
         ~Input() noexcept {
             if(mGamepad != nullptr and SDL_GamepadConnected(mGamepad)) {
                 SDL_CloseGamepad(mGamepad);
             }
-            if(mPrevKeyState) delete[] mPrevKeyState;
+            if (mPrevKeyState) delete[] mPrevKeyState;
+            if (mCurrentKeyState) delete[] mCurrentKeyState;
         }
         Input(const Input& other) = delete;
         Input(Input&& other) = delete;
@@ -164,6 +179,28 @@ namespace mars {
                         resultMapping.numAxes++;
                     }
                 }
+                if (mapping.contains("buffered")) {
+                    if (mapping.at("buffered").getType() != JSON::Type::jtrue and mapping.at("buffered").getType() != JSON::Type::jfalse) {
+                        FATAL("Mapping field \"buffered\" should be true or false");
+                    }
+                    resultMapping.isBuffered = mapping.at("buffered").getBool().value();
+                    resultMapping.bufferIndex = mActionBuffers.size();
+                    //Get the wait time for the buffer
+                    float waitTimeS = 0.0f;
+                    if (mapping.contains("bufferTime")) {
+                        if (mapping.at("bufferTime").getType() != JSON::Type::jnumber) {
+                            FATAL("Mapping field \"bufferTime\" should be a number");
+                        }
+                        waitTimeS = JSON::valueTo<float>(mapping.at("bufferTime")).value();
+                    }
+                    //Construct the action buffer struct at the end of this array
+                    mActionBuffers.push_back(ActionBuffer<ActionIndex>{
+                        .isActive = false,
+						.timer = mars::Timer{ waitTimeS },
+						.action = strToIndex.at(mapping.at("tag").getString().value())
+                    });
+                }
+
                 //Get the index of the current mapping from its name
                 if(mapping.at("tag").getType() != JSON::Type::jstring) {
                     FATAL("Mapping field \"tag\" should hold a JSON string");
@@ -173,6 +210,7 @@ namespace mars {
                 if(mMappings.size() <= mappingIndex) {
                     mMappings.resize(mappingIndex + 1);
                 }
+
                 //Write the result mapping
                 mMappings[mappingIndex] = resultMapping;
             }
@@ -180,9 +218,10 @@ namespace mars {
         }
         /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
         /// Returns: void    Nothing
-        void update() noexcept {
-            std::memcpy(mPrevKeyState, mKeyState, mNumKeys);
-            mKeyState = SDL_GetKeyboardState(nullptr);
+        template<class DeltaType>
+        void update(DeltaType deltaTime) noexcept {
+            std::memcpy(mPrevKeyState, mCurrentKeyState, mNumKeys);
+            std::memcpy(mCurrentKeyState, mKeyState, mNumKeys);
 
             int numGamepads = 0;
             SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
@@ -210,6 +249,21 @@ namespace mars {
             }
             SDL_GetMouseState(&mMouseX, &mMouseY);
             SDL_GetRelativeMouseState(&mMouseDx, &mMouseDy);
+
+            //Update action buffers
+            for (ActionBuffer<ActionIndex>& buffer : mActionBuffers) {
+                if (isActionJustPressed(buffer.action)) {
+                    buffer.isActive = true;
+                    buffer.timer.stop();
+                    buffer.timer.start();
+                }
+                else if (buffer.timer.status() != TimerStatus::stopped) {
+                    buffer.timer.update(deltaTime);
+                    if (buffer.timer.status() == TimerStatus::stopped) {
+                        buffer.isActive = false;
+                    }
+                }
+            }
         }
         Rect getMousePosition() const noexcept {
             return { mMouseX, mMouseY };
@@ -218,13 +272,13 @@ namespace mars {
             return { mMouseDx, mMouseDy };
         }
         bool isKeyDown(SDL_Scancode scancode) const noexcept {
-            return mKeyState[scancode];
+            return mCurrentKeyState[scancode];
         }
         bool isKeyJustPressed(SDL_Scancode scancode) const noexcept {
-            return mKeyState[scancode] and !mPrevKeyState[scancode];
+            return mCurrentKeyState[scancode] and !mPrevKeyState[scancode];
         }
         bool isKeyJustReleased(SDL_Scancode scancode) const noexcept {
-            return !mKeyState[scancode] and mPrevKeyState[scancode];
+            return !mCurrentKeyState[scancode] and mPrevKeyState[scancode];
         }
         bool isButtonDown(SDL_GamepadButton button) const noexcept {
             return mGamepadButtonState[button];
@@ -296,6 +350,12 @@ namespace mars {
             }
 
             return false;
+        }
+	    bool isActionBuffered(ActionIndex action) const noexcept {
+            if (!isMappingValid(action)) return false;
+            const Mapping& mapping = mMappings[std::to_underlying(action)];
+            if (!mapping.isBuffered) return false;
+            return mActionBuffers[mapping.bufferIndex].isActive;
         }
     };
 }
