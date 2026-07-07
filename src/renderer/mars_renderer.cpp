@@ -117,6 +117,9 @@ namespace mars {
     }
 
     Error<VkPresentModeKHR> choosePresentMode(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) noexcept {
+        // I've decided to just use FIFO
+        return VK_PRESENT_MODE_FIFO_KHR;
+
         VkPresentModeKHR presentMode{};
         //Get present modes for the surface supported by the physical device
         u32 presentModeCount = 0;
@@ -129,7 +132,7 @@ namespace mars {
         {
             FATAL("Failed to get physical device surface present modes!");
         }
-        HeapArray<VkPresentModeKHR> presentModes(presentModeCount);
+        HeapArray<VkPresentModeKHR> presentModes{presentModeCount};
         if(vkGetPhysicalDeviceSurfacePresentModesKHR(
                 physicalDevice, 
                 surface, 
@@ -144,6 +147,7 @@ namespace mars {
             //This is our preferred present mode
             if(mode == VK_PRESENT_MODE_MAILBOX_KHR) return mode;
         }
+
         //This mode is always supported, and is preferred over other options if mailbox isn't available
         return VK_PRESENT_MODE_FIFO_KHR;
     }
