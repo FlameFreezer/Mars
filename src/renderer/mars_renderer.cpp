@@ -450,27 +450,24 @@ namespace mars {
     }
 
     void Renderer::updateCamera2D() noexcept {
-        glm::mat4 constexpr identity = glm::mat4(1.0f);
         //Calculate size of overscan (region of the cube not visible)
-        float overscanSize = 0.0f;
         const float w = static_cast<float>(swapchainImageExtent.width);
         const float h = static_cast<float>(swapchainImageExtent.height);
-        if(w > h) {
-            overscanSize = (w - h) / 2.0f;
-        }
-        else {
-            overscanSize = (h - w) / 2.0f;
-        }
+        const float overscanSize = std::abs(w - h) / 2.0f;
+        //Pushes vertices at 0,0 downwards so that they're on screen, allowing user to
+        // assume 0,0 is the top left corner
+        const glm::mat4 overscan = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, overscanSize, 0.0f});
+
         //Factor to put coordinates in range [0, 2]
-        const float scale = 1.0f / (0.5f * static_cast<float>(cube.dim));
-        //Pushes vertices at (0,0) downwards so that they're on screen, allowing user to
-        // assume (0,0) is the top left corner
-        const glm::mat4 overscan = glm::translate(identity, glm::vec3(0.0f, overscanSize, 0.0f));
-        //Does the afformentioned scaling
-        const glm::mat4 s = glm::scale(identity, glm::vec3(scale, scale, 1.0f));
+        const float scaleFactor = 2.0f / static_cast<float>(cube.dim);
+        //Performs this scaling
+        const glm::mat4 scale = glm::scale(glm::mat4{1.0f}, glm::vec3{scaleFactor, scaleFactor, 1.0f});
+
         //Moves scene into canonical vulkan viewing volume with range [-1,1]
-        const glm::mat4 t = glm::translate(identity, glm::vec3(-1.0f, -1.0f, 0.0f));
-        *mCamera2D.mappedMemory = t * s * overscan;
+        const glm::mat4 translate = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.0f, -1.0f, 0.0f});
+
+        //The full transformation
+        *mCamera2D.mappedMemory = translate * scale * overscan;
     }
 
     Error<noreturn> Renderer::createCamera() noexcept {
