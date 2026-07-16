@@ -9,6 +9,11 @@
 
 namespace mars {
     using SignatureT = u32;
+
+    static constexpr SignatureT componentToBit(Component c) noexcept {
+        return 1 << std::to_underlying(c);
+    }
+
     static_assert(numComponents < bitWidth<SignatureT>());
     class Signature {
 		//Null Signature has every component such that storage in component systems is always reserved
@@ -16,7 +21,12 @@ namespace mars {
         SignatureT mBits = nullSignatureBits;
         public:
         constexpr Signature() noexcept = default;
-        Signature(std::initializer_list<Component> comps) noexcept;
+        constexpr Signature(std::initializer_list<Component> comps) noexcept : mBits(0) {
+			for(Component c : comps) {
+				if (mBits & componentToBit(c)) continue;
+				mBits |= componentToBit(c);
+			}
+		}
         bool has(std::initializer_list<Component> comps) const noexcept;
         bool has(Component comp) const noexcept;
         bool operator==(std::initializer_list<Component> comps) const noexcept;

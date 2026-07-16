@@ -5,16 +5,6 @@
 #include "mars_components.h"
 
 namespace mars {
-    static constexpr SignatureT componentToBit(Component c) noexcept {
-        return 1 << std::to_underlying(c);
-    }
-
-    Signature::Signature(std::initializer_list<Component> comps) noexcept : mBits(0) {
-        for(Component c : comps) {
-            if (mBits & componentToBit(c)) continue;
-            mBits |= componentToBit(c);
-        }
-    }
 
     bool Signature::has(const std::initializer_list<Component> comps) const noexcept {
         SignatureT sig = 0;
