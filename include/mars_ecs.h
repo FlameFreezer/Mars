@@ -32,6 +32,12 @@ namespace mars {
         const ComponentSystem<typename GetComp<c>::Type>& system() const noexcept {
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mComponentSystems[std::to_underlying(c)]);
         }
+
+        template<Component c>
+        void initSystem() noexcept {
+            mComponentSystems[std::to_underlying(c)] = new ComponentSystem<typename GetComp<c>::Type>();
+            mComponentSystems[std::to_underlying(c)]->reserve(nullID);
+        }
     };
     using ECS = EntityComponentSystem;
 }

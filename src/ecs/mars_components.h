@@ -59,9 +59,8 @@ namespace mars {
         
     //This struct template allows accessing the type of a component at compile time just using the actual component enum member
     template<Component c>
-    struct GetComp { using Type = void; };
+    struct GetComp {};
     template<> struct GetComp<Component::draw> {using Type = Draw;};
     template<> struct GetComp<Component::physics> {using Type = Physics;};
     template<> struct GetComp<Component::collide> {using Type = Collide;};
-    template<> struct GetComp<Component::maxComponent> {};
 }

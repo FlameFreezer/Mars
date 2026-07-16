@@ -7,9 +7,6 @@
 #include "mars_entity.h"
 
 #include "mars_components.h"
-#ifdef MARS_USER_COMPONENTS
-#include MARS_USER_COMPONENTS
-#endif
 
 namespace mars {
     template<ComponentT c>
@@ -21,10 +18,11 @@ namespace mars {
         //Allocate the next system
         allocSystem<c + 1>(systems);
     }
-    //Base Case: do nothing once all systems have been allocated
-    template<> void allocSystem<numComponents>(ComponentSystemParent**) noexcept {}
+    // Base Case: do nothing once all systems have been allocated. We stop at the first user
+    // component since these should be manually initialized by the user
+    template<> void allocSystem<std::to_underlying(Component::USER_COMP_0)>(ComponentSystemParent**) noexcept {}
 
-    static void allocSystems(ComponentSystemParent* systems[]) noexcept {
+    void allocSystems(ComponentSystemParent* systems[]) noexcept {
         allocSystem<0>(systems);
     }
 
@@ -34,6 +32,7 @@ namespace mars {
             mIDs.push(i);
         }
         mSignatures[nullID] = nullSignature;
+        for (ComponentT i = 0; i < numComponents; i++) mComponentSystems[i] = nullptr;
         allocSystems(mComponentSystems);
     }
     EntityComponentSystem::~EntityComponentSystem() noexcept {
@@ -58,6 +57,10 @@ namespace mars {
         ComponentT bitNum = 0;
         for(SignatureT i = 1; i != 0; i <<= 1) {
             if(bits & i) {
+                // Alert the user if they tried to use a custom component that they didn't initialize
+                if (!mComponentSystems[bitNum]) {
+                    FATAL(std::format("Component System with number {} was not initialized", bitNum));
+                }
                 mComponentSystems[bitNum]->reserve(id);
             }
             ++bitNum;
