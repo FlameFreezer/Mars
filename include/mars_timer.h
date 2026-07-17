@@ -82,7 +82,6 @@ namespace mars {
         std::mutex mtx;
         std::chrono::steady_clock::time_point::duration mWaitTime {0};
         std::chrono::steady_clock::time_point::duration mTimeLeft {0};
-        std::chrono::steady_clock::time_point mStartTime;
         TimerStatus mStatus = TimerStatus::stopped;
         void startInternal(std::unique_lock<std::mutex>&& l) noexcept;
         void updateInternal(std::chrono::steady_clock::time_point::duration deltaTime) noexcept;

@@ -217,7 +217,7 @@ namespace mars {
             }
             return SUCCESS;
         }
-        /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame.
+        /// Updates the `keyState` public class member to reflect the current state of keyboard inputs. Should be called once at the start of the current frame AFTER all events have been processed.
         /// Returns: void    Nothing
         template<class DeltaType>
         void update(DeltaType deltaTime) noexcept {
@@ -256,8 +256,12 @@ namespace mars {
             for (ActionBuffer<ActionIndex>& buffer : mActionBuffers) {
                 if (isActionJustPressed(buffer.action)) {
                     buffer.isActive = true;
-                    buffer.timer.stop();
-                    buffer.timer.start();
+                    // If no waitTime was specified (or it was specified to zero), the action's
+                    //    buffer is held until it is next consumed
+                    if (buffer.timer.waitTime() != 0.0f) {
+						buffer.timer.stop();
+						buffer.timer.start();
+                    }
                 }
                 else if (buffer.timer.status() != TimerStatus::stopped) {
                     buffer.timer.update(deltaTime);

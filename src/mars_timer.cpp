@@ -100,7 +100,7 @@ namespace mars {
         mWaitTime = std::chrono::duration_cast<std::chrono::steady_clock::duration>(s);
         mTimeLeft = mWaitTime;
     }
-    Timer::Timer(const Timer& other) noexcept : mtx(), mWaitTime(other.mWaitTime), mTimeLeft(other.mTimeLeft), mStartTime(other.mStartTime), mStatus(other.mStatus) {}
+    Timer::Timer(const Timer& other) noexcept : mtx(), mWaitTime(other.mWaitTime), mTimeLeft(other.mTimeLeft), mStatus(other.mStatus) {}
     void Timer::updateInternal(std::chrono::steady_clock::time_point::duration deltaTime) noexcept {
         std::unique_lock<std::mutex> l{ mtx };
         if (mStatus == TimerStatus::running) {
@@ -124,7 +124,6 @@ namespace mars {
     void Timer::startInternal(std::unique_lock<std::mutex>&& l) noexcept {
         mStatus = TimerStatus::running;
         mTimeLeft = mWaitTime;
-        mStartTime = std::chrono::steady_clock::now();
     }
     void Timer::start() noexcept {
         std::unique_lock<std::mutex> l{ mtx };
@@ -178,5 +177,9 @@ namespace mars {
         if(mStatus == TimerStatus::stopped) {
             mTimeLeft = mWaitTime;
         }
+    }
+    float Timer::waitTime() const noexcept {
+        const std::chrono::duration<float, std::chrono::seconds::period> waitTimeS{ mWaitTime };
+        return waitTimeS.count();
     }
 }
