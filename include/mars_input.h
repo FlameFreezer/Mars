@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 #include <cstring>
+#include <format>
 
 #include <SDL3/SDL.h>
 
@@ -14,6 +15,7 @@
 #include "mars_heaparray.h"
 #include "jsonparser.h"
 #include "mars_timer.h"
+#include "mars_debug.h"
 
 static std::unordered_map<std::string, SDL_Scancode> initScancodeMap() noexcept {
     std::unordered_map<std::string, SDL_Scancode> map;
@@ -256,6 +258,7 @@ namespace mars {
             for (ActionBuffer<ActionIndex>& buffer : mActionBuffers) {
                 if (isActionJustPressed(buffer.action)) {
                     buffer.isActive = true;
+                    debug::inputLog(std::format("Action {} was buffered", std::to_underlying(buffer.action)));
                     // If no waitTime was specified (or it was specified to zero), the action's
                     //    buffer is held until it is next consumed
                     if (buffer.timer.waitTime() != 0.0f) {

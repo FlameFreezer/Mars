@@ -17,6 +17,9 @@ set(SDL_SHARED True)
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 
+option(MARS_DEBUG_ALL "Have all systems output debug info" false)
+option(MARS_DEBUG_INPUT "Have input systems output debug info" false)
+
 if(NOT DEFINED ${MARS_ECS_MAX_ENTITIES})
     set(MARS_ECS_MAX_ENTITIES 512)
 endif()
@@ -71,10 +74,21 @@ file(GLOB_RECURSE
     MARS_SOURCE_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/*.cpp")
 target_sources(Mars PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv")
 
-target_compile_definitions(Mars PUBLIC MARS_SHADERS_PATH="${CMAKE_BINARY_DIR}/$<CONFIGURATION>/")
-target_compile_definitions(Mars PUBLIC MARS_ECS_MAX_ENTITIES=${MARS_ECS_MAX_ENTITIES})
-target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_MESHES=${MARS_RENDERER_MAX_MESHES})
-target_compile_definitions(Mars PUBLIC MARS_RENDERER_MAX_TEXTURES=${MARS_RENDERER_MAX_TEXTURES})
+target_compile_definitions(Mars PUBLIC 
+    MARS_SHADERS_PATH="${CMAKE_BINARY_DIR}/$<CONFIGURATION>/"
+	MARS_ECS_MAX_ENTITIES=${MARS_ECS_MAX_ENTITIES}
+	MARS_RENDERER_MAX_MESHES=${MARS_RENDERER_MAX_MESHES}
+	MARS_RENDERER_MAX_TEXTURES=${MARS_RENDERER_MAX_TEXTURES}
+)
+
+macro(mars_pass_debug_flag debug_flag)
+    if(${debug_flag})
+        target_compile_definitions(Mars PUBLIC ${debug_flag}=${${debug_flag}})
+    endif()
+endmacro()
+
+mars_pass_debug_flag(MARS_DEBUG_ALL)
+mars_pass_debug_flag(MARS_DEBUG_INPUT)
 
 # Link libraries to mars
 target_link_libraries(Mars PRIVATE SDL3::SDL3 glm::glm)
