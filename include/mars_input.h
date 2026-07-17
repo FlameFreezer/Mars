@@ -51,6 +51,7 @@ namespace mars {
     constexpr u8 maxScancodes = 5;
     constexpr u8 maxGamepadButtons = 5;
     constexpr u8 maxAxes = SDL_GAMEPAD_AXIS_COUNT;
+    // Put axis values on a scale [-90,90] degrees
     constexpr i16 angleToAxisValue = SDL_JOYSTICK_AXIS_MAX / 90.0f;
 
     struct Mapping {
@@ -352,11 +353,31 @@ namespace mars {
 
             return false;
         }
+        // Checks if an action was buffered. Returns false if the action's mapping is invalid OR if 
+        //   the action does not have a buffer OR if the buffer is inactive.
+        // Arguments:   action    The action to check
+        // Returns: bool
 	    bool isActionBuffered(ActionIndex action) const noexcept {
             if (!isMappingValid(action)) return false;
             const Mapping& mapping = mMappings[std::to_underlying(action)];
             if (!mapping.isBuffered) return false;
             return mActionBuffers[mapping.bufferIndex].isActive;
+        }
+
+        // Checks if an action was buffered, then unbuffers the action if it was. Returns false if 
+        //   the action's mapping is invalid OR if the action does not have a buffer OR if the 
+        //   buffer is inactive.
+        // Postconditions:  isActionBuffered(action) == false for this action
+        //                  consumeActionBuffer(action) == false for this action
+        // Arguments:   action  The action to check and unbuffer
+        // Returns: bool
+        bool consumeActionBuffer(ActionIndex action) noexcept {
+            if (!isMappingValid(action)) return false;
+            const Mapping& mapping = mMappings[std::to_underlying(action)];
+            if (!mapping.isBuffered) return false;
+            const bool result = mActionBuffers[mapping.bufferIndex].isActive;
+			mActionBuffers[mapping.bufferIndex].isActive = false;
+            return result;
         }
     };
 }
