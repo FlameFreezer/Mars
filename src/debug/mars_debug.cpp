@@ -8,7 +8,7 @@ namespace mars {
 	namespace debug {
 		void inputLog(std::string_view message, std::FILE* ostrm) noexcept {
 			if constexpr (doInputDebug) {
-				std::println(ostrm, "From Input: {}", message);
+				std::println(ostrm, "From Mars Input: {}", message);
 			}
 		}
 	}
