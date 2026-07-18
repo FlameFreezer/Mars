@@ -1,6 +1,8 @@
 #include "mars_renderer.h"
 #include "mars_renderer_flags.h"
 #include "mars_renderer_gpubuffer.h"
+#include <mars_global.h>
+#include "mars_ecs.h"
 
 #include <fstream>
 #include <print>
@@ -1234,11 +1236,12 @@ namespace mars {
         );
 
         //Iterate through every drawable entity
-        for(u64 i = 0; i < entities.size; i++) {
+        const ComponentSystem<Draw>& sysDraw = ECS::get().system<Draw::component>();
+        for (u64 i = 0; i < sysDraw.size(); i++) {
             //Push the descriptor for the texture
             const VkDescriptorImageInfo materialInfo = {
                 .sampler = sampler,
-                .imageView = (*entityManager.sysTexture)[entities.textureIDs[i]].view,
+                .imageView = (*entityManager.sysTexture)[sysDraw.textureIDs()[i]].view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
             const VkWriteDescriptorSet writeMaterial = {
@@ -1261,6 +1264,12 @@ namespace mars {
                 1, 
                 &writeMaterial
             );
+            //Generate the model matrix
+            glm::mat4 modelMatrix{ 1.0f };
+            const float pixelsPerMeter = mars::Global::get().pixelsPerMeter();
+            modelMatrix[0][0] = sysDraw.scales()[i].x * pixelsPerMeter;
+            modelMatrix[1][1] = sysDraw.scales()[i].y * pixelsPerMeter;
+            modelMatrix[3] = glm::vec4{ sysDraw.positions()[i] * pixelsPerMeter, sysDraw.zLayers()[i], 1.0f };
 
             //Push the model matrix to the shader
             vkCmdPushConstants(
@@ -1269,14 +1278,14 @@ namespace mars {
                 VK_SHADER_STAGE_VERTEX_BIT, 
                 0, 
                 sizeof(glm::mat4), 
-                &entities.modelMatrices[i]);
+                &modelMatrix);
 
             //Get the index for the current mesh within the array of vertex buffers
             //This is an i32 to match the parameter for vkCmdDrawIndexed
-            assert(entityManager.sysMesh->index(entities.meshIDs[i]) < std::numeric_limits<i32>::max());
-            const i32 meshIndex = entityManager.sysMesh->index(entities.meshIDs[i]);
+            assert(entityManager.sysMesh->index(sysDraw.meshIDs()[i]) < std::numeric_limits<i32>::max());
+            const i32 meshIndex = entityManager.sysMesh->index(sysDraw.meshIDs()[i]);
             assert(meshIndex >= 0);
-            const ID meshID = entities.meshIDs[i];
+            const ID meshID = sysDraw.meshIDs()[i];
 
             //Bind the vertex buffer for the mesh
             const VkDeviceSize offsets[] = { 0 };

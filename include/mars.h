@@ -10,6 +10,7 @@
 #include "mars_time.h"
 #include "mars_timer.h"
 #include "mars_input.h"
+#include "mars_global.h"
 #include "jsonparser.h"
 #include "error.h"
 

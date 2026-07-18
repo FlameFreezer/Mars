@@ -85,12 +85,12 @@ namespace mars {
 		mNextState = next;
 	}
 	void Camera2D::moveAndLookAt(glm::vec2 where) noexcept {
-		mTargetPosition = where - (0.5f * mScale);
+		mTargetPosition = where - 0.5f * mScale;
 		mPosition = mTargetPosition;
 		mFollowMode = Camera2D::FollowMode::FOLLOW_POSITION;
 	}
 	void Camera2D::lookAt(glm::vec2 where) noexcept {
-		mTargetPosition = where - (0.5f * mScale);
+		mTargetPosition = where - 0.5f * mScale;
 		mFollowMode = Camera2D::FollowMode::FOLLOW_POSITION;
 	}
 	Error<Camera2D::FollowState> Camera2D::checkStateTransitions() const noexcept {
