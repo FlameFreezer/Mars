@@ -2,6 +2,7 @@
 
 #include "mars_types.h"
 #include "mars_camera.h"
+#include "mars_camera2D.h"
 #include "mars_renderer.h"
 #include "mars_heaparray.h"
 #include "mars_ecs.h"

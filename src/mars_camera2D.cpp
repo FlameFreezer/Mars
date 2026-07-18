@@ -36,9 +36,22 @@ namespace mars {
 		}
 		mTargetID = id;
 		if (doFollowEntity) {
-			mTargetPosition = sysDraw.position(mTargetID) - mScale;
+			mTargetPosition = sysDraw.position(mTargetID) + 0.5f * sysDraw.scale(mTargetID) - 0.5f * mScale;
 			mFollowMode = Camera2D::FollowMode::FOLLOW_ENTITY;
 		}
+		return SUCCESS;
+	}
+	Error<noreturn> Camera2D::setTargetIDAndLookAt(ID id, bool doFollowEntity) noexcept {
+		const ComponentSystem<Draw>& sysDraw = ECS::get().system<Component::draw>();
+		if (!sysDraw.has(id)) {
+			FATAL(std::format("Entity with ID {} doesn't have a draw component", id));
+		}
+		mTargetID = id;
+		if (doFollowEntity) {
+			mTargetPosition = sysDraw.position(mTargetID) + 0.5f * sysDraw.scale(mTargetID) - 0.5f * mScale;
+			mFollowMode = Camera2D::FollowMode::FOLLOW_ENTITY;
+		}
+		mPosition = mTargetPosition;
 		return SUCCESS;
 	}
 	Error<noreturn> Camera2D::setFollowMode(Camera2D::FollowMode mode) noexcept {
@@ -88,8 +101,9 @@ namespace mars {
 				if (!sysDraw.has(mTargetID)) {
 					FATAL(std::format("Target ID {} invalid for Camera2D", mTargetID));
 				}
-				const glm::vec2 targetCenter = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID));
-				if (glm::length(targetCenter - mPosition + (0.5f * mScale)) > glm::length(mDeadzone)) {
+				const glm::vec2 targetCenter = sysDraw.position(mTargetID) + 0.5f * sysDraw.scale(mTargetID);
+				const glm::vec2 cameraCenter = mPosition + 0.5f * mScale;
+				if (glm::length(targetCenter - cameraCenter) > glm::length(mDeadzone)) {
 					return FollowState::FOLLOWING;
 				}
 			}
@@ -101,16 +115,30 @@ namespace mars {
 					FATAL(std::format("Target ID {} invalid for Camera2D", mTargetID));
 				}
 				const glm::vec2 targetCenter = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID));
-				if (mPosition + (0.5f * mScale) == targetCenter) {
+				const glm::vec2 cameraCenter = mPosition + 0.5f * mScale;
+				if (glm::length(targetCenter - cameraCenter) <= 0.002f) {
 					return FollowState::IDLE;
 				}
 			}
-			if (mPosition + (0.5f * mScale) == mTargetPosition) {
+			else if (glm::length(mPosition - mTargetPosition) <= 0.002f) {
 				return FollowState::IDLE;
 			}
 			break;
 		}
-		case FollowState::FOLLOWING: break;
+		case FollowState::FOLLOWING: {
+			if (mFollowMode == FollowMode::FOLLOW_ENTITY) {
+				const ComponentSystem<Draw>& sysDraw = ECS::get().system<Component::draw>();
+				const glm::vec2 targetCenter = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID));
+				const glm::vec2 cameraCenter = mPosition + 0.5f * mScale;
+				if (glm::length(targetCenter - cameraCenter) <= 0.002f) {
+					return FollowState::IDLE;
+				}
+			}
+			else if (glm::length(mPosition - mTargetPosition) <= 0.002f) {
+				return FollowState::IDLE;
+			}
+			break;
+		}
 		}
 		return FollowState::NULL_STATE;
 	}
@@ -135,7 +163,7 @@ namespace mars {
 					FATAL(std::format("Target ID {} invalid for Camera2D", mTargetID));
 				}
 				//Look at the center of the target object
-				target = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID)) - (0.5f * mScale);
+				target = sysDraw.position(mTargetID) + 0.5f * sysDraw.scale(mTargetID) - 0.5f * mScale;
 			}
 			const glm::vec2 distance{ target - mPosition + mFollowLead};
 			glm::vec2 movement = glm::normalize(distance) * std::min(glm::length(distance), mFollowSpeed * delta);
@@ -159,6 +187,7 @@ namespace mars {
 		}
 		case FollowState::IDLE: break;
 		}
+
 		return SUCCESS;
 	}
 

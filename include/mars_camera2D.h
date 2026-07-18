@@ -35,6 +35,7 @@ namespace mars {
 		float getFollowSpeed() const noexcept;
 		//Setters
 		Error<noreturn> setTargetID(ID id, bool doFollowEntity = true) noexcept;
+		Error<noreturn> setTargetIDAndLookAt(ID id, bool doFollowEntity = true) noexcept;
 		Error<noreturn> setFollowMode(FollowMode mode) noexcept;
 		void setPosition(glm::vec2 pos) noexcept;
 		void setScale(glm::vec2 scale) noexcept;
