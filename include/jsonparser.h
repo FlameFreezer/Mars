@@ -35,6 +35,8 @@ namespace JSON {
         std::unreachable();
     }
 
+    template<class T>
+    concept IsNumeric = std::is_arithmetic<T>::value and !std::same_as<bool, T>;
 
     struct Number {
         u64 whole = 0;
@@ -43,7 +45,7 @@ namespace JSON {
         u64 exponent = 0;
         i32 sign = 1;
         i32 exponentSign = 1;
-        template<typename T> requires std::is_arithmetic<T>::value
+        template<typename T> requires IsNumeric<T>
         T to() const noexcept {
             return (sign * (whole + static_cast<double>(part) / partPlace)) * std::pow(10, static_cast<i64>(exponent * exponentSign));
         }
@@ -90,7 +92,7 @@ namespace JSON {
     };
 
     template<class T>
-    Error<T> valueTo(const Value& value) noexcept;
+    Error<T> valueTo(const Value&) noexcept = delete;
 
     template<>
     Error<bool> valueTo(const Value& value) noexcept;
@@ -98,7 +100,7 @@ namespace JSON {
     template<>
     Error<std::string> valueTo(const Value& value) noexcept;
 
-    template<class T> requires std::is_arithmetic<T>::value
+    template<class T> requires IsNumeric<T>
     Error<T> valueTo(const Value& value) noexcept {
 		if(value.getType() != Type::jnumber) {
 			FATAL(std::format("Tried to get a number from a JSON value, but the type was {}", typeToString(value.getType())));

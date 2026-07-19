@@ -1,5 +1,7 @@
 #include <mars_camera2D.h>
 #include <mars_ecs.h>
+#include <mars_global.h>
+#include <mars_math.h>
 
 namespace mars {
 	glm::vec2 Camera2D::getPosition() const noexcept {
@@ -103,7 +105,8 @@ namespace mars {
 				}
 				const glm::vec2 targetCenter = sysDraw.position(mTargetID) + 0.5f * sysDraw.scale(mTargetID);
 				const glm::vec2 cameraCenter = mPosition + 0.5f * mScale;
-				if (glm::length(targetCenter - cameraCenter) > glm::length(mDeadzone)) {
+				const glm::vec2 distance = targetCenter - cameraCenter;
+				if (std::abs(distance.x) > mDeadzone.x or std::abs(distance.y) > mDeadzone.y) {
 					return FollowState::FOLLOWING;
 				}
 			}
@@ -234,30 +237,37 @@ Error<mars::Camera2D> JSON::valueTo(const JSON::Value& value) noexcept {
 	}
 	mars::Camera2DBuilder cameraBuilder{};
 	const JSON::Object& json{ value.getObject().value()};
+	float metersPerPixel = 1.0f;
 
+	if (json.contains("isPixels")) {
+		TRY_INIT(bool, isPixels, JSON::valueTo<bool>(json.at("isPixels")));
+		if (isPixels) {
+			metersPerPixel = 1.0f / mars::Global::get().pixelsPerMeter();
+		}
+	}
 	if (json.contains("position")) {
 		TRY_INIT(glm::vec2, pos, JSON::valueTo<glm::vec2>(json.at("position")));
-		cameraBuilder.setPosition(pos);
+		cameraBuilder.setPosition(pos * metersPerPixel);
 	}
 	if (json.contains("scale")) {
 		TRY_INIT(glm::vec2, scale, JSON::valueTo<glm::vec2>(json.at("scale")));
-		cameraBuilder.setScale(scale);
+		cameraBuilder.setScale(scale * metersPerPixel);
 	}
 	if (json.contains("deadzone")) {
 		TRY_INIT(glm::vec2, deadzone, JSON::valueTo<glm::vec2>(json.at("deadzone")));
-		cameraBuilder.setDeadzone(deadzone);
+		cameraBuilder.setDeadzone(deadzone * metersPerPixel);
 	}
 	if (json.contains("targetPosition")) {
 		TRY_INIT(glm::vec2, targetPosition, JSON::valueTo<glm::vec2>(json.at("targetPosition")));
-		cameraBuilder.setTargetPosition(targetPosition);
+		cameraBuilder.setTargetPosition(targetPosition * metersPerPixel);
 	}
 	if (json.contains("followLead")) {
 		TRY_INIT(glm::vec2, followLead, JSON::valueTo<glm::vec2>(json.at("followLead")));
-		cameraBuilder.setFollowLead(followLead);
+		cameraBuilder.setFollowLead(followLead * metersPerPixel);
 	}
 	if (json.contains("followSpeed")) {
 		TRY_INIT(float, followSpeed, JSON::valueTo<float>(json.at("followSpeed")));
-		cameraBuilder.setFollowSpeed(followSpeed);
+		cameraBuilder.setFollowSpeed(followSpeed * metersPerPixel);
 	}
 	return cameraBuilder.build();
 }
