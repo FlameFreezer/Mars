@@ -29,6 +29,8 @@ namespace mars {
 		glm::vec2 getDeadzone() const noexcept;
 		glm::vec2 getTargetPosition() const noexcept;
 		glm::vec2 getFollowLead() const noexcept;
+		glm::vec2 getCenter() const noexcept;
+		glm::vec2 getFollowLeadSigns() const noexcept;
 		ID getTargetID() const noexcept;
 		FollowMode getFollowMode() const noexcept;
 		FollowState getFollowState() const noexcept;
@@ -41,6 +43,7 @@ namespace mars {
 		void setScale(glm::vec2 scale) noexcept;
 		void setDeadzone(glm::vec2 deadzone) noexcept;
 		void setTargetPosition(glm::vec2 pos) noexcept;
+		void setFollowLeadSigns(glm::vec2 signs) noexcept;
 		void setFollowSpeed(float speed) noexcept;
 		void setFollowLead(glm::vec2 lead) noexcept;
 		void signalStateChange(FollowState next) noexcept;
@@ -56,6 +59,7 @@ namespace mars {
 		glm::vec2 mDeadzone{};
 		glm::vec2 mTargetPosition{};
 		glm::vec2 mFollowLead{};
+		glm::vec2 mFollowLeadSigns{};
 		ID mTargetID{ nullID };
 		float mFollowSpeed{};
 		FollowMode mFollowMode{ FollowMode::DONT_FOLLOW };

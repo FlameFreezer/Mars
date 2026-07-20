@@ -19,6 +19,12 @@ namespace mars {
 	glm::vec2 Camera2D::getFollowLead() const noexcept {
 		return mFollowLead;
 	}
+	glm::vec2 Camera2D::getCenter() const noexcept {
+		return mPosition + 0.5f * mScale;
+	}
+	glm::vec2 Camera2D::getFollowLeadSigns() const noexcept {
+		return mFollowLeadSigns;
+	}
 	ID Camera2D::getTargetID() const noexcept {
 		return mTargetID;
 	}
@@ -77,6 +83,9 @@ namespace mars {
 		mTargetPosition = pos;
 		mFollowMode = Camera2D::FollowMode::FOLLOW_POSITION;
 	}
+	void Camera2D::setFollowLeadSigns(glm::vec2 signs) noexcept {
+		mFollowLeadSigns = signs;
+	}
 	void Camera2D::setFollowSpeed(float speed) noexcept {
 		mFollowSpeed = speed;
 	}
@@ -118,8 +127,7 @@ namespace mars {
 					FATAL(std::format("Target ID {} invalid for Camera2D", mTargetID));
 				}
 				const glm::vec2 targetCenter = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID));
-				const glm::vec2 cameraCenter = mPosition + 0.5f * mScale;
-				if (glm::length(targetCenter - cameraCenter) <= 0.002f) {
+				if (glm::length(targetCenter - getCenter()) <= 0.002f) {
 					return FollowState::IDLE;
 				}
 			}
@@ -132,8 +140,7 @@ namespace mars {
 			if (mFollowMode == FollowMode::FOLLOW_ENTITY) {
 				const ComponentSystem<Draw>& sysDraw = ECS::get().system<Component::draw>();
 				const glm::vec2 targetCenter = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID));
-				const glm::vec2 cameraCenter = mPosition + 0.5f * mScale;
-				if (glm::length(targetCenter - cameraCenter) <= 0.002f) {
+				if (glm::length(targetCenter - getCenter()) <= 0.002f) {
 					return FollowState::IDLE;
 				}
 			}
@@ -159,7 +166,7 @@ namespace mars {
 		// Do the main update
 		switch (mFollowState) {
 		case FollowState::FOLLOWING: {
-			glm::vec2 target{ mTargetPosition };
+			glm::vec2 target = mTargetPosition;
 			if (mFollowMode == FollowMode::FOLLOW_ENTITY) {
 				const ComponentSystem<Draw>& sysDraw = ECS::get().system<Component::draw>();
 				if (!sysDraw.has(mTargetID)) {
@@ -168,13 +175,14 @@ namespace mars {
 				//Look at the center of the target object
 				target = sysDraw.position(mTargetID) + 0.5f * sysDraw.scale(mTargetID) - 0.5f * mScale;
 			}
-			const glm::vec2 distance{ target - mPosition + mFollowLead};
+			const glm::vec2 lead = mFollowLead * mFollowLeadSigns;
+			const glm::vec2 distance = target - mPosition + lead;
 			glm::vec2 movement = glm::normalize(distance) * std::min(glm::length(distance), mFollowSpeed * delta);
 			mPosition += movement;
 			break;
 		}
 		case FollowState::RETURNING: {
-			glm::vec2 target{ mTargetPosition };
+			glm::vec2 target = mTargetPosition;
 			if (mFollowMode == FollowMode::FOLLOW_ENTITY) {
 				const ComponentSystem<Draw>& sysDraw = ECS::get().system<Component::draw>();
 				if (!sysDraw.has(mTargetID)) {
@@ -183,7 +191,7 @@ namespace mars {
 				//Look at the center of the target object
 				target = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID)) - (0.5f * mScale);
 			}
-			const glm::vec2 distance{ target - mPosition};
+			const glm::vec2 distance = target - mPosition;
 			glm::vec2 movement = glm::normalize(distance) * std::min(glm::length(distance), mFollowSpeed * delta);
 			mPosition += movement;
 			break;
