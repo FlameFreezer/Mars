@@ -20,7 +20,6 @@ namespace mars {
 		enum class FollowState : u8 {
 			IDLE,
 			FOLLOWING,
-			RETURNING,
 			NULL_STATE
 		};
 		//Getters
@@ -46,7 +45,6 @@ namespace mars {
 		void setFollowLeadSigns(glm::vec2 signs) noexcept;
 		void setFollowSpeed(float speed) noexcept;
 		void setFollowLead(glm::vec2 lead) noexcept;
-		void signalStateChange(FollowState next) noexcept;
 		// Changes the position of the camera such that the argument is at the center of its viewport. Also sets the follow mode to FOLLOW_POSITION.
 		void moveAndLookAt(glm::vec2 where) noexcept;
 		// Sets the target position such that the argument is at the center of its viewport, but does not move the camera. Also sets the follow mode to FOLLOW_POSITION.
@@ -64,7 +62,6 @@ namespace mars {
 		float mFollowSpeed{};
 		FollowMode mFollowMode{ FollowMode::DONT_FOLLOW };
 		FollowState mFollowState{ FollowState::IDLE };
-		FollowState mNextState{ FollowState::NULL_STATE };
 	};
 
 	class Camera2DBuilder {

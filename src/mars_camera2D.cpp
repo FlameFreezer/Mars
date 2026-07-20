@@ -92,9 +92,6 @@ namespace mars {
 	void Camera2D::setFollowLead(glm::vec2 lead) noexcept {
 		mFollowLead = lead;
 	}
-	void Camera2D::signalStateChange(FollowState next) noexcept {
-		mNextState = next;
-	}
 	void Camera2D::moveAndLookAt(glm::vec2 where) noexcept {
 		mTargetPosition = where - 0.5f * mScale;
 		mPosition = mTargetPosition;
@@ -106,7 +103,7 @@ namespace mars {
 	}
 	Error<Camera2D::FollowState> Camera2D::checkStateTransitions() const noexcept {
 		switch (mFollowState) {
-		case FollowState::IDLE:
+		case FollowState::IDLE: {
 			if (mFollowMode == FollowMode::FOLLOW_ENTITY) {
 				const ComponentSystem<Draw>& sysDraw = ECS::get().system<Component::draw>();
 				if (!sysDraw.has(mTargetID)) {
@@ -118,21 +115,6 @@ namespace mars {
 				if (std::abs(distance.x) > mDeadzone.x or std::abs(distance.y) > mDeadzone.y) {
 					return FollowState::FOLLOWING;
 				}
-			}
-			break;
-		case FollowState::RETURNING: {
-			if (mFollowMode == FollowMode::FOLLOW_ENTITY) {
-				const ComponentSystem<Draw>& sysDraw = ECS::get().system<Component::draw>();
-				if (!sysDraw.has(mTargetID)) {
-					FATAL(std::format("Target ID {} invalid for Camera2D", mTargetID));
-				}
-				const glm::vec2 targetCenter = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID));
-				if (glm::length(targetCenter - getCenter()) <= 0.002f) {
-					return FollowState::IDLE;
-				}
-			}
-			else if (glm::length(mPosition - mTargetPosition) <= 0.002f) {
-				return FollowState::IDLE;
 			}
 			break;
 		}
@@ -153,11 +135,6 @@ namespace mars {
 		return FollowState::NULL_STATE;
 	}
 	Error<noreturn> Camera2D::update(float delta) noexcept {
-		// If a state change is buffered, perform it
-		if (mNextState != Camera2D::FollowState::NULL_STATE) {
-			mFollowState = mNextState;
-			mNextState = Camera2D::FollowState::NULL_STATE;
-		}
 		// Check state transitions
 		TRY_INIT(FollowState, next, checkStateTransitions());
 		if (next != FollowState::NULL_STATE) {
@@ -177,21 +154,6 @@ namespace mars {
 			}
 			const glm::vec2 lead = mFollowLead * mFollowLeadSigns;
 			const glm::vec2 distance = target - mPosition + lead;
-			glm::vec2 movement = glm::normalize(distance) * std::min(glm::length(distance), mFollowSpeed * delta);
-			mPosition += movement;
-			break;
-		}
-		case FollowState::RETURNING: {
-			glm::vec2 target = mTargetPosition;
-			if (mFollowMode == FollowMode::FOLLOW_ENTITY) {
-				const ComponentSystem<Draw>& sysDraw = ECS::get().system<Component::draw>();
-				if (!sysDraw.has(mTargetID)) {
-					FATAL(std::format("Target ID {} invalid for Camera2D", mTargetID));
-				}
-				//Look at the center of the target object
-				target = sysDraw.position(mTargetID) + (0.5f * sysDraw.scale(mTargetID)) - (0.5f * mScale);
-			}
-			const glm::vec2 distance = target - mPosition;
 			glm::vec2 movement = glm::normalize(distance) * std::min(glm::length(distance), mFollowSpeed * delta);
 			mPosition += movement;
 			break;
