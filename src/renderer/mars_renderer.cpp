@@ -1938,6 +1938,10 @@ namespace mars {
             SDL_free(displays);
             FATAL(SDL_GetError());
         }
+        //Use smaller window for testing
+        displayBounds.w = 800;
+        displayBounds.h = 600;
+
         //SDL_WINDOW_MOUSE_GRABBED : mouse cannot escape window bounds - allows using relative
         // mouse mode
         //SDL_WINDOW_HIDDEN : hide the window before we're ready to display images to it

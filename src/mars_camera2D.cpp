@@ -131,6 +131,7 @@ namespace mars {
 			}
 			break;
 		}
+        case FollowState::NULL_STATE: std::unreachable();
 		}
 		return FollowState::NULL_STATE;
 	}
@@ -159,6 +160,7 @@ namespace mars {
 			break;
 		}
 		case FollowState::IDLE: break;
+        case FollowState::NULL_STATE: std::unreachable();
 		}
 
 		return SUCCESS;

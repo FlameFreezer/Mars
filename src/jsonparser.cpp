@@ -250,6 +250,7 @@ namespace JSON {
         if (strcmp(buff, "null") != 0) {
             FATAL(std::format("Failed to parse null: \"{}\" is not null", std::string_view(buff, 4)));
         }
+        parseWhitespace(txt);
         return Value{}; 
     }
     Error<Value> parseTrue(std::istringstream& txt) noexcept {
@@ -263,6 +264,7 @@ namespace JSON {
         if (strcmp(buff, "true") != 0) {
             FATAL(std::format("Failed to parse true: \"{}\" is not true", std::string_view(buff, 4)));
         }
+        parseWhitespace(txt);
         return Value{true}; 
     }
     Error<Value> parseFalse(std::istringstream& txt) noexcept {
@@ -276,6 +278,7 @@ namespace JSON {
         if (strcmp(buff, "false") != 0) {
             FATAL(std::format("Failed to parse false: \"{}\" is not false", std::string_view(buff, 5)));
         }
+        parseWhitespace(txt);
         return Value{false}; 
     }
 

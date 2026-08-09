@@ -11,5 +11,7 @@ namespace mars {
 	private:
 		Global() noexcept = default;
 		float mPixelsPerMeter{ 1.0f };
+        static std::mutex mutex;
 	};
+
 }

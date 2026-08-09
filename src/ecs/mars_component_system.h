@@ -54,6 +54,7 @@ namespace mars {
         //Abstract function which should swap the data at id with the data at the end, then calls
         // swapErase
         virtual void erase(ID id) noexcept = 0;
+        virtual ~ComponentSystemParent() noexcept{}
     };
     template<typename C>
     class ComponentSystem : public ComponentSystemParent {

@@ -1,10 +1,10 @@
 #include <mars_global.h>
 
-std::mutex mutex;
-
 namespace mars {
+    std::mutex Global::mutex {};
+
 	Global& Global::get() noexcept {
-		std::unique_lock<std::mutex> lock{ mutex };
+		std::unique_lock<std::mutex> lock{ Global::mutex };
 		static Global instance{};
 		return instance;
 	}
