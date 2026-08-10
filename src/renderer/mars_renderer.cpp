@@ -474,12 +474,12 @@ namespace mars {
         const glm::mat4 translate = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.0f, -1.0f, 0.0f});
 
         //The full transformation
-        *mCamera2D.mappedMemory = translate * scale * overscan * camera;
+        mCamera2D.mappedMemory[currentFrame] = translate * scale * overscan * camera;
     }
 
     Error<noreturn> Renderer::createCamera() noexcept {
         Error<UniformBuffer<glm::mat4>> cam2D = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
-            sizeof(glm::mat4)); 
+            sizeof(glm::mat4) * maxConcurrentFrames); 
         if (!cam2D.okay()) {
             APPEND_SOURCE_INFO(cam2D);
             return MOVE_ERROR(cam2D);
@@ -487,7 +487,7 @@ namespace mars {
         else mCamera2D = cam2D.moveValue();
 
         Error<UniformBuffer<glm::mat4>> cam3D = UniformBuffer<glm::mat4>::make(device, physicalDevice, 
-            sizeof(glm::mat4)); 
+            sizeof(glm::mat4) * maxConcurrentFrames); 
         if (!cam3D.okay()) {
             APPEND_SOURCE_INFO(cam3D);
             return MOVE_ERROR(cam3D);
@@ -1095,7 +1095,7 @@ namespace mars {
         //Write the 3D camera to the push descriptor
         const VkDescriptorBufferInfo camera3DBufferInfo = {
             .buffer = mCamera3D.buffer.handle,
-            .offset = 0,
+            .offset = sizeof(glm::mat4) * currentFrame,
             .range = sizeof(glm::mat4)
         };
         const VkWriteDescriptorSet writeCamera = {
@@ -1218,7 +1218,7 @@ namespace mars {
         //Write the 2D camera to the push descriptor
         const VkDescriptorBufferInfo camera2DBufferInfo = {
             .buffer = mCamera2D.buffer.handle,
-            .offset = 0,
+            .offset = sizeof(glm::mat4) * currentFrame,
             .range = sizeof(glm::mat4)
         };
         const VkWriteDescriptorSet writeCamera = {
@@ -2084,7 +2084,7 @@ namespace mars {
 		const glm::mat4 view = glm::lookAt(camera.pos, camera.dir + camera.pos, camera.up);
 		glm::mat4 proj = glm::perspective(camera.fov, aspect, camera.nearPlane, camera.farPlane);
 		proj[1][1] *= -1.0f;
-		*mCamera3D.mappedMemory = proj * view;
+		mCamera3D.mappedMemory[currentFrame] = proj * view;
 
         return drawFrame(camera.fov, aspect, entities);
     }
