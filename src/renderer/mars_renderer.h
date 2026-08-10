@@ -21,6 +21,7 @@
 #include "mars_heaparray.h"
 #include "mars_types.h"
 #include "mars_camera.h"
+#include "mars_camera2D.h"
 
 inline constexpr u32 maxConcurrentFrames = 2;
 
@@ -149,6 +150,27 @@ namespace mars {
     };
 
     class Renderer {
+        public:
+        rendererFlags::FlagT flags = 0;
+
+        static Error<std::unique_ptr<Renderer>> make(const std::string& name, ID& squareID) noexcept; 
+        //Destructor
+        ~Renderer() noexcept; 
+
+        void destroy() noexcept;
+
+        Error<noreturn> draw(const Camera& camera, RendererEntities entities) noexcept; 
+
+        Error<ID> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept; 
+
+        Error<ID> makeTexture(std::string_view texturePath) noexcept;
+
+        Error<noreturn> loadTilemap(std::string_view tilemapPath) noexcept;
+
+        const mars::Camera2D* getMainCamera2D() const noexcept;
+
+        void setMainCamera2D(const mars::Camera2D& camera2D) noexcept;
+    private:
         RendererEntityManager entityManager;
         Cube cube;
 
@@ -190,6 +212,7 @@ namespace mars {
         VkSampleCountFlagBits msaaSampleCount;
 
         SDL_Window* window = nullptr;
+        const mars::Camera2D* mainCamera2D = nullptr;
 
         SurfaceInfo mSurfaceInfo{};
 
@@ -245,22 +268,6 @@ namespace mars {
 
         Error<noreturn> createSurface(std::string_view name) noexcept; 
 
-        public:
-        rendererFlags::FlagT flags = 0;
-
-        static Error<std::unique_ptr<Renderer>> make(const std::string& name, ID& squareID) noexcept; 
-        //Destructor
-        ~Renderer() noexcept; 
-
-        void destroy() noexcept;
-
-        Error<noreturn> draw(const Camera& camera, RendererEntities entities) noexcept; 
-
-        Error<ID> makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept; 
-
-        Error<ID> makeTexture(std::string_view texturePath) noexcept;
-
-        Error<noreturn> loadTilemap(std::string_view tilemapPath) noexcept;
     };
 }
 

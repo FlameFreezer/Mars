@@ -452,6 +452,11 @@ namespace mars {
     }
 
     void Renderer::updateCamera2D() noexcept {
+        //Move from world space to camera space
+        glm::mat4 camera{1.0f};
+        if(mainCamera2D) {
+            camera = glm::translate(glm::mat4{1.0f}, glm::vec3{mainCamera2D->getPosition() * -Global::get().pixelsPerMeter(), 0.0f});
+        }
         //Calculate size of overscan (region of the cube not visible)
         const float w = static_cast<float>(swapchainImageExtent.width);
         const float h = static_cast<float>(swapchainImageExtent.height);
@@ -469,7 +474,7 @@ namespace mars {
         const glm::mat4 translate = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.0f, -1.0f, 0.0f});
 
         //The full transformation
-        *mCamera2D.mappedMemory = translate * scale * overscan;
+        *mCamera2D.mappedMemory = translate * scale * overscan * camera;
     }
 
     Error<noreturn> Renderer::createCamera() noexcept {
@@ -505,6 +510,8 @@ namespace mars {
             cube.fov = fov;
             cube.aspect = aspect;
         };
+
+        updateCamera2D();
 
         //These semaphores indicate that we have successfully acquired an image on this frame
         TRY_INIT(Slice<VkSemaphore>, imageAcquiredSemaphores, Slice<VkSemaphore>::make(semaphores, 0, maxConcurrentFrames));
@@ -2307,4 +2314,13 @@ namespace mars {
         t.view = textureImage.view;
         return entityManager.insertTexture(t);
     }
+
+    const mars::Camera2D* Renderer::getMainCamera2D() const noexcept {
+        return mainCamera2D;
+    }
+
+    void Renderer::setMainCamera2D(const mars::Camera2D& camera2D) noexcept {
+        mainCamera2D = &camera2D;
+    }
+
 }
