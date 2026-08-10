@@ -9,18 +9,28 @@ namespace mars {
 	class Camera2D {
 	public:
 		friend class Camera2DBuilder;
-		//Getters
+		// Getters
+        // Returns the world-space position of the top-right corner of the camera.
 		glm::vec2 getPosition() const noexcept;
 		glm::vec2 getScale() const noexcept;
 		glm::vec2 getTargetPosition() const noexcept;
-		glm::vec2 getFollowLead() const noexcept;
+        // Returns the world-space position of the center of the camera's viewport.
 		glm::vec2 getCenter() const noexcept;
         float getSpeed() const noexcept;
+        // Setters
+        // Sets the world-space position of the top-right corner of the camera.
 		void setPosition(glm::vec2 pos) noexcept;
 		void setScale(glm::vec2 scale) noexcept;
+        // Sets the world-space target position for the top-right corner of the camera. When update 
+        // is called, the camera will try to move such that its top-right corner ends up at this position.
 		void setTargetPosition(glm::vec2 pos) noexcept;
+        // Sets the world-space target position for the center of the camera's viewport. When
+        // update is called, the camera will try to move such that the center of its viewport is at
+        // this position.
         void setTargetCenter(glm::vec2 where) noexcept;
         void setSpeed(float speed) noexcept;
+        // Relocate the camera such that the center of its viewport is at this world-space 
+        // position.
 		void lookAt(glm::vec2 where) noexcept;
 		void update(float delta) noexcept;
 	private:
