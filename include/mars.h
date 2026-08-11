@@ -12,6 +12,7 @@
 #include "mars_input.h"
 #include "mars_global.h"
 #include "jsonparser.h"
+#include "mars_event.h"
 #include "error.h"
 
 namespace mars {

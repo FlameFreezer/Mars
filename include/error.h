@@ -4,9 +4,7 @@
 #include <utility>
 #include <print>
 #include <iostream>
-#include <stdexcept>
 #include <cassert>
-#include <list>
 #include <source_location>
 
 #include "mars_types.h"
