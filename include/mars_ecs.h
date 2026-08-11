@@ -41,3 +41,6 @@ namespace mars {
     };
     using ECS = EntityComponentSystem;
 }
+
+#define MARS_COMPONENT(comp, id) mars::EntityComponentSystem::get().system<comp::component>()[id]
+#define MARS_SYSTEM(comp) mars::EntityComponentSystem::get().system<comp::component>()
