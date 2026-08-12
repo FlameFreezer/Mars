@@ -2086,7 +2086,7 @@ namespace mars {
         return drawFrame(camera.fov, aspect, entities);
     }
 
-    Error<ID> Renderer::makeMesh(ConstSlice<Vertex> vertices, ConstSlice<u32> indices) noexcept {
+    Error<ID> Renderer::makeMesh(Slice<const Vertex> vertices, Slice<const u32> indices) noexcept {
         const VkDeviceSize verticesSize = vertices.size() * sizeof(Vertex);
         const VkDeviceSize indicesSize = indices.size() * sizeof(u32);
         const VkDeviceSize size = verticesSize + indicesSize;
