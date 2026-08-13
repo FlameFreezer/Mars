@@ -165,6 +165,8 @@ namespace mars {
 
         Error<ID> makeTexture(std::string_view texturePath) noexcept;
 
+        Error<GPUImage> loadTexture(std::string_view texturePath) noexcept;
+
         Error<noreturn> loadTilemap(std::string_view tilemapPath) noexcept;
 
         const mars::Camera2D* getMainCamera2D() const noexcept;
