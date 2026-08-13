@@ -34,7 +34,6 @@ namespace mars {
         float angle = 0;
         float zLayer = 0;
         ID meshID = 0;
-        ID textureID = 0;
         std::shared_ptr<Texture> texture;
     };
     struct Physics {

@@ -501,7 +501,7 @@ namespace mars {
         return SUCCESS;
     }
 
-    Error<noreturn> Renderer::drawFrame(float fov, float aspect, RendererEntities entities) noexcept {
+    Error<noreturn> Renderer::drawFrame(float fov, float aspect) noexcept {
         //Fix the cube - only if any of the viewport details changed
         if(fov != cube.fov or aspect != cube.aspect) {
             float halfd = glm::tan(fov / 2.0f);
@@ -558,7 +558,7 @@ namespace mars {
             for (GPUImage& texture : textures2DScene) texture.destroy(mDevice);
             TRY(createRenderTargets());
             flags &= ~rendererFlags::recreateSwapchain;
-            return drawFrame(fov, aspect, entities);
+            return drawFrame(fov, aspect);
         }
         //Fatal error has occurred
         else if(res != VK_SUCCESS) {
@@ -604,7 +604,7 @@ namespace mars {
 
         vkCmdPipelineBarrier2(commandBuffer2D, &colorWriteDependency2D);
 
-        renderPass2D(cube.dim, commandBuffer2D, entities);
+        renderPass2D(cube.dim, commandBuffer2D);
 
         //Submit to create 2D scene
         TRY_VK(vkEndCommandBuffer(commandBuffer2D), std::format("Failed to end command buffer {}", currentFrame));
@@ -1156,7 +1156,7 @@ namespace mars {
         vkCmdDrawIndexed(commandBuffer, Cube::indices.max_size(), 1, 0, 0, 0);
         vkCmdEndRendering(commandBuffer);
     }
-    void Renderer::renderPass2D(u32 d, VkCommandBuffer commandBuffer, RendererEntities entities) noexcept {
+    void Renderer::renderPass2D(u32 d, VkCommandBuffer commandBuffer) noexcept {
         //Render to the 2D render target, resolve to the 2D scene texture image
         //The texture image will be used as the texture for the cube
         const VkRenderingAttachmentInfo renderAttachment = {
@@ -2078,7 +2078,7 @@ namespace mars {
         destroy();
     }
 
-    Error<noreturn> Renderer::draw(const Camera& camera, RendererEntities entities) noexcept {
+    Error<noreturn> Renderer::draw(const Camera& camera) noexcept {
         //Don't draw if the window is minimized
         if (flags & rendererFlags::windowMinimized) return SUCCESS;
         float aspect = camera.aspect;
@@ -2091,7 +2091,7 @@ namespace mars {
 		proj[1][1] *= -1.0f;
 		mCamera3D.mappedMemory[currentFrame] = proj * view;
 
-        return drawFrame(camera.fov, aspect, entities);
+        return drawFrame(camera.fov, aspect);
     }
 
     Error<ID> Renderer::makeMesh(Slice<const Vertex> vertices, Slice<const u32> indices) noexcept {

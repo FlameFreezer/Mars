@@ -204,7 +204,6 @@ namespace mars {
         float& angle;
         float& zLayer;
         ID& meshID;
-        ID& textureID;
         std::shared_ptr<Texture>& texture;
     };
     template<>
@@ -214,7 +213,6 @@ namespace mars {
         float mAngles[maxEntities];
         float mZLayers[maxEntities];
         ID mMeshIDs[maxEntities];
-        ID mTextureIDs[maxEntities];
         std::shared_ptr<Texture> mTextures[maxEntities];
         public:
         DrawProxy operator[](ID id) noexcept {
@@ -224,7 +222,6 @@ namespace mars {
                 mAngles[index(id)],
                 mZLayers[index(id)],
                 mMeshIDs[index(id)],
-                mTextureIDs[index(id)],
                 mTextures[index(id)],
             };
         }
@@ -258,12 +255,6 @@ namespace mars {
         const ID& meshID(ID id) const noexcept {
             return mMeshIDs[index(id)];
         } 
-        ID& textureID(ID id) noexcept {
-            return mTextureIDs[index(id)];
-        }
-        const ID& textureID(ID id) const noexcept {
-            return mTextureIDs[index(id)];
-        }
         std::shared_ptr<Texture>& texture(ID id) noexcept {
             return mTextures[index(id)];
         }
@@ -294,12 +285,6 @@ namespace mars {
         const ID* meshIDs() const noexcept {
             return mMeshIDs;
         }
-        ID* textureIDs() noexcept {
-            return mTextureIDs;
-        }
-        const ID* textureIDs() const noexcept {
-            return mTextureIDs;
-        }
         std::shared_ptr<Texture>* textures() noexcept {
             return mTextures;
         }
@@ -317,7 +302,7 @@ namespace mars {
             mAngles[index] = mAngles[mSize];
             mZLayers[index] = mZLayers[mSize];
             mMeshIDs[index] = mMeshIDs[mSize];
-            mTextureIDs[index] = mTextureIDs[mSize]; 
+            mTextures[index] = mTextures[mSize];
             swapErase(id);
         }
         class PositionIterator {

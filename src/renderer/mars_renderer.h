@@ -142,13 +142,6 @@ namespace mars {
         };
     };
 
-    struct RendererEntities {
-        const glm::mat4* modelMatrices;
-        const ID* meshIDs;
-        const ID* textureIDs;
-        u64 size;
-    };
-
     class Renderer {
         public:
         static Renderer& get() noexcept;
@@ -162,7 +155,7 @@ namespace mars {
 
         void destroy() noexcept;
 
-        Error<noreturn> draw(const Camera& camera, RendererEntities entities) noexcept; 
+        Error<noreturn> draw(const Camera& camera) noexcept; 
 
         Error<ID> makeMesh(Slice<const Vertex> vertices, Slice<const u32> indices) noexcept; 
 
@@ -232,7 +225,7 @@ namespace mars {
 
         Error<noreturn> createCamera() noexcept;
 
-        Error<noreturn> drawFrame(float fov, float aspect, RendererEntities entities) noexcept;
+        Error<noreturn> drawFrame(float fov, float aspect) noexcept;
 
         Error<noreturn> beginTransferOps() noexcept;
 
@@ -252,7 +245,7 @@ namespace mars {
 
         void renderPass3D(u32 imageIndex, VkCommandBuffer commandBuffer) noexcept; 
 
-        void renderPass2D(u32 d, VkCommandBuffer commandBuffer, RendererEntities entities) noexcept;        
+        void renderPass2D(u32 d, VkCommandBuffer commandBuffer) noexcept;        
 
         Error<noreturn> createSyncObjects() noexcept; 
 
