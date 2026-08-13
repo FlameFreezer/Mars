@@ -9,9 +9,6 @@ namespace mars {
         for(ID i = 0; i < maxMeshes; i++) {
             mMeshIDQueue.push(i);
         }
-        for(ID i = 0; i < maxTextures; i++) {
-            mTextureIDQueue.push(i);
-        }
     }
 
     RendererEntityManager::~RendererEntityManager() noexcept {

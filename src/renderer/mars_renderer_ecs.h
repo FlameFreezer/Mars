@@ -74,7 +74,6 @@ namespace mars {
 
     class RendererEntityManager {
         std::queue<ID> mMeshIDQueue;
-        std::queue<ID> mTextureIDQueue;
         public:
         RendererEntityManager() noexcept;
         ~RendererEntityManager() noexcept;
