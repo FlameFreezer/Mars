@@ -17,6 +17,8 @@
 
 namespace mars {
 
+    std::mutex Renderer::mutex{};
+
     #define TRY_VK(proc, msg) do{\
         if((proc) != VK_SUCCESS) {\
             FATAL(msg);\
@@ -1966,50 +1968,56 @@ namespace mars {
         return SUCCESS;
     }
 
-    Error<std::unique_ptr<Renderer>> Renderer::make(const std::string& name, ID& squareID) noexcept {
-        std::unique_ptr<Renderer> r{ std::make_unique<Renderer>() };
-        r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
+    Renderer& Renderer::get() noexcept {
+        std::unique_lock<std::mutex> lock{Renderer::mutex};
+        static Renderer instance;
+        return instance;
+    }
 
-        if(Error<noreturn> res = r->createVkInstance(name); !res.okay()) {
+    Error<Renderer&> Renderer::init(const std::string& name, ID& squareID) noexcept {
+        Renderer& r = Renderer::get();
+        r.flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
+
+        if(Error<noreturn> res = r.createVkInstance(name); !res.okay()) {
             APPEND_SOURCE_INFO(res);
-            r->flags &= ~rendererFlags::instanceInvalid;
+            r.flags &= ~rendererFlags::instanceInvalid;
             return MOVE_ERROR(res);
         }
         if constexpr (enableValidationLayers) {
-            TRY(r->createDebugUtilsMessenger());
+            TRY(r.createDebugUtilsMessenger());
         }
 
-        TRY(r->createSurface(name));
+        TRY(r.createSurface(name));
 
-        if(Error<noreturn> res = r->createDevice(); !res.okay()) {
+        if(Error<noreturn> res = r.createDevice(); !res.okay()) {
             APPEND_SOURCE_INFO(res);
-            r->flags &= ~rendererFlags::deviceInvalid;
+            r.flags &= ~rendererFlags::deviceInvalid;
             return MOVE_ERROR(res);
         }
-        TRY(r->createSwapchain());
-        TRY(r->getSwapchainImages());
-        TRY(r->createCommandBuffers());
-        TRY(r->createCube());
-        TRY(r->createSampler());
-        TRY(r->createRenderTargets());
-        TRY(r->createDepthImages());
-        TRY(r->createSyncObjects());
-        TRY(r->createDescriptorSetLayouts());
-        TRY(r->createGraphicsPipeline());
-        TRY(r->createCamera());
-        if(!SDL_ShowWindow(r->window)) {
+        TRY(r.createSwapchain());
+        TRY(r.getSwapchainImages());
+        TRY(r.createCommandBuffers());
+        TRY(r.createCube());
+        TRY(r.createSampler());
+        TRY(r.createRenderTargets());
+        TRY(r.createDepthImages());
+        TRY(r.createSyncObjects());
+        TRY(r.createDescriptorSetLayouts());
+        TRY(r.createGraphicsPipeline());
+        TRY(r.createCamera());
+        if(!SDL_ShowWindow(r.window)) {
             FATAL("Failed to show window");
         }
 
         //Create square mesh
-        Error<ID> sq = r->makeMesh(Square::vertices, Square::indices);
+        Error<ID> sq = r.makeMesh(Square::vertices, Square::indices);
         if(!sq.okay()) {
             PROPAGATE_ERROR(sq);
         }
         //Give ID number of square mesh back to the game
         else squareID = sq.value();
 
-        r->currentFrame = 0;
+        r.currentFrame = 0;
         return r;
     }
 

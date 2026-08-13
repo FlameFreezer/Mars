@@ -203,6 +203,8 @@ public:
     Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage() {
         mMessage.pushBack(std::move(inMessage));
     }
+    Error(ErrorTag inTag, const MessageList& list) noexcept : mTag(inTag), mMessage(list) {}
+    Error(ErrorTag inTag, MessageList&& list) noexcept : mTag(inTag), mMessage(std::move(list)) {}
     Error(const Error<T&>& other) noexcept {
         mTag = other.mTag;
         if(other.okay()) {
@@ -294,6 +296,8 @@ public:
     Error(ErrorTag inTag, std::string&& inMessage) noexcept : mTag(inTag), mMessage() {
         mMessage.pushBack(std::move(inMessage));
     }
+    Error(ErrorTag inTag, const MessageList& list) noexcept : mTag(inTag), mMessage(list) {}
+    Error(ErrorTag inTag, MessageList&& list) noexcept : mTag(inTag), mMessage(std::move(list)) {}
     Error(const Error<const T&>& other) noexcept {
         mTag = other.mTag;
         if(other.okay()) {
