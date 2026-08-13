@@ -16,7 +16,7 @@ struct PushDescriptors {
 ParameterBlock<PushDescriptors> push;
 
 [shader("vertex")]
-func vertMain(VertexIn input, uniform float4x4 transform, uint vertexID : SV_VulkanVertexID, uint instanceID : SV_VulkanInstanceID) ->VertexOut {
+func vertMain(VertexIn input, uniform float4x4 transform) ->VertexOut {
     VertexOut output;
     output.position = mul(push.camera, mul(transform, float4(input.position, 1.0f)));
     output.texCoord = input.texCoord;

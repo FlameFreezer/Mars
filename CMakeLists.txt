@@ -62,6 +62,20 @@ add_custom_command(OUTPUT shader3d.spv
     CODEGEN
     VERBATIM
 )
+add_custom_command(OUTPUT sprite.spv
+    COMMAND slangc "${MARS_SHADER_PATH}/sprite.slang"
+        -target spirv
+        -profile spirv_1_4
+        -emit-spirv-directly
+        -fvk-use-entrypoint-name
+        -entry vertMain
+        -o sprite.spv
+    DEPENDS "${MARS_SHADER_PATH}/sprite.slang"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
+    COMMENT "Compiling sprite shader"
+    CODEGEN
+    VERBATIM
+)
 
 # Set compiler flags for Mars library (these cause issues when building SDL3 
 #   so I have to set them after it it built)
@@ -72,7 +86,7 @@ set(CMAKE_LINK_WARNING_AS_ERROR True)
 add_library(Mars)
 file(GLOB_RECURSE 
     MARS_SOURCE_FILES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/*.cpp")
-target_sources(Mars PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv")
+target_sources(Mars PRIVATE "${MARS_SOURCE_FILES}" "shader2d.spv" "shader3d.spv" "sprite.spv")
 
 target_compile_definitions(Mars PUBLIC 
     MARS_SHADERS_PATH="${CMAKE_BINARY_DIR}/$<CONFIGURATION>/"
