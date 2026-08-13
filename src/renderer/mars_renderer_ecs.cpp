@@ -16,7 +16,6 @@ namespace mars {
 
     RendererEntityManager::~RendererEntityManager() noexcept {
         delete sysMesh;
-        delete sysTexture;
     }
 
     ID RendererEntityManager::insertMesh(VkBuffer handle, VkDeviceMemory memory, VkDeviceSize indexOffset, u32 numIndices) noexcept {
@@ -25,19 +24,9 @@ namespace mars {
         sysMesh->insert(id, handle, memory, indexOffset, numIndices);
         return id;
     }
-    ID RendererEntityManager::insertTexture(const TextureC& t) noexcept {
-        const ID id = mTextureIDQueue.front();
-        mTextureIDQueue.pop();
-        sysTexture->insert(id, t);
-        return id;
-    }
 
     void RendererEntityManager::eraseMesh(ID id) noexcept {
         sysMesh->erase(id);
         mMeshIDQueue.push(id);
-    }
-    void RendererEntityManager::eraseTexture(ID id) noexcept {
-        sysTexture->erase(id);
-        mTextureIDQueue.push(id);
     }
 }

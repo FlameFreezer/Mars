@@ -159,8 +159,6 @@ namespace mars {
 
         Error<ID> makeMesh(Slice<const Vertex> vertices, Slice<const u32> indices) noexcept; 
 
-        Error<ID> makeTexture(std::string_view texturePath) noexcept;
-
         Error<GPUImage> loadTexture(std::string_view texturePath) noexcept;
 
         Error<noreturn> loadTilemap(std::string_view tilemapPath) noexcept;
