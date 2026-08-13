@@ -6,7 +6,6 @@
 #include <string_view>
 #include <queue>
 #include <cstddef>
-#include <memory>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -153,6 +152,7 @@ namespace mars {
     class Renderer {
         public:
         static Renderer& get() noexcept;
+        static VkDevice device() noexcept;
 
         rendererFlags::FlagT flags = 0;
 
@@ -206,7 +206,7 @@ namespace mars {
         VkInstance instance = nullptr;
         VkDebugUtilsMessengerEXT debugMessenger = nullptr;
         VkSurfaceKHR surface = nullptr;
-        VkDevice device = nullptr;
+        VkDevice mDevice = nullptr;
         VkPhysicalDevice physicalDevice = nullptr;
         VkSwapchainKHR swapchain = nullptr;
         VkExtent2D swapchainImageExtent;
