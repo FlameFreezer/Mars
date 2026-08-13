@@ -1,21 +1,23 @@
 #include <format>
+#include <mars_renderer.h>
 #include <mars_texture.h>
 
 namespace mars {
-    Texture::Texture(GPUImage&& image, u64 width, u64 height) noexcept : mImage(std::move(image)), mWidth(width), mHeight(height) {
+    Texture::Texture(GPUImage&& image) noexcept : mImage(std::move(image)) {
 
     }
     Texture::~Texture() noexcept {
-        //mImage.destroy(Renderer::get().device);
+        vkDeviceWaitIdle(Renderer::device());
+        mImage.destroy(Renderer::device());
     }
 
-    Error<Slice<const Sprite>> Texture::slice(u64 spriteWidth, u64 spriteHeight) noexcept {
+    Error<Slice<const Sprite>> Texture::slice(u32 spriteWidth, u32 spriteHeight) noexcept {
         //Assume zero spacing
-        if (mWidth % spriteWidth != 0 or mHeight % spriteHeight != 0) {
-            FATAL(std::format("Provided sprite dimensions ({},{}) cannot divide texture with dimensions ({},{})", spriteWidth, spriteHeight, mWidth, mHeight));
+        if (mImage.width % spriteWidth != 0 or mImage.height % spriteHeight != 0) {
+            FATAL(std::format("Provided sprite dimensions ({},{}) cannot divide texture with dimensions ({},{})", spriteWidth, spriteHeight, mImage.width, mImage.height));
         }
-        const u64 columns = mWidth / spriteWidth;
-        const u64 rows = mHeight / spriteHeight;
+        const u64 columns = mImage.width / spriteWidth;
+        const u64 rows = mImage.height / spriteHeight;
         mSprites.resize(rows * columns);
         for (u64 i = 0; i < rows; i++) {
             for (u64 j = 0; j < columns; j++) {
@@ -24,10 +26,10 @@ namespace mars {
                 sprite.height = spriteHeight;
                 sprite.width = spriteWidth;
                 // Get normalized UV coordinates
-                sprite.uMin = j * spriteWidth / static_cast<float>(mWidth);
-                sprite.uMax = (j + 1) * spriteWidth / static_cast<float>(mWidth);
-                sprite.vMin = i * spriteHeight / static_cast<float>(mHeight);
-                sprite.vMax = (i + 1) * spriteHeight / static_cast<float>(mHeight);
+                sprite.uMin = j * spriteWidth / static_cast<float>(mImage.width);
+                sprite.uMax = (j + 1) * spriteWidth / static_cast<float>(mImage.width);
+                sprite.vMin = i * spriteHeight / static_cast<float>(mImage.height);
+                sprite.vMax = (i + 1) * spriteHeight / static_cast<float>(mImage.height);
             }
         }
         return Slice<const Sprite>(mSprites);
@@ -36,12 +38,12 @@ namespace mars {
         return mImage;
     }
 
-    u64 Texture::width() const noexcept {
-        return mWidth;
+    u32 Texture::width() const noexcept {
+        return mImage.width;
     }
 
-    u64 Texture::height() const noexcept {
-        return mHeight;
+    u32 Texture::height() const noexcept {
+        return mImage.height;
     }
 
     Slice<const Sprite> Texture::sprites() const noexcept {

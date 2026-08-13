@@ -18,7 +18,7 @@ namespace mars {
             u32 numIndices = 0;
         } sizes[maxMeshes];
     };
-    struct Texture {
+    struct TextureC {
         VkImage handle = nullptr;
         VkDeviceMemory memory = nullptr;
         VkImageView view = nullptr;
@@ -84,9 +84,9 @@ namespace mars {
         RendererEntityManager() noexcept;
         ~RendererEntityManager() noexcept;
         ComponentSystem<Mesh>* sysMesh = new ComponentSystem<Mesh>;
-        ComponentSystem<Texture>* sysTexture = new ComponentSystem<Texture>;
+        ComponentSystem<TextureC>* sysTexture = new ComponentSystem<TextureC>;
         ID insertMesh(VkBuffer handle, VkDeviceMemory memory, VkDeviceSize indexOffset, u32 numIndices) noexcept;
-        ID insertTexture(const Texture& t) noexcept;
+        ID insertTexture(const TextureC& t) noexcept;
         void eraseMesh(ID id) noexcept;
         void eraseTexture(ID id) noexcept;
     };

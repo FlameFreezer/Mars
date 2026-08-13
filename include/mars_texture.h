@@ -12,22 +12,20 @@ namespace mars {
         float uMax = 1.0f;
         float vMin = 0.0f;
         float vMax = 1.0f;
-        u64 width;
-        u64 height;
+        u32 width;
+        u32 height;
     };
     class Texture {
     public:
-        Texture(GPUImage&& image, u64 width, u64 height) noexcept;
+        Texture(GPUImage&& image) noexcept;
         ~Texture() noexcept;
-        Error<Slice<const Sprite>> slice(u64 spriteWidth, u64 spriteHeight) noexcept;
+        Error<Slice<const Sprite>> slice(u32 spriteWidth, u32 spriteHeight) noexcept;
         const GPUImage& image() const noexcept;
-        u64 width() const noexcept;
-        u64 height() const noexcept;
+        u32 width() const noexcept;
+        u32 height() const noexcept;
         Slice<const Sprite> sprites() const noexcept;
     private:
         GPUImage mImage;
-        u64 mWidth;
-        u64 mHeight;
         HeapArray<Sprite> mSprites;
     };
 }

@@ -13,6 +13,8 @@
 #include "mars_global.h"
 #include "jsonparser.h"
 #include "mars_event.h"
+#include "mars_assets.h"
+#include "mars_texture.h"
 #include "error.h"
 
 namespace mars {

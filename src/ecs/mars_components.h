@@ -1,9 +1,11 @@
 #pragma once
 
+#include <memory>
 #include <utility>
 
 #include <glm/glm.hpp>
 
+#include "mars_texture.h"
 #include "mars_types.h"
 #include "mars_room.h"
 
@@ -33,6 +35,7 @@ namespace mars {
         float zLayer = 0;
         ID meshID = 0;
         ID textureID = 0;
+        std::shared_ptr<Texture> texture;
     };
     struct Physics {
         static constexpr Component component = Component::physics;

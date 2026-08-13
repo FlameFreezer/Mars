@@ -1,9 +1,11 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <memory>
 
 #include "mars_constants.h"
 #include "mars_entity.h"
+#include "mars_texture.h"
 #include "mars_types.h"
 
 namespace mars {
@@ -203,6 +205,7 @@ namespace mars {
         float& zLayer;
         ID& meshID;
         ID& textureID;
+        std::shared_ptr<Texture>& texture;
     };
     template<>
     class ComponentSystem<Draw> : public ComponentSystemParent {
@@ -212,6 +215,7 @@ namespace mars {
         float mZLayers[maxEntities];
         ID mMeshIDs[maxEntities];
         ID mTextureIDs[maxEntities];
+        std::shared_ptr<Texture> mTextures[maxEntities];
         public:
         DrawProxy operator[](ID id) noexcept {
             return {
@@ -220,7 +224,8 @@ namespace mars {
                 mAngles[index(id)],
                 mZLayers[index(id)],
                 mMeshIDs[index(id)],
-                mTextureIDs[index(id)]
+                mTextureIDs[index(id)],
+                mTextures[index(id)],
             };
         }
         glm::vec2& position(ID id) noexcept {
@@ -259,6 +264,12 @@ namespace mars {
         const ID& textureID(ID id) const noexcept {
             return mTextureIDs[index(id)];
         }
+        std::shared_ptr<Texture>& texture(ID id) noexcept {
+            return mTextures[index(id)];
+        }
+        const std::shared_ptr<Texture>& texture(ID id) const noexcept {
+            return mTextures[index(id)];
+        }
         glm::vec2* positions() noexcept {
             return mPositions;
         }
@@ -289,6 +300,13 @@ namespace mars {
         const ID* textureIDs() const noexcept {
             return mTextureIDs;
         }
+        std::shared_ptr<Texture>* textures() noexcept {
+            return mTextures;
+        }
+        const std::shared_ptr<Texture>* textures() const noexcept {
+            return mTextures;
+        }
+
         void erase(ID id) noexcept {
             //Refuse to erase the null entity
             if(id == nullID) return;

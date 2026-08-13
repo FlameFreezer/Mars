@@ -1246,11 +1246,11 @@ namespace mars {
 
         //Iterate through every drawable entity
         const ComponentSystem<Draw>& sysDraw = ECS::get().system<Draw::component>();
-        for (u64 i = 0; i < sysDraw.size(); i++) {
+        for (u64 i = 1; i < sysDraw.size(); i++) {
             //Push the descriptor for the texture
             const VkDescriptorImageInfo materialInfo = {
                 .sampler = sampler,
-                .imageView = (*entityManager.sysTexture)[sysDraw.textureIDs()[i]].view,
+                .imageView = sysDraw.textures()[i]->image().view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
             const VkWriteDescriptorSet writeMaterial = {
@@ -2031,7 +2031,7 @@ namespace mars {
             cube.buffer.destroy(mDevice);
             entityManager.sysMesh->destroySystem(mDevice);
             for(u64 i = 0; i < entityManager.sysTexture->size(); i++) {
-                Texture& t = entityManager.sysTexture->data()[i];
+                TextureC& t = entityManager.sysTexture->data()[i];
                 vkDestroyImage(mDevice, t.handle, nullptr);
                 vkFreeMemory(mDevice, t.memory, nullptr);
                 vkDestroyImageView(mDevice, t.view, nullptr);
@@ -2472,7 +2472,7 @@ namespace mars {
         };
         vkCmdPipelineBarrier2(transferCommandBuffers[currentFrame], &dep2);
 
-        Texture t;
+        TextureC t;
         t.handle = textureImage.handle;
         t.memory = textureImage.memory;
         t.view = textureImage.view;

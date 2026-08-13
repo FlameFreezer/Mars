@@ -25,7 +25,7 @@ namespace mars {
         sysMesh->insert(id, handle, memory, indexOffset, numIndices);
         return id;
     }
-    ID RendererEntityManager::insertTexture(const Texture& t) noexcept {
+    ID RendererEntityManager::insertTexture(const TextureC& t) noexcept {
         const ID id = mTextureIDQueue.front();
         mTextureIDQueue.pop();
         sysTexture->insert(id, t);

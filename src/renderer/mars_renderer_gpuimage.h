@@ -10,6 +10,8 @@ namespace mars {
         VkImage handle;
         VkImageView view;
         VkDeviceMemory memory;
+        u32 width;
+        u32 height;
 
         void destroy(VkDevice device) noexcept {
             vkDestroyImageView(device, view, nullptr);
@@ -29,6 +31,8 @@ namespace mars {
             ) noexcept 
         {
             GPUImage result{};
+            result.width = extent.width;
+            result.height = extent.height;
             const VkImageCreateInfo imageInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                 .pNext = nullptr,
