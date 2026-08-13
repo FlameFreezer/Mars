@@ -480,7 +480,7 @@ namespace mars {
     }
 
     Error<noreturn> Renderer::createCamera() noexcept {
-        Error<UniformBuffer<glm::mat4>> cam2D = UniformBuffer<glm::mat4>::make(mDevice, physicalDevice, 
+        Error<UniformBuffer<glm::mat4>> cam2D = UniformBuffer<glm::mat4>::make(mDevice, mPhysicalDevice, 
             sizeof(glm::mat4) * maxConcurrentFrames); 
         if (!cam2D.okay()) {
             APPEND_SOURCE_INFO(cam2D);
@@ -488,7 +488,7 @@ namespace mars {
         }
         else mCamera2D = cam2D.moveValue();
 
-        Error<UniformBuffer<glm::mat4>> cam3D = UniformBuffer<glm::mat4>::make(mDevice, physicalDevice, 
+        Error<UniformBuffer<glm::mat4>> cam3D = UniformBuffer<glm::mat4>::make(mDevice, mPhysicalDevice, 
             sizeof(glm::mat4) * maxConcurrentFrames); 
         if (!cam3D.okay()) {
             APPEND_SOURCE_INFO(cam3D);
@@ -807,7 +807,7 @@ namespace mars {
         const VkDeviceSize verticesSize = Cube::vertices.max_size() * sizeof(Vertex);
         const VkDeviceSize indicesSize = Cube::indices.max_size() * sizeof(u32);
         TRY_ASSIGN(cube.buffer, GPUBuffer::make(
-            mDevice, physicalDevice,
+            mDevice, mPhysicalDevice,
             verticesSize + indicesSize,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
             | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -815,7 +815,7 @@ namespace mars {
         ));
         
         Error<GPUBuffer> transferBuffer = GPUBuffer::make(
-            mDevice, physicalDevice,
+            mDevice, mPhysicalDevice,
             verticesSize + indicesSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
@@ -870,7 +870,7 @@ namespace mars {
         renderTargets2D.resize(maxConcurrentFrames);
         for(GPUImage& target : renderTargets2D) {
             TRY_ASSIGN(target, GPUImage::make(
-                mDevice, physicalDevice,
+                mDevice, mPhysicalDevice,
                 {d, d, 1},
                 //this image will be multisampled
                 msaaSampleCount, 
@@ -885,7 +885,7 @@ namespace mars {
         textures2DScene.resize(maxConcurrentFrames);
         for(GPUImage& tex : textures2DScene) {
             TRY_ASSIGN(tex, GPUImage::make(
-                mDevice, physicalDevice,
+                mDevice, mPhysicalDevice,
                 {d, d, 1},
                 VK_SAMPLE_COUNT_1_BIT, //texture does not store multiple samples
                 VK_IMAGE_TILING_OPTIMAL,
@@ -900,7 +900,7 @@ namespace mars {
         renderTargets3D.resize(maxConcurrentFrames);
         for(GPUImage& target : renderTargets3D) {
             TRY_ASSIGN(target, GPUImage::make(
-                mDevice, physicalDevice,
+                mDevice, mPhysicalDevice,
                 { swapchainImageExtent.width, swapchainImageExtent.height, 1 },
                 //this image will be multisampled
                 msaaSampleCount,
@@ -917,7 +917,7 @@ namespace mars {
         const u32 d = cube.dim;
         const VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
         //2D depth image has the dimensions of the cube
-        TRY_ASSIGN(depthImage2D, GPUImage::make(mDevice, physicalDevice,
+        TRY_ASSIGN(depthImage2D, GPUImage::make(mDevice, mPhysicalDevice,
             { d, d, 1 },
             msaaSampleCount, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -925,7 +925,7 @@ namespace mars {
             depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT));
         
         //3D depth image has the dimensions of the swapchain images
-        TRY_ASSIGN(depthImage3D, GPUImage::make(mDevice, physicalDevice,
+        TRY_ASSIGN(depthImage3D, GPUImage::make(mDevice, mPhysicalDevice,
             { swapchainImageExtent.width, swapchainImageExtent.height, 1 },
             msaaSampleCount, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -952,12 +952,19 @@ namespace mars {
             .pBindings = globalBindings.data()
         };
         TRY_VK(vkCreateDescriptorSetLayout(mDevice, &globalLayout, nullptr, &mDescriptorSetLayouts[0]), "Failed to create descriptor set layout");
-        std::array<VkDescriptorSetLayoutBinding, 1> instanceBindings = {
+        std::array<VkDescriptorSetLayoutBinding, 2> instanceBindings = {
             VkDescriptorSetLayoutBinding{
                 .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 .descriptorCount = 1,
                 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .pImmutableSamplers = nullptr
+            },
+            VkDescriptorSetLayoutBinding{
+                .binding = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                 .pImmutableSamplers = nullptr
             }
         };
@@ -973,13 +980,17 @@ namespace mars {
     }
 
     Error<noreturn> Renderer::createDescriptorPool() noexcept {
-        const std::array<VkDescriptorPoolSize, 2> poolSizes = {
+        const std::array<VkDescriptorPoolSize, 3> poolSizes = {
             VkDescriptorPoolSize{
                 .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .descriptorCount = 1
             },
             VkDescriptorPoolSize{
                 .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptorCount = 1
+            },
+            VkDescriptorPoolSize{
+                .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                 .descriptorCount = 1
             }
         };
@@ -1006,10 +1017,11 @@ namespace mars {
         TRY_VK(vkAllocateDescriptorSets(mDevice, &allocInfo, mDescriptorSets.data()), "Failed to allocate descriptor sets");
         return SUCCESS;
     }
+
     Error<noreturn> Renderer::createSampler() noexcept {
         VkPhysicalDeviceProperties2 props{};
         props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-        vkGetPhysicalDeviceProperties2(physicalDevice, &props);
+        vkGetPhysicalDeviceProperties2(mPhysicalDevice, &props);
         const VkSamplerCreateInfo samplerInfo = {
             .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             .pNext = nullptr,
@@ -1036,7 +1048,7 @@ namespace mars {
     Error<noreturn> Renderer::recreateSwapchain() noexcept {
         vkDeviceWaitIdle(mDevice);
 
-        TRY_ASSIGN(mSurfaceInfo, querySurfaceInfo(physicalDevice, surface));
+        TRY_ASSIGN(mSurfaceInfo, querySurfaceInfo(mPhysicalDevice, surface));
 
         TRY_ASSIGN(swapchainImageExtent, chooseImageExtent(mSurfaceInfo.capabilities));
 
@@ -1281,19 +1293,38 @@ namespace mars {
                 .imageView = sysDraw.textures()[i]->image().view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
-            const VkWriteDescriptorSet writeMaterial = {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .pNext = nullptr,
-                .dstSet = mDescriptorSets[1],
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .pImageInfo = &materialInfo,
-                .pBufferInfo = nullptr,
-                .pTexelBufferView = nullptr
+            const VkDescriptorBufferInfo bufferInfo = {
+                .buffer = sysDraw.textures()[i]->sprites()[0].uvBuffer.buffer.handle,
+                .offset = 0,
+                .range = sysDraw.textures()[i]->sprites()[0].uvBuffer.buffer.size
             };
-            vkUpdateDescriptorSets(mDevice, 1, &writeMaterial, 0, nullptr);
+            std::array<VkWriteDescriptorSet, 2> writeDescriptorSets = {
+                VkWriteDescriptorSet{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .pNext = nullptr,
+                    .dstSet = mDescriptorSets[1],
+                    .dstBinding = 0,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .pImageInfo = &materialInfo,
+                    .pBufferInfo = nullptr,
+                    .pTexelBufferView = nullptr
+                },
+                VkWriteDescriptorSet{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .pNext = nullptr,
+                    .dstSet = mDescriptorSets[1],
+                    .dstBinding = 1,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    .pImageInfo = nullptr,
+                    .pBufferInfo = &bufferInfo,
+                    .pTexelBufferView = nullptr
+                }
+            };
+            vkUpdateDescriptorSets(mDevice, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, nullptr);
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout2D, 1, 1, &mDescriptorSets[1], 0, nullptr);
 
             //Generate the model matrix
@@ -1314,6 +1345,7 @@ namespace mars {
 
             //Get the index for the current mesh within the array of vertex buffers
             //This is an i32 to match the parameter for vkCmdDrawIndexed
+            /*
             assert(entityManager.sysMesh->index(sysDraw.meshIDs()[i]) < std::numeric_limits<i32>::max());
             const i32 meshIndex = entityManager.sysMesh->index(sysDraw.meshIDs()[i]);
             assert(meshIndex >= 0);
@@ -1335,6 +1367,10 @@ namespace mars {
                 0, 
                 meshIndex, 
                 0);
+           
+            */
+            //Draw the sprite
+            vkCmdDraw(commandBuffer, 6, 1, 0, 0);
         }
 
         vkCmdEndRendering(commandBuffer);
@@ -1382,7 +1418,7 @@ namespace mars {
     }
 
     Error<noreturn> Renderer::createGraphicsPipeline() noexcept {
-        TRY_INIT(VkShaderModule, shaderMod2D, createShaderModule("shader2d.spv"));
+        TRY_INIT(VkShaderModule, shaderMod2D, createShaderModule("sprite.spv"));
         TRY_INIT(VkShaderModule, shaderMod3D, createShaderModule("shader3d.spv"));
 
         std::array<VkPipelineShaderStageCreateInfo, 2> shaderStageInfos2D;
@@ -1537,7 +1573,7 @@ namespace mars {
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                 .offset = 0,
                 .size = sizeof(glm::mat4)
-            }
+            },
         };
         const VkPipelineLayoutCreateInfo pipelineLayoutInfo2D = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1733,7 +1769,7 @@ namespace mars {
         //Pick a physical mDevice to use
         if (Error<PickPhysicalDeviceResult> pickResult = pickPhysicalDevice(physicalDevices, surface); pickResult.okay()) {
             const PickPhysicalDeviceResult& res = pickResult.value();
-            physicalDevice = res.physicalDevice;
+            mPhysicalDevice = res.physicalDevice;
             graphicsQueueFamilyIndex = res.queueFamilyInfo.graphicsIndex;
             presentQueueFamilyIndex = res.queueFamilyInfo.presentIndex;
             graphicsQueueCount = res.queueFamilyInfo.graphicsCount;
@@ -1751,7 +1787,7 @@ namespace mars {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
             .pNext = nullptr
         };
-        vkGetPhysicalDeviceProperties2(physicalDevice, &props);
+        vkGetPhysicalDeviceProperties2(mPhysicalDevice, &props);
         const VkSampleCountFlags availableSampleCounts = props.properties.limits.framebufferColorSampleCounts;
         if(availableSampleCounts & VK_SAMPLE_COUNT_64_BIT) msaaSampleCount = VK_SAMPLE_COUNT_64_BIT;
         else if(availableSampleCounts & VK_SAMPLE_COUNT_32_BIT) msaaSampleCount = VK_SAMPLE_COUNT_32_BIT;
@@ -1832,7 +1868,7 @@ namespace mars {
             .pEnabledFeatures = nullptr
         };
 
-        TRY_VK(vkCreateDevice(physicalDevice, &deviceInfo, nullptr, &mDevice), "Failed to create VkDevice!");
+        TRY_VK(vkCreateDevice(mPhysicalDevice, &deviceInfo, nullptr, &mDevice), "Failed to create VkDevice!");
 
         //Acquire handles to all the GPU queues we just created
         if(differentQueueFamilies) {
@@ -2117,7 +2153,7 @@ namespace mars {
         const VkDeviceSize indicesSize = indices.size() * sizeof(u32);
         const VkDeviceSize size = verticesSize + indicesSize;
         //Initialize destination buffer
-        Error<GPUBuffer> buffer = GPUBuffer::make(mDevice, physicalDevice, size, 
+        Error<GPUBuffer> buffer = GPUBuffer::make(mDevice, mPhysicalDevice, size, 
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         if (!buffer.okay()) {
@@ -2127,7 +2163,7 @@ namespace mars {
         GPUBuffer vertexBuffer = buffer.moveValue();
         
         //Initialize transfer buffer
-        buffer = GPUBuffer::make(mDevice, physicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        buffer = GPUBuffer::make(mDevice, mPhysicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         if(!buffer.okay()) {
             APPEND_SOURCE_INFO(buffer);
@@ -2187,7 +2223,7 @@ namespace mars {
 
         //Initialize destination image
         if(Error<GPUImage> image = GPUImage::make(
-                mDevice, physicalDevice, 
+                mDevice, mPhysicalDevice, 
                 {static_cast<u32>(texWidth), static_cast<u32>(texHeight), 1},
                 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, 
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
@@ -2204,7 +2240,7 @@ namespace mars {
         GPUBuffer transferBuffer;
         if(Error<GPUBuffer> tb = GPUBuffer::make(
                 mDevice, 
-                physicalDevice, 
+                mPhysicalDevice, 
                 imageSize, 
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
@@ -2344,5 +2380,9 @@ namespace mars {
 
     VkDevice Renderer::device() noexcept {
         return Renderer::get().mDevice;
+    }
+
+    VkPhysicalDevice Renderer::physicalDevice() noexcept {
+        return Renderer::get().mPhysicalDevice;
     }
 }

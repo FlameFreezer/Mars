@@ -69,6 +69,7 @@ add_custom_command(OUTPUT sprite.spv
         -emit-spirv-directly
         -fvk-use-entrypoint-name
         -entry vertMain
+        -entry fragMain
         -o sprite.spv
     DEPENDS "${MARS_SHADER_PATH}/sprite.slang"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"

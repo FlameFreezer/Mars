@@ -1,6 +1,8 @@
 #pragma once
 
 #include <mars_renderer_gpuimage.h>
+#include "glm/ext/vector_float2.hpp"
+#include "mars_renderer_gpubuffer.h"
 #include "mars_types.h"
 #include "error.h"
 #include "mars_heaparray.h"
@@ -14,6 +16,8 @@ namespace mars {
         float vMax = 1.0f;
         u32 width;
         u32 height;
+        UniformBuffer<glm::vec2> uvBuffer;
+        ~Sprite() noexcept;
     };
     class Texture {
     public:

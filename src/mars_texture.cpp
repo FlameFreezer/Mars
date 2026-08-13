@@ -1,14 +1,19 @@
+#include "mars_renderer_gpubuffer.h"
 #include <format>
 #include <mars_renderer.h>
 #include <mars_texture.h>
 
 namespace mars {
     Texture::Texture(GPUImage&& image) noexcept : mImage(std::move(image)) {
-
+        // This will always succeed
+        auto r = slice(mImage.width, mImage.height);
     }
     Texture::~Texture() noexcept {
         vkDeviceWaitIdle(Renderer::device());
         mImage.destroy(Renderer::device());
+    }
+    Sprite::~Sprite() noexcept {
+        uvBuffer.destroy(Renderer::device());
     }
 
     Error<Slice<const Sprite>> Texture::slice(u32 spriteWidth, u32 spriteHeight) noexcept {
@@ -30,6 +35,11 @@ namespace mars {
                 sprite.uMax = (j + 1) * spriteWidth / static_cast<float>(mImage.width);
                 sprite.vMin = i * spriteHeight / static_cast<float>(mImage.height);
                 sprite.vMax = (i + 1) * spriteHeight / static_cast<float>(mImage.height);
+                TRY_ASSIGN(sprite.uvBuffer, UniformBuffer<glm::vec2>::make(Renderer::device(), Renderer::physicalDevice(), 4 * sizeof(glm::vec2)));
+                sprite.uvBuffer.mappedMemory[0] = {sprite.uMin, sprite.vMin};
+                sprite.uvBuffer.mappedMemory[1] = {sprite.uMax, sprite.vMin};
+                sprite.uvBuffer.mappedMemory[2] = {sprite.uMin, sprite.vMax};
+                sprite.uvBuffer.mappedMemory[3] = {sprite.uMax, sprite.vMax};
             }
         }
         return Slice<const Sprite>(mSprites);

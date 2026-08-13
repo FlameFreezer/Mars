@@ -146,6 +146,7 @@ namespace mars {
         public:
         static Renderer& get() noexcept;
         static VkDevice device() noexcept;
+        static VkPhysicalDevice physicalDevice() noexcept;
 
         rendererFlags::FlagT flags = 0;
 
@@ -197,7 +198,7 @@ namespace mars {
         VkDebugUtilsMessengerEXT debugMessenger = nullptr;
         VkSurfaceKHR surface = nullptr;
         VkDevice mDevice = nullptr;
-        VkPhysicalDevice physicalDevice = nullptr;
+        VkPhysicalDevice mPhysicalDevice = nullptr;
         VkSwapchainKHR swapchain = nullptr;
         VkExtent2D swapchainImageExtent;
     	VkCommandPool commandPool = nullptr;
