@@ -193,7 +193,6 @@ namespace mars {
         std::array<VkCommandBuffer, maxConcurrentFrames> transferCommandBuffers;
         std::array<VkFence, maxConcurrentFrames> fences;
         std::array<VkPipeline, 2> graphicsPipelines;
-        VkDescriptorSetLayout pushSetLayout = nullptr;
         VkInstance instance = nullptr;
         VkDebugUtilsMessengerEXT debugMessenger = nullptr;
         VkSurfaceKHR surface = nullptr;
@@ -209,6 +208,10 @@ namespace mars {
         u32 graphicsQueueFamilyIndex = 0;
         u32 presentQueueFamilyIndex = 0;
         VkSampleCountFlagBits msaaSampleCount;
+
+        std::array<VkDescriptorSetLayout, 2> mDescriptorSetLayouts;
+        VkDescriptorPool mDescriptorPool;
+        std::array<VkDescriptorSet, 2> mDescriptorSets;
 
         SDL_Window* window = nullptr;
         const mars::Camera2D* mainCamera2D = nullptr;
@@ -236,6 +239,10 @@ namespace mars {
         Error<noreturn> createDepthImages() noexcept; 
 
         Error<noreturn> createDescriptorSetLayouts() noexcept; 
+
+        Error<noreturn> createDescriptorPool() noexcept;
+
+        Error<noreturn> allocateDescriptorSets() noexcept;
 
         Error<noreturn> createSampler() noexcept;
 

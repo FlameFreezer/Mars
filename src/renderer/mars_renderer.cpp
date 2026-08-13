@@ -935,32 +935,75 @@ namespace mars {
         return SUCCESS;
     }
     Error<noreturn> Renderer::createDescriptorSetLayouts() noexcept {
-        std::array<VkDescriptorSetLayoutBinding, 2> pushBindings = {
-            //Camera matrix
+        std::array<VkDescriptorSetLayoutBinding, 1> globalBindings = {
             VkDescriptorSetLayoutBinding{
                 .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .descriptorCount = 1,
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                 .pImmutableSamplers = nullptr
-            },
-            //Texture image sampler
+            }
+        };
+        const VkDescriptorSetLayoutCreateInfo globalLayout = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .bindingCount = globalBindings.size(),
+            .pBindings = globalBindings.data()
+        };
+        TRY_VK(vkCreateDescriptorSetLayout(mDevice, &globalLayout, nullptr, &mDescriptorSetLayouts[0]), "Failed to create descriptor set layout");
+        std::array<VkDescriptorSetLayoutBinding, 1> instanceBindings = {
             VkDescriptorSetLayoutBinding{
-                .binding = 1,
+                .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 .descriptorCount = 1,
                 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
                 .pImmutableSamplers = nullptr
             }
         };
-        const VkDescriptorSetLayoutCreateInfo pushLayout = {
+        const VkDescriptorSetLayoutCreateInfo instanceLayout = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .pNext = nullptr,
-            .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT,
-            .bindingCount = pushBindings.max_size(),
-            .pBindings = pushBindings.data()
+            .flags = 0,
+            .bindingCount = instanceBindings.size(),
+            .pBindings = instanceBindings.data()
         };
-        TRY_VK(vkCreateDescriptorSetLayout(mDevice, &pushLayout, nullptr, &pushSetLayout), "Failed to create descriptor set layout");
+        TRY_VK(vkCreateDescriptorSetLayout(mDevice, &instanceLayout, nullptr, &mDescriptorSetLayouts[1]), "Failed to create descriptor set layout");
+        return SUCCESS;
+    }
+
+    Error<noreturn> Renderer::createDescriptorPool() noexcept {
+        const std::array<VkDescriptorPoolSize, 2> poolSizes = {
+            VkDescriptorPoolSize{
+                .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorCount = 1
+            },
+            VkDescriptorPoolSize{
+                .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptorCount = 1
+            }
+        };
+        const VkDescriptorPoolCreateInfo poolInfo = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            .pNext = nullptr, 
+            .flags = /*VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT*/0,
+            .maxSets = static_cast<u32>(mDescriptorSetLayouts.size()),
+            .poolSizeCount = poolSizes.size(),
+            .pPoolSizes = poolSizes.data()
+        };
+        TRY_VK(vkCreateDescriptorPool(mDevice, &poolInfo, nullptr, &mDescriptorPool), "Failed to create descriptor pool");
+        return SUCCESS;
+    }
+
+    Error<noreturn> Renderer::allocateDescriptorSets() noexcept {
+        const VkDescriptorSetAllocateInfo allocInfo = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .descriptorPool = mDescriptorPool,
+            .descriptorSetCount = static_cast<u32>(mDescriptorSets.size()),
+            .pSetLayouts = mDescriptorSetLayouts.data()
+        };
+        TRY_VK(vkAllocateDescriptorSets(mDevice, &allocInfo, mDescriptorSets.data()), "Failed to allocate descriptor sets");
         return SUCCESS;
     }
     Error<noreturn> Renderer::createSampler() noexcept {
@@ -1094,7 +1137,7 @@ namespace mars {
         };
         vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
 
-        //Write the 3D camera to the push descriptor
+        // Update and bind the 3D camera
         const VkDescriptorBufferInfo camera3DBufferInfo = {
             .buffer = mCamera3D.buffer.handle,
             .offset = sizeof(glm::mat4) * currentFrame,
@@ -1103,7 +1146,7 @@ namespace mars {
         const VkWriteDescriptorSet writeCamera = {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .pNext = nullptr,
-            .dstSet = nullptr,
+            .dstSet = mDescriptorSets[0],
             .dstBinding = 0,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -1112,15 +1155,10 @@ namespace mars {
             .pBufferInfo = &camera3DBufferInfo,
             .pTexelBufferView = nullptr
         };
-        vkCmdPushDescriptorSet(
-            commandBuffer, 
-            VK_PIPELINE_BIND_POINT_GRAPHICS, 
-            pipelineLayout3D, 
-            0, 
-            1, 
-            &writeCamera
-        );
-        //Push the 2D scene texture
+        vkUpdateDescriptorSets(mDevice, 1, &writeCamera, 0, nullptr);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout3D, 0, 1, &mDescriptorSets[0], 0, nullptr);
+
+        //Update and bind the 2D scene texture
         const VkDescriptorImageInfo materialInfo = {
             .sampler = sampler,
             .imageView = textures2DScene[currentFrame].view,
@@ -1129,8 +1167,8 @@ namespace mars {
         const VkWriteDescriptorSet writeMaterial = {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .pNext = nullptr,
-            .dstSet = nullptr,
-            .dstBinding = 1,
+            .dstSet = mDescriptorSets[1],
+            .dstBinding = 0,
             .dstArrayElement = 0,
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -1138,14 +1176,9 @@ namespace mars {
             .pBufferInfo = nullptr,
             .pTexelBufferView = nullptr
         };
-        vkCmdPushDescriptorSet(
-            commandBuffer, 
-            VK_PIPELINE_BIND_POINT_GRAPHICS, 
-            pipelineLayout3D, 
-            0, 
-            1, 
-            &writeMaterial
-        );
+        vkUpdateDescriptorSets(mDevice, 1, &writeMaterial, 0, nullptr);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout3D, 1, 1, &mDescriptorSets[1], 0, nullptr);
+
         //Bind the cube's mesh
         const VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &cube.buffer.handle, &offset);
@@ -1217,7 +1250,7 @@ namespace mars {
         };
         vkCmdSetScissorWithCount(commandBuffer, 1, &scissor);
 
-        //Write the 2D camera to the push descriptor
+        // Update and bind the 2D camera descriptor set
         const VkDescriptorBufferInfo camera2DBufferInfo = {
             .buffer = mCamera2D.buffer.handle,
             .offset = sizeof(glm::mat4) * currentFrame,
@@ -1226,7 +1259,7 @@ namespace mars {
         const VkWriteDescriptorSet writeCamera = {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .pNext = nullptr,
-            .dstSet = nullptr,
+            .dstSet = mDescriptorSets[0],
             .dstBinding = 0,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -1235,19 +1268,14 @@ namespace mars {
             .pBufferInfo = &camera2DBufferInfo,
             .pTexelBufferView = nullptr
         };
-        vkCmdPushDescriptorSet(
-            commandBuffer, 
-            VK_PIPELINE_BIND_POINT_GRAPHICS, 
-            pipelineLayout2D, 
-            0, 
-            1, 
-            &writeCamera
-        );
+        vkUpdateDescriptorSets(mDevice, 1, &writeCamera, 0, nullptr);
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout2D, 0, 1, &mDescriptorSets[0], 0, nullptr);
 
         //Iterate through every drawable entity
         const ComponentSystem<Draw>& sysDraw = ECS::get().system<Draw::component>();
         for (u64 i = 1; i < sysDraw.size(); i++) {
-            //Push the descriptor for the texture
+            // Update and bind the texture
             const VkDescriptorImageInfo materialInfo = {
                 .sampler = sampler,
                 .imageView = sysDraw.textures()[i]->image().view,
@@ -1256,8 +1284,8 @@ namespace mars {
             const VkWriteDescriptorSet writeMaterial = {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .pNext = nullptr,
-                .dstSet = nullptr,
-                .dstBinding = 1,
+                .dstSet = mDescriptorSets[1],
+                .dstBinding = 0,
                 .dstArrayElement = 0,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -1265,14 +1293,9 @@ namespace mars {
                 .pBufferInfo = nullptr,
                 .pTexelBufferView = nullptr
             };
-            vkCmdPushDescriptorSet(
-                commandBuffer, 
-                VK_PIPELINE_BIND_POINT_GRAPHICS, 
-                pipelineLayout2D, 
-                0, 
-                1, 
-                &writeMaterial
-            );
+            vkUpdateDescriptorSets(mDevice, 1, &writeMaterial, 0, nullptr);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout2D, 1, 1, &mDescriptorSets[1], 0, nullptr);
+
             //Generate the model matrix
             glm::mat4 modelMatrix{ 1.0f };
             const float pixelsPerMeter = mars::Global::get().pixelsPerMeter();
@@ -1508,25 +1531,22 @@ namespace mars {
             .pDynamicStates = dynamicStates.data()
         };
 
-        const VkPushConstantRange pushConstantRanges2D[] = {
+        const std::array<VkPushConstantRange, 1> pushConstantRanges2D = {
             //Model matrix being pushed
-            {
+            VkPushConstantRange{
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                 .offset = 0,
                 .size = sizeof(glm::mat4)
             }
         };
-        const VkDescriptorSetLayout descriptorSetLayouts2D[] = {
-            pushSetLayout
-        };
         const VkPipelineLayoutCreateInfo pipelineLayoutInfo2D = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
-            .setLayoutCount = 1,
-            .pSetLayouts = descriptorSetLayouts2D,
-            .pushConstantRangeCount = 1,
-            .pPushConstantRanges = pushConstantRanges2D
+            .setLayoutCount = static_cast<u32>(mDescriptorSetLayouts.size()),
+            .pSetLayouts = mDescriptorSetLayouts.data(),
+            .pushConstantRangeCount = static_cast<u32>(pushConstantRanges2D.size()),
+            .pPushConstantRanges = pushConstantRanges2D.data()
         };
         if(vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo2D, nullptr, &pipelineLayout2D) != VK_SUCCESS) {
             vkDestroyShaderModule(mDevice, shaderMod2D, nullptr);
@@ -1542,15 +1562,12 @@ namespace mars {
                 .size = sizeof(glm::mat4)
             }
         };
-        const VkDescriptorSetLayout descriptorSetLayouts3D[] = {
-            pushSetLayout
-        };
         const VkPipelineLayoutCreateInfo pipelineLayoutInfo3D = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
-            .setLayoutCount = 1,
-            .pSetLayouts = descriptorSetLayouts3D,
+            .setLayoutCount = static_cast<u32>(mDescriptorSetLayouts.size()),
+            .pSetLayouts = mDescriptorSetLayouts.data(),
             .pushConstantRangeCount = 1,
             .pPushConstantRanges = pushConstantRanges3D
         };
@@ -2003,6 +2020,8 @@ namespace mars {
         TRY(r.createDepthImages());
         TRY(r.createSyncObjects());
         TRY(r.createDescriptorSetLayouts());
+        TRY(r.createDescriptorPool());
+        TRY(r.allocateDescriptorSets());
         TRY(r.createGraphicsPipeline());
         TRY(r.createCamera());
         if(!SDL_ShowWindow(r.window)) {
@@ -2030,7 +2049,12 @@ namespace mars {
             }
             cube.buffer.destroy(mDevice);
             entityManager.sysMesh->destroySystem(mDevice);
-            vkDestroyDescriptorSetLayout(mDevice, pushSetLayout, nullptr);
+            for (VkDescriptorSetLayout& setLayout : mDescriptorSetLayouts) {
+                vkDestroyDescriptorSetLayout(mDevice, setLayout, nullptr);
+            }
+            //vkFreeDescriptorSets(mDevice, mDescriptorPool, mDescriptorSets.size(), mDescriptorSets.data());
+            vkResetDescriptorPool(mDevice, mDescriptorPool, 0);
+            vkDestroyDescriptorPool(mDevice, mDescriptorPool, nullptr);
             for(VkSemaphore semaphore : semaphores) {
                 vkDestroySemaphore(mDevice, semaphore, nullptr);
             }
