@@ -20,7 +20,7 @@ ParameterBlock<Global> global;
 ParameterBlock<Instance> instance;
 
 [shader("vertex")]
-func vertMain(VertexIn input, uniform float4x4 model) -> VertexOut {
+VertexOut vertMain(VertexIn input, uniform float4x4 model) {
     VertexOut output;
     output.position = mul(global.camera, mul(model, float4(input.position, 1.0f)));
     output.texCoord = input.texCoord;
@@ -28,6 +28,6 @@ func vertMain(VertexIn input, uniform float4x4 model) -> VertexOut {
 }
 
 [shader("fragment")]
-func fragMain(VertexOut input) -> float4 {
+float4 fragMain(VertexOut input) : SV_Target {
     return instance.texture.Sample(input.texCoord);
 }

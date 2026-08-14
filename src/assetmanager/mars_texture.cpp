@@ -39,8 +39,8 @@ namespace mars {
                 TRY_ASSIGN(sprite.uvBuffer, UniformBuffer<glm::vec2>::make(Renderer::device(), Renderer::physicalDevice(), 4 * sizeof(glm::vec2), VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT));
                 sprite.uvBuffer.mappedMemory[0] = {sprite.uMin, sprite.vMin};
                 sprite.uvBuffer.mappedMemory[1] = {sprite.uMax, sprite.vMin};
-                sprite.uvBuffer.mappedMemory[2] = {sprite.uMin, sprite.vMax};
-                sprite.uvBuffer.mappedMemory[3] = {sprite.uMax, sprite.vMax};
+                sprite.uvBuffer.mappedMemory[2] = {sprite.uMax, sprite.vMax};
+                sprite.uvBuffer.mappedMemory[3] = {sprite.uMin, sprite.vMax};
             }
         }
         return Slice<const Sprite>(mSprites);

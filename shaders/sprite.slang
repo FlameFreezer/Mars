@@ -28,7 +28,7 @@ ParameterBlock<Global> global;
 ParameterBlock<Instance> instance;
 
 [shader("vertex")]
-func vertMain(int vertexID: SV_VulkanVertexID, uniform float4x4 transform)->VertexOut {
+VertexOut vertMain(int vertexID: SV_VulkanVertexID, uniform float4x4 transform) {
     VertexOut output;
     output.position = mul(global.camera, mul(transform, float4(vertices[indices[vertexID]], 0.0, 1.0)));
     output.texCoord = instance.textureCoords[indices[vertexID]];
@@ -36,6 +36,6 @@ func vertMain(int vertexID: SV_VulkanVertexID, uniform float4x4 transform)->Vert
 }
 
 [shader("fragment")]
-func fragMain(VertexOut input)->float4 {
+float4 fragMain(VertexOut input) : SV_Target {
     return instance.texture.Sample(input.texCoord);
 }
