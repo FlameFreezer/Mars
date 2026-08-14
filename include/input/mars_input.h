@@ -340,6 +340,10 @@ namespace mars {
 			mActionBuffers[mapping.bufferIndex].isActive = false;
             return result;
         }
+        Input(const Input&) = delete;
+        Input(Input&&) = delete;
+        Input& operator=(const Input&) = delete;
+        Input& operator=(Input&&) = delete;
     private:
         std::vector<Mapping> mMappings{};
         bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
@@ -380,8 +384,6 @@ namespace mars {
             if (mPrevKeyState) delete[] mPrevKeyState;
             if (mCurrentKeyState) delete[] mCurrentKeyState;
         }
-        Input(const Input& other) = delete;
-        Input(Input&& other) = delete;
         bool isMappingValid(ActionIndex action) const noexcept {
             return mMappings.size() > std::to_underlying(action) and mMappings[std::to_underlying(action)].isValid;
         }

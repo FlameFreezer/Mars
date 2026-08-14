@@ -11,14 +11,13 @@
 
 namespace mars {
     class EntityComponentSystem {
-        std::queue<ID> mIDs;
-        Signature mSignatures[maxEntities];
-        ComponentSystemParent* mComponentSystems[numComponents];
-        EntityComponentSystem() noexcept;
 	public:
         ~EntityComponentSystem() noexcept;
         EntityComponentSystem(const EntityComponentSystem&) = delete;
         EntityComponentSystem(EntityComponentSystem&&) = delete;
+        EntityComponentSystem& operator=(const EntityComponentSystem&) = delete;
+        EntityComponentSystem& operator=(EntityComponentSystem&&) = delete;
+
         static EntityComponentSystem& get() noexcept;
         Error<Entity> createEntity(Signature s) noexcept;
         void destroyEntity(Entity e) noexcept;
@@ -38,6 +37,11 @@ namespace mars {
             mComponentSystems[std::to_underlying(c)] = new ComponentSystem<typename GetComp<c>::Type>();
             mComponentSystems[std::to_underlying(c)]->reserve(nullID);
         }
+    private:
+        std::queue<ID> mIDs;
+        Signature mSignatures[maxEntities];
+        ComponentSystemParent* mComponentSystems[numComponents];
+        EntityComponentSystem() noexcept;
     };
     using ECS = EntityComponentSystem;
 }

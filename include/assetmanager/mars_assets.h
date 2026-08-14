@@ -13,6 +13,10 @@ namespace mars {
     public:
         static Assets& get() noexcept;
         static Error<std::shared_ptr<Texture>> getTexture(std::string_view path) noexcept;
+        Assets& operator=(const Assets&) = delete;
+        Assets& operator=(Assets&&) = delete;
+        Assets(const Assets&) = delete;
+        Assets(Assets&&) = delete;
     private:
         Assets() = default;
         static std::mutex mutex;

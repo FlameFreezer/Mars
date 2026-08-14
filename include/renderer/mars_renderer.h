@@ -164,6 +164,11 @@ namespace mars {
         const mars::Camera2D* getMainCamera2D() const noexcept;
 
         void setMainCamera2D(const mars::Camera2D& camera2D) noexcept;
+
+        Renderer(const Renderer&) = delete;
+        Renderer(Renderer&&) = delete;
+        Renderer& operator=(const Renderer&) = delete;
+        Renderer& operator=(Renderer&&) = delete;
     private:
         Renderer() = default;
         static std::mutex mutex;
