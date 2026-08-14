@@ -17,9 +17,6 @@ set(SDL_SHARED True)
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 
-option(MARS_DEBUG_ALL "Have all systems output debug info" false)
-option(MARS_DEBUG_INPUT "Have input systems output debug info" false)
-
 if(NOT DEFINED ${MARS_ECS_MAX_ENTITIES})
     set(MARS_ECS_MAX_ENTITIES 512)
 endif()
@@ -33,7 +30,7 @@ endif()
 # Shader Compilation
 set(MARS_SHADER_PATH "${PROJECT_SOURCE_DIR}/shaders")
 add_custom_command(OUTPUT shader2d.spv
-    COMMAND slangc "${MARS_SHADER_PATH}/shader2d.slang" 
+    COMMAND slangc ${MARS_SHADER_PATH}/shader2d.slang 
         -target spirv 
         -profile spirv_1_4 
         -emit-spirv-directly 
@@ -41,14 +38,13 @@ add_custom_command(OUTPUT shader2d.spv
         -entry vertMain 
         -entry fragMain 
         -o shader2d.spv
-    DEPENDS "${MARS_SHADER_PATH}/shader2d.slang"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
+    DEPENDS ${MARS_SHADER_PATH}/shader2d.slang
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIGURATION>
     COMMENT "Compiling 2D shaders"
-    CODEGEN
     VERBATIM
 )
 add_custom_command(OUTPUT shader3d.spv
-    COMMAND slangc "${MARS_SHADER_PATH}/shader3d.slang" 
+    COMMAND slangc ${MARS_SHADER_PATH}/shader3d.slang 
         -target spirv 
         -profile spirv_1_4 
         -emit-spirv-directly 
@@ -56,14 +52,13 @@ add_custom_command(OUTPUT shader3d.spv
         -entry vertMain 
         -entry fragMain 
         -o shader3d.spv
-    DEPENDS "${MARS_SHADER_PATH}/shader3d.slang"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
+    DEPENDS ${MARS_SHADER_PATH}/shader3d.slang
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIGURATION>
     COMMENT "Compiling 3D shaders"
-    CODEGEN
     VERBATIM
 )
 add_custom_command(OUTPUT sprite.spv
-    COMMAND slangc "${MARS_SHADER_PATH}/sprite.slang"
+    COMMAND slangc ${MARS_SHADER_PATH}/sprite.slang
         -target spirv
         -profile spirv_1_4
         -emit-spirv-directly
@@ -71,10 +66,9 @@ add_custom_command(OUTPUT sprite.spv
         -entry vertMain
         -entry fragMain
         -o sprite.spv
-    DEPENDS "${MARS_SHADER_PATH}/sprite.slang"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
+    DEPENDS ${MARS_SHADER_PATH}/sprite.slang
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIGURATION>
     COMMENT "Compiling sprite shader"
-    CODEGEN
     VERBATIM
 )
 
@@ -95,15 +89,6 @@ target_compile_definitions(Mars PUBLIC
 	MARS_RENDERER_MAX_MESHES=${MARS_RENDERER_MAX_MESHES}
 	MARS_RENDERER_MAX_TEXTURES=${MARS_RENDERER_MAX_TEXTURES}
 )
-
-macro(mars_pass_debug_flag debug_flag)
-    if(${debug_flag})
-        target_compile_definitions(Mars PUBLIC ${debug_flag}=${${debug_flag}})
-    endif()
-endmacro()
-
-mars_pass_debug_flag(MARS_DEBUG_ALL)
-mars_pass_debug_flag(MARS_DEBUG_INPUT)
 
 # Link libraries to mars
 target_link_libraries(Mars PRIVATE SDL3::SDL3 glm::glm)

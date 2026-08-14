@@ -1496,7 +1496,16 @@ namespace mars {
 
         const VkVertexInputBindingDescription desc = Vertex::getInputBindingDescription();
         const auto attributeDescs = Vertex::getInputAttributeDescriptions();
-        const VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = {
+        const VkPipelineVertexInputStateCreateInfo vertexInputStateInfo2D = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .vertexBindingDescriptionCount = 0,
+            .pVertexBindingDescriptions = nullptr,
+            .vertexAttributeDescriptionCount = 0,
+            .pVertexAttributeDescriptions = nullptr
+        };
+        const VkPipelineVertexInputStateCreateInfo vertexInputStateInfo3D = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
@@ -1661,7 +1670,7 @@ namespace mars {
             .flags = 0,
             .stageCount = shaderStageInfos2D.max_size(),
             .pStages = shaderStageInfos2D.data(),
-            .pVertexInputState = &vertexInputStateInfo,
+            .pVertexInputState = &vertexInputStateInfo2D,
             .pInputAssemblyState = &inputAssemblyInfo,
             .pTessellationState = nullptr,
             .pViewportState = nullptr,
@@ -1680,6 +1689,7 @@ namespace mars {
         graphicsPipelineInfos[1] = graphicsPipelineInfos[0];
         graphicsPipelineInfos[1].stageCount = shaderStageInfos3D.max_size();
         graphicsPipelineInfos[1].pStages = shaderStageInfos3D.data();
+        graphicsPipelineInfos[1].pVertexInputState = &vertexInputStateInfo3D;
         graphicsPipelineInfos[1].layout = pipelineLayout3D;
         if(vkCreateGraphicsPipelines(mDevice, nullptr, graphicsPipelineInfos.max_size(), graphicsPipelineInfos.data(), nullptr, graphicsPipelines.data()) != VK_SUCCESS) {
             vkDestroyShaderModule(mDevice, shaderMod2D, nullptr);
