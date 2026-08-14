@@ -33,8 +33,8 @@ namespace mars {
         glm::vec2 scale = glm::vec2(1.0f);
         float angle = 0;
         float zLayer = 0;
-        ID meshID = 0;
         std::shared_ptr<Texture> texture;
+        u64 spriteIndex = 0;
     };
     struct Physics {
         static constexpr Component component = Component::physics;

@@ -1319,15 +1319,17 @@ namespace mars {
         const ComponentSystem<Draw>& sysDraw = ECS::get().system<Draw::component>();
         for (u64 i = 1; i < sysDraw.size(); i++) {
             // Update and bind the texture
+            const Texture& texture = *sysDraw.textures()[i];
+            const Sprite& sprite = texture.sprites()[sysDraw.spriteIndices()[i]];
             const VkDescriptorImageInfo materialInfo = {
                 .sampler = sampler,
-                .imageView = sysDraw.textures()[i]->image().view,
+                .imageView = texture.image().view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
             const VkDescriptorBufferInfo bufferInfo = {
-                .buffer = sysDraw.textures()[i]->sprites()[0].uvBuffer.buffer.handle,
+                .buffer = sprite.uvBuffer.buffer.handle,
                 .offset = 0,
-                .range = sysDraw.textures()[i]->sprites()[0].uvBuffer.buffer.size
+                .range = sprite.uvBuffer.buffer.size
             };
             std::array<VkWriteDescriptorSet, 2> writeDescriptorSets = {
                 VkWriteDescriptorSet{
@@ -2065,7 +2067,7 @@ namespace mars {
         return instance;
     }
 
-    Error<Renderer&> Renderer::init(const std::string& name, ID& squareID) noexcept {
+    Error<Renderer&> Renderer::init(const std::string& name) noexcept {
         Renderer& r = Renderer::get();
         r.flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
 
@@ -2102,14 +2104,6 @@ namespace mars {
             FATAL("Failed to show window");
         }
 
-        //Create square mesh
-        Error<ID> sq = r.makeMesh(Square::vertices, Square::indices);
-        if(!sq.okay()) {
-            PROPAGATE_ERROR(sq);
-        }
-        //Give ID number of square mesh back to the game
-        else squareID = sq.value();
-
         r.currentFrame = 0;
         return r;
     }
@@ -2122,7 +2116,6 @@ namespace mars {
                 vkDestroyImageView(mDevice, view, nullptr);
             }
             cube.buffer.destroy(mDevice);
-            entityManager.sysMesh->destroySystem(mDevice);
             vkDestroyDescriptorSetLayout(mDevice, mGlobalLayout2D, nullptr);
             vkDestroyDescriptorSetLayout(mDevice, mGlobalLayout3D, nullptr);
             vkDestroyDescriptorSetLayout(mDevice, mPushLayout2D, nullptr);
@@ -2185,69 +2178,6 @@ namespace mars {
 		mCamera3D.mappedMemory[currentFrame] = proj * view;
 
         return drawFrame(camera.fov, aspect);
-    }
-
-    Error<ID> Renderer::makeMesh(Slice<const Vertex> vertices, Slice<const u32> indices) noexcept {
-        const VkDeviceSize verticesSize = vertices.size() * sizeof(Vertex);
-        const VkDeviceSize indicesSize = indices.size() * sizeof(u32);
-        const VkDeviceSize size = verticesSize + indicesSize;
-        //Initialize destination buffer
-        Error<GPUBuffer> buffer = GPUBuffer::make(mDevice, mPhysicalDevice, size, 
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        if (!buffer.okay()) {
-            APPEND_SOURCE_INFO(buffer);
-            return MOVE_ERROR(buffer);
-        }
-        GPUBuffer vertexBuffer = buffer.moveValue();
-        
-        //Initialize transfer buffer
-        buffer = GPUBuffer::make(mDevice, mPhysicalDevice, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        if(!buffer.okay()) {
-            APPEND_SOURCE_INFO(buffer);
-            vertexBuffer.destroy(mDevice);
-            return MOVE_ERROR(buffer);
-        }
-        GPUBuffer transferBuffer = buffer.moveValue();
-
-        //Copy vertex and index data to transfer buffer
-        void* memory;
-        if(vkMapMemory(mDevice, transferBuffer.memory, 0, verticesSize, 0, &memory) != VK_SUCCESS) {
-            vertexBuffer.destroy(mDevice);
-            transferBuffer.destroy(mDevice);
-            FATAL("Failed to map mDevice memory");
-        }
-        std::memcpy(memory, reinterpret_cast<const void*>(vertices.data()), verticesSize);
-        vkUnmapMemory(mDevice, transferBuffer.memory);
-
-        if(vkMapMemory(mDevice, transferBuffer.memory, verticesSize, indicesSize, 0, &memory) != VK_SUCCESS) {
-            vertexBuffer.destroy(mDevice);
-            transferBuffer.destroy(mDevice);
-            FATAL("Failed to map mDevice memory");
-        }
-        std::memcpy(memory, reinterpret_cast<const void*>(indices.data()), indicesSize);
-        vkUnmapMemory(mDevice, transferBuffer.memory);
-
-        if(!(flags & rendererFlags::beganTransferOps)) {
-            Error<noreturn> res = beginTransferOps();
-            if(!res.okay()) {
-                APPEND_SOURCE_INFO(res);
-                vertexBuffer.destroy(mDevice);
-                transferBuffer.destroy(mDevice);
-                return MOVE_ERROR(res);
-            }
-        }
-
-        const VkBufferCopy region = {
-            .srcOffset = 0, 
-            .dstOffset = 0, 
-            .size = size
-        };
-        vkCmdCopyBuffer(transferCommandBuffers[currentFrame], transferBuffer.handle, vertexBuffer.handle, 1, &region);
-        transferBuffers.push(transferBuffer);
-
-        return entityManager.insertMesh(vertexBuffer.handle, vertexBuffer.memory, verticesSize, indicesSize / sizeof(u32));
     }
 
     Error<GPUImage> Renderer::loadTexture(std::string_view texturePath) noexcept {

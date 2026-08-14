@@ -203,8 +203,8 @@ namespace mars {
         glm::vec2& scale;
         float& angle;
         float& zLayer;
-        ID& meshID;
         std::shared_ptr<Texture>& texture;
+        u64& spriteIndex;
     };
     template<>
     class ComponentSystem<Draw> : public ComponentSystemParent {
@@ -212,8 +212,8 @@ namespace mars {
         glm::vec2 mScales[maxEntities];
         float mAngles[maxEntities];
         float mZLayers[maxEntities];
-        ID mMeshIDs[maxEntities];
         std::shared_ptr<Texture> mTextures[maxEntities];
+        u64 mSpriteIndices[maxEntities];
         public:
         DrawProxy operator[](ID id) noexcept {
             return {
@@ -221,8 +221,8 @@ namespace mars {
                 mScales[index(id)],
                 mAngles[index(id)],
                 mZLayers[index(id)],
-                mMeshIDs[index(id)],
                 mTextures[index(id)],
+                mSpriteIndices[index(id)]
             };
         }
         glm::vec2& position(ID id) noexcept {
@@ -249,17 +249,17 @@ namespace mars {
         const float& zLayer(ID id) const noexcept {
             return mZLayers[index(id)];
         }
-        ID& meshID(ID id) noexcept {
-            return mMeshIDs[index(id)];
-        }
-        const ID& meshID(ID id) const noexcept {
-            return mMeshIDs[index(id)];
-        } 
         std::shared_ptr<Texture>& texture(ID id) noexcept {
             return mTextures[index(id)];
         }
         const std::shared_ptr<Texture>& texture(ID id) const noexcept {
             return mTextures[index(id)];
+        }
+        u64& spriteIndex(ID id) noexcept {
+            return mSpriteIndices[index(id)];
+        }
+        const u64& spriteIndex(ID id) const noexcept {
+            return mSpriteIndices[index(id)];
         }
         glm::vec2* positions() noexcept {
             return mPositions;
@@ -279,17 +279,17 @@ namespace mars {
         const float* zLayers() const noexcept {
             return mZLayers;
         }
-        ID* meshIDs() noexcept {
-            return mMeshIDs;
-        }
-        const ID* meshIDs() const noexcept {
-            return mMeshIDs;
-        }
         std::shared_ptr<Texture>* textures() noexcept {
             return mTextures;
         }
         const std::shared_ptr<Texture>* textures() const noexcept {
             return mTextures;
+        }
+        u64* spriteIndices() noexcept {
+            return mSpriteIndices;
+        }
+        const u64* spriteIndices() const noexcept {
+            return mSpriteIndices;
         }
 
         void erase(ID id) noexcept {
@@ -301,8 +301,8 @@ namespace mars {
             mScales[index] = mScales[mSize];
             mAngles[index] = mAngles[mSize];
             mZLayers[index] = mZLayers[mSize];
-            mMeshIDs[index] = mMeshIDs[mSize];
             mTextures[index] = mTextures[mSize];
+            mSpriteIndices[index] = mSpriteIndices[mSize];
             swapErase(id);
         }
         class PositionIterator {

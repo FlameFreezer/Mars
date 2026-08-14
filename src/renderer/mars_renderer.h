@@ -16,7 +16,6 @@
 #include "mars_renderer_flags.h"
 #include "mars_renderer_gpubuffer.h"
 #include "mars_renderer_gpuimage.h"
-#include "mars_renderer_ecs.h"
 #include "error.h"
 #include "mars_heaparray.h"
 #include "mars_types.h"
@@ -150,15 +149,13 @@ namespace mars {
 
         rendererFlags::FlagT flags = 0;
 
-        static Error<Renderer&> init(const std::string& name, ID& squareID) noexcept; 
+        static Error<Renderer&> init(const std::string& name) noexcept; 
         //Destructor
         ~Renderer() noexcept; 
 
         void destroy() noexcept;
 
         Error<noreturn> draw(const Camera& camera) noexcept; 
-
-        Error<ID> makeMesh(Slice<const Vertex> vertices, Slice<const u32> indices) noexcept; 
 
         Error<GPUImage> loadTexture(std::string_view texturePath) noexcept;
 
@@ -171,7 +168,6 @@ namespace mars {
         Renderer() = default;
         static std::mutex mutex;
 
-        RendererEntityManager entityManager;
         Cube cube;
 
         UniformBuffer<glm::mat4> mCamera2D;
