@@ -5,9 +5,9 @@
 
 #include <glm/glm.hpp>
 
-#include "mars_texture.h"
-#include "mars_types.h"
-#include "mars_room.h"
+#include <assetmanager/mars_texture.h>
+#include <mars_types.h>
+#include <mars_room.h>
 
 namespace mars {
     using ComponentT = u8;

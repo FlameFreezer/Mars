@@ -1,20 +1,20 @@
 #pragma once
 
 #include "mars_types.h"
-#include "mars_camera.h"
-#include "mars_camera2D.h"
-#include "mars_renderer.h"
+#include "camera/mars_camera.h"
+#include "camera/mars_camera2D.h"
+#include "renderer/mars_renderer.h"
 #include "mars_heaparray.h"
-#include "mars_ecs.h"
+#include "ecs/mars_ecs.h"
 #include "mars_room.h"
 #include "mars_time.h"
-#include "mars_timer.h"
-#include "mars_input.h"
+#include "timer/mars_timer.h"
+#include "input/mars_input.h"
 #include "mars_global.h"
 #include "jsonparser.h"
 #include "mars_event.h"
-#include "mars_assets.h"
-#include "mars_texture.h"
+#include "assetmanager/mars_assets.h"
+#include "assetmanager/mars_texture.h"
 #include "error.h"
 
 namespace mars {

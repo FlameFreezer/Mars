@@ -6,12 +6,12 @@ struct Fields {
 
 	template<size_t fieldNum>
 	auto& get() noexcept {
-		return others.get<fieldNum - 1>();
+		return others.template get<fieldNum - 1>();
 	}
 
 	template<size_t fieldNum>
 	const auto& get() const noexcept {
-		return others.get<fieldNum - 1>();
+		return others.template get<fieldNum - 1>();
 	}
 
 	template<>
@@ -27,7 +27,7 @@ struct Fields {
 
 //Fields subobject with only one field
 template<size_t size, class T>
-struct Fields<size, T> noexcept {
+struct Fields<size, T> {
 	T field[size];
 	template<size_t fieldNum>
 	auto& get() = delete;
@@ -47,18 +47,18 @@ struct Fields<size, T> noexcept {
 };
 
 template<size_t size, class... Types>
-class Multiarray {
+class MultiArray {
 	Fields<size, Types...> mFields;
 
 public:
 	template<size_t fieldNum>
 	auto& get() noexcept {
-		return mFields.get<fieldNum>();
+		return mFields.template get<fieldNum>();
 	}
 
 	template<size_t fieldNum>
 	const auto& get() const noexcept {
-		return mFields.get<fieldNum>();
+		return mFields.template get<fieldNum>();
 	}
 
 	size_t capacity() const noexcept {

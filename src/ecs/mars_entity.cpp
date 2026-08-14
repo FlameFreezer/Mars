@@ -1,7 +1,4 @@
-#include "mars_entity.h"
-
-#include "mars_types.h"
-#include "mars_signature.h"
+#include <ecs/mars_entity.h>
 
 namespace mars {
     ID Entity::id() const noexcept {

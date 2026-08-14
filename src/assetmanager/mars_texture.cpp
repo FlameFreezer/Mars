@@ -1,7 +1,8 @@
-#include "mars_renderer_gpubuffer.h"
+#include <assetmanager/mars_texture.h>
+
 #include <format>
-#include <mars_renderer.h>
-#include <mars_texture.h>
+
+#include <renderer/mars_renderer.h>
 
 namespace mars {
     Texture::Texture(GPUImage&& image) noexcept : mImage(std::move(image)) {

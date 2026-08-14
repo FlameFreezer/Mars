@@ -14,13 +14,13 @@
 #include <glm/glm.hpp>
 
 #include "mars_renderer_flags.h"
-#include "mars_renderer_gpubuffer.h"
-#include "mars_renderer_gpuimage.h"
+#include "mars_gpubuffer.h"
+#include "mars_gpuimage.h"
 #include "error.h"
 #include "mars_heaparray.h"
 #include "mars_types.h"
-#include "mars_camera.h"
-#include "mars_camera2D.h"
+#include <camera/mars_camera.h>
+#include <camera/mars_camera2D.h>
 
 inline constexpr u32 maxConcurrentFrames = 2;
 

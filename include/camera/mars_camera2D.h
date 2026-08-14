@@ -2,8 +2,8 @@
 
 #include <glm/glm.hpp>
 
-#include "error.h"
-#include "jsonparser.h"
+#include <error.h>
+#include <jsonparser.h>
 
 namespace mars {
 	class Camera2D {

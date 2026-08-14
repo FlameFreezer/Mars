@@ -4,7 +4,7 @@
 #include <chrono>
 #include <mutex>
 
-#include "mars_types.h"
+#include <mars_types.h>
 
 namespace mars {
     enum class TimerStatus : u8 {

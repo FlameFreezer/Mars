@@ -1,4 +1,5 @@
-#include "mars_camera.h"
+#include <camera/mars_camera.h>
+#include <mars_math.h>
 
 #include <format>
 

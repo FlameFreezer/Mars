@@ -1,8 +1,6 @@
-#include "mars_signature.h"
+#include <ecs/mars_signature.h>
 
 #include <utility>
-
-#include "mars_components.h"
 
 namespace mars {
 

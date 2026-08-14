@@ -1,11 +1,12 @@
 #pragma once
 
-#include <mars_renderer_gpuimage.h>
-#include "glm/ext/vector_float2.hpp"
-#include "mars_renderer_gpubuffer.h"
-#include "mars_types.h"
-#include "error.h"
-#include "mars_heaparray.h"
+#include <glm/glm.hpp>
+
+#include <renderer/mars_gpuimage.h>
+#include <renderer/mars_gpubuffer.h>
+#include <mars_types.h>
+#include <error.h>
+#include <mars_heaparray.h>
 
 namespace mars {
     struct Sprite {

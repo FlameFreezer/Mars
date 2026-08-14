@@ -1,5 +1,5 @@
-#include <mars_camera2D.h>
-#include <mars_ecs.h>
+#include <camera/mars_camera2D.h>
+#include <ecs/mars_ecs.h>
 #include <mars_global.h>
 #include <mars_math.h>
 

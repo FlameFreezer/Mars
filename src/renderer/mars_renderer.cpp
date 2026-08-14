@@ -1,8 +1,8 @@
-#include "mars_renderer.h"
-#include "mars_renderer_flags.h"
-#include "mars_renderer_gpubuffer.h"
+#include <renderer/mars_renderer.h>
+#include <renderer/mars_renderer_flags.h>
+#include <renderer/mars_gpubuffer.h>
 #include <mars_global.h>
-#include "mars_ecs.h"
+#include <ecs/mars_ecs.h>
 
 #include <fstream>
 #include <print>
@@ -2003,9 +2003,9 @@ namespace mars {
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
             .pNext = nullptr,
             .pApplicationName = appName.data(),
-            .applicationVersion = 1,
-            .pEngineName = nullptr,
-            .engineVersion = 0,
+            .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+            .pEngineName = "Mars",
+            .engineVersion = VK_MAKE_VERSION(1, 0, 0),
             .apiVersion = VK_MAKE_API_VERSION(1, 4, 0, 0)
         };
         VkInstanceCreateInfo instanceInfo = {

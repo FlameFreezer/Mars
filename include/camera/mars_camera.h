@@ -4,9 +4,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "error.h"
-#include "jsonparser.h"
-#include "mars_math.h"
+#include <error.h>
+#include <jsonparser.h>
 
 namespace mars {
     struct Camera {

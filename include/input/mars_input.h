@@ -10,12 +10,11 @@
 
 #include <SDL3/SDL.h>
 
-#include "error.h"
-#include "mars_types.h"
-#include "mars_heaparray.h"
-#include "jsonparser.h"
-#include "mars_timer.h"
-#include "mars_debug.h"
+#include <error.h>
+#include <mars_types.h>
+#include <mars_heaparray.h>
+#include <jsonparser.h>
+#include <timer/mars_timer.h>
 
 static std::unordered_map<std::string, SDL_Scancode> initScancodeMap() noexcept {
     std::unordered_map<std::string, SDL_Scancode> map;
@@ -78,50 +77,6 @@ namespace mars {
 
     template<class ActionIndex>
     class Input {
-        std::vector<Mapping> mMappings{};
-        bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
-        bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
-        i16 mPrevAxisState[SDL_GAMEPAD_AXIS_COUNT] = { 0 };
-        i16 mAxisState[SDL_GAMEPAD_AXIS_COUNT] = { 0 };
-        float mMouseX{};
-        float mMouseY{};
-        float mMouseDx{};
-        float mMouseDy{};
-        SDL_Gamepad* mGamepad = nullptr;
-        bool* mPrevKeyState = nullptr;
-        bool* mCurrentKeyState = nullptr;
-        const bool* mKeyState = nullptr;
-        int mNumKeys = 0;
-        std::vector<ActionBuffer<ActionIndex>> mActionBuffers{};
-
-		const std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
-		const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
-		const std::unordered_map<std::string, SDL_GamepadAxis> strToAxis = initAxisMap();
-
-        Input() noexcept {
-            int numGamepads;
-            SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
-            if(numGamepads != 0) {
-                mGamepad = SDL_OpenGamepad(gamepads[0]);
-            }
-            mKeyState = SDL_GetKeyboardState(&mNumKeys);
-            mCurrentKeyState = new bool[mNumKeys];
-            mPrevKeyState = new bool[mNumKeys];
-            for(int i = 0; i < mNumKeys; i++) mPrevKeyState[i] = false;
-            std::memcpy(mCurrentKeyState, mKeyState, mNumKeys);
-        }
-        ~Input() noexcept {
-            if(mGamepad != nullptr and SDL_GamepadConnected(mGamepad)) {
-                SDL_CloseGamepad(mGamepad);
-            }
-            if (mPrevKeyState) delete[] mPrevKeyState;
-            if (mCurrentKeyState) delete[] mCurrentKeyState;
-        }
-        Input(const Input& other) = delete;
-        Input(Input&& other) = delete;
-        bool isMappingValid(ActionIndex action) const noexcept {
-            return mMappings.size() > std::to_underlying(action) and mMappings[std::to_underlying(action)].isValid;
-        }
         public:
         static Input& get() noexcept {
             static Input instance;
@@ -258,7 +213,6 @@ namespace mars {
             for (ActionBuffer<ActionIndex>& buffer : mActionBuffers) {
                 if (isActionJustPressed(buffer.action)) {
                     buffer.isActive = true;
-                    debug::inputLog(std::format("Action {} was buffered", std::to_underlying(buffer.action)));
                     // If no waitTime was specified (or it was specified to zero), the action's
                     //    buffer is held until it is next consumed
                     if (buffer.timer.waitTime() != 0.0f) {
@@ -386,5 +340,51 @@ namespace mars {
 			mActionBuffers[mapping.bufferIndex].isActive = false;
             return result;
         }
+    private:
+        std::vector<Mapping> mMappings{};
+        bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
+        bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
+        i16 mPrevAxisState[SDL_GAMEPAD_AXIS_COUNT] = { 0 };
+        i16 mAxisState[SDL_GAMEPAD_AXIS_COUNT] = { 0 };
+        float mMouseX{};
+        float mMouseY{};
+        float mMouseDx{};
+        float mMouseDy{};
+        SDL_Gamepad* mGamepad = nullptr;
+        bool* mPrevKeyState = nullptr;
+        bool* mCurrentKeyState = nullptr;
+        const bool* mKeyState = nullptr;
+        int mNumKeys = 0;
+        std::vector<ActionBuffer<ActionIndex>> mActionBuffers{};
+
+		const std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
+		const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
+		const std::unordered_map<std::string, SDL_GamepadAxis> strToAxis = initAxisMap();
+
+        Input() noexcept {
+            int numGamepads;
+            SDL_JoystickID* gamepads = SDL_GetGamepads(&numGamepads);
+            if(numGamepads != 0) {
+                mGamepad = SDL_OpenGamepad(gamepads[0]);
+            }
+            mKeyState = SDL_GetKeyboardState(&mNumKeys);
+            mCurrentKeyState = new bool[mNumKeys];
+            mPrevKeyState = new bool[mNumKeys];
+            for(int i = 0; i < mNumKeys; i++) mPrevKeyState[i] = false;
+            std::memcpy(mCurrentKeyState, mKeyState, mNumKeys);
+        }
+        ~Input() noexcept {
+            if(mGamepad != nullptr and SDL_GamepadConnected(mGamepad)) {
+                SDL_CloseGamepad(mGamepad);
+            }
+            if (mPrevKeyState) delete[] mPrevKeyState;
+            if (mCurrentKeyState) delete[] mCurrentKeyState;
+        }
+        Input(const Input& other) = delete;
+        Input(Input&& other) = delete;
+        bool isMappingValid(ActionIndex action) const noexcept {
+            return mMappings.size() > std::to_underlying(action) and mMappings[std::to_underlying(action)].isValid;
+        }
+
     };
 }

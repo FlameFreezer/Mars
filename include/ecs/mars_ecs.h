@@ -5,8 +5,8 @@
 
 #include "mars_entity.h"
 #include "mars_signature.h"
-#include "mars_types.h"
-#include "error.h"
+#include <mars_types.h>
+#include <error.h>
 #include "mars_component_system.h"
 
 namespace mars {

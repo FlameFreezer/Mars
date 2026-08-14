@@ -80,6 +80,6 @@ namespace mars {
             return mObservers.size();
         }
     private:
-        Swaparray<IObserver<Args...>*> mObservers;
+        SwapArray<IObserver<Args...>*> mObservers;
     };
 }

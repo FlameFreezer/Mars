@@ -1,12 +1,8 @@
-#include "mars_ecs.h"
+#include <ecs/mars_ecs.h>
 
-#include "mars_types.h"
-#include "mars_constants.h"
-#include "error.h"
-#include "mars_signature.h"
-#include "mars_entity.h"
-
-#include "mars_components.h"
+#include <mars_types.h>
+#include <mars_constants.h>
+#include <error.h>
 
 namespace mars {
     template<ComponentT c>

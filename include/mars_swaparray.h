@@ -7,10 +7,10 @@
 
 namespace mars {
     template<class T>
-    class Swaparray {
+    class SwapArray {
     public:
-        Swaparray() noexcept : mSize(0), mCapacity(mInitialCapacity), mData(new T[mInitialCapacity]) {}
-        Swaparray(const Swaparray& other) noexcept : mSize(other.mSize), mCapacity(other.mCapacity), mData(nullptr) {
+        SwapArray() noexcept : mSize(0), mCapacity(mInitialCapacity), mData(new T[mInitialCapacity]) {}
+        SwapArray(const SwapArray& other) noexcept : mSize(other.mSize), mCapacity(other.mCapacity), mData(nullptr) {
             if (other.mData) {
                 mData = new T[mCapacity];
             }
@@ -18,17 +18,17 @@ namespace mars {
                 mData[i] = other.mData[i];
             }
         }
-        Swaparray(Swaparray&& other) noexcept : mSize(other.mSize), mCapacity(other.mCapacity), mData(other.mData) {
+        SwapArray(SwapArray&& other) noexcept : mSize(other.mSize), mCapacity(other.mCapacity), mData(other.mData) {
             other.mData = nullptr;
             other.mSize = 0;
             other.mCapacity = 0;
         }
-        ~Swaparray() noexcept {
+        ~SwapArray() noexcept {
             if (mData) {
                 delete[] mData;
             }
         }
-        Swaparray& operator=(const Swaparray& other) noexcept {
+        SwapArray& operator=(const SwapArray& other) noexcept {
             if (mData) {
                 delete[] mData;
             }
@@ -40,7 +40,7 @@ namespace mars {
             }
             return *this; 
         }
-        Swaparray& operator=(Swaparray&& other) noexcept {
+        SwapArray& operator=(SwapArray&& other) noexcept {
             if (mData) {
                 delete[] mData;
             }

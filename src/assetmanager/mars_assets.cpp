@@ -1,8 +1,8 @@
-#include <mars_assets.h>
+#include <assetmanager/mars_assets.h>
 
 #include <mutex>
 
-#include <mars_renderer.h>
+#include <renderer/mars_renderer.h>
 
 std::mutex mars::Assets::mutex{};
 

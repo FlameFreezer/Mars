@@ -3,10 +3,10 @@
 #include <glm/glm.hpp>
 #include <memory>
 
-#include "mars_constants.h"
+#include <mars_constants.h>
 #include "mars_entity.h"
-#include "mars_texture.h"
-#include "mars_types.h"
+#include <assetmanager/mars_texture.h>
+#include <mars_types.h>
 
 namespace mars {
     //Abstract parent class for component systems - to automate initialization and deinitialization
