@@ -35,7 +35,7 @@ namespace mars {
                 sprite.uMax = (j + 1) * spriteWidth / static_cast<float>(mImage.width);
                 sprite.vMin = i * spriteHeight / static_cast<float>(mImage.height);
                 sprite.vMax = (i + 1) * spriteHeight / static_cast<float>(mImage.height);
-                TRY_ASSIGN(sprite.uvBuffer, UniformBuffer<glm::vec2>::make(Renderer::device(), Renderer::physicalDevice(), 4 * sizeof(glm::vec2)));
+                TRY_ASSIGN(sprite.uvBuffer, UniformBuffer<glm::vec2>::make(Renderer::device(), Renderer::physicalDevice(), 4 * sizeof(glm::vec2), VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT));
                 sprite.uvBuffer.mappedMemory[0] = {sprite.uMin, sprite.vMin};
                 sprite.uvBuffer.mappedMemory[1] = {sprite.uMax, sprite.vMin};
                 sprite.uvBuffer.mappedMemory[2] = {sprite.uMin, sprite.vMax};

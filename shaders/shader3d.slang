@@ -16,7 +16,6 @@ struct Instance {
     Sampler2D texture;
 };
 
-
 ParameterBlock<Global> global;
 ParameterBlock<Instance> instance;
 

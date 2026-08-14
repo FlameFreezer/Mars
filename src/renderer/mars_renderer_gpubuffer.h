@@ -50,12 +50,12 @@ namespace mars {
             }
             buffer.destroy(device);
         }
-        static Error<UniformBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size) noexcept {
+        static Error<UniformBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags2 usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) noexcept {
             Error<GPUBuffer> buffer = GPUBuffer::make(
                 device, 
                 physicalDevice, 
                 size, 
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+                usage, 
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
             ); 
             if (!buffer.okay()) {

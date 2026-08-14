@@ -210,9 +210,12 @@ namespace mars {
         u32 presentQueueFamilyIndex = 0;
         VkSampleCountFlagBits msaaSampleCount;
 
-        std::array<VkDescriptorSetLayout, 2> mDescriptorSetLayouts;
+        VkDescriptorSetLayout mGlobalLayout2D;
+        VkDescriptorSetLayout mGlobalLayout3D;
+        VkDescriptorSetLayout mPushLayout2D;
+        VkDescriptorSetLayout mPushLayout3D;
         VkDescriptorPool mDescriptorPool;
-        std::array<VkDescriptorSet, 2> mDescriptorSets;
+        std::array<VkDescriptorSet, 2 * maxConcurrentFrames> mDescriptorSets;
 
         SDL_Window* window = nullptr;
         const mars::Camera2D* mainCamera2D = nullptr;
