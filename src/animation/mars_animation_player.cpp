@@ -24,7 +24,11 @@ namespace mars {
             if (anim.isLooped) {
                 mAnimationSpriteIndex %= anim.spriteIndices.size();
             }
-            else if (mAnimationSpriteIndex == anim.spriteIndices.size()) --mAnimationSpriteIndex;
+            // Otherwise stay on the last frame
+            else if (mAnimationSpriteIndex == anim.spriteIndices.size()) {
+                --mAnimationSpriteIndex;
+                mIsPaused = true;
+            }
             MARS_COMPONENT(mars::Draw, mEntityID).spriteIndex = anim.spriteIndices[mAnimationSpriteIndex];
         }
     }
