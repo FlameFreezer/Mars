@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <format>
+#include <initializer_list>
 
 #include "error.h"
 
@@ -14,12 +15,27 @@ namespace mars {
         std::size_t mSize;
     public:
         HeapArray() noexcept : mPtr(nullptr), mSize(0) {}
+        HeapArray(const HeapArray& other) noexcept : mPtr(new T[other.mSize]), mSize(other.mSize) {
+            for (u32 i = 0; i < other.mSize; i++) {
+                mPtr[i] = other.mPtr[i];
+            }
+        }
+        HeapArray(HeapArray&& other) noexcept : mPtr(other.mPtr), mSize(other.mSize) {
+            other.mPtr = nullptr;
+            other.mSize = 0;
+        }
+        HeapArray(std::initializer_list<T> initializer) noexcept : mPtr(new T[initializer.size()]), mSize(initializer.size()) {
+            u64 index = 0;
+            for (const T* it = initializer.begin(); it != initializer.end(); it++, index++) {
+                mPtr[index] = *it;
+            }
+        }
         HeapArray(std::size_t inSize) noexcept : mPtr(new T[inSize]), mSize(inSize) {}
         HeapArray(std::size_t inSize, T initial) noexcept : mPtr(new T[inSize]), mSize(inSize) {
             for(std::size_t i = 0; i < mSize; i++) mPtr[i] = initial;
         }
         ~HeapArray() noexcept {
-            delete[] mPtr;
+            if (mPtr) delete[] mPtr;
             mSize = 0;
         }
         std::size_t size() const noexcept {
@@ -42,9 +58,11 @@ namespace mars {
         }
         HeapArray<T>& operator=(HeapArray<T> const& rhs) noexcept {
             if(this != &rhs) {
-                if(mPtr == nullptr) delete[] mPtr;
+                if(mPtr != nullptr) delete[] mPtr;
                 mPtr = new T[rhs.mSize];
-                for(std::size_t i = 0; i < rhs.mSize; i++) mPtr[i] = rhs.mPtr[i];
+                for(std::size_t i = 0; i < rhs.mSize; i++) {
+                    mPtr[i] = rhs.mPtr[i];
+                }
                 mSize = rhs.mSize;
             }
             return *this;

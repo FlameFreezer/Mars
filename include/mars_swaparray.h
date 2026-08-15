@@ -29,6 +29,8 @@ namespace mars {
             }
         }
         SwapArray& operator=(const SwapArray& other) noexcept {
+            if (this == &other) return *this;
+
             if (mData) {
                 delete[] mData;
             }
@@ -41,6 +43,8 @@ namespace mars {
             return *this; 
         }
         SwapArray& operator=(SwapArray&& other) noexcept {
+            if (this == &other) return *this;
+
             if (mData) {
                 delete[] mData;
             }

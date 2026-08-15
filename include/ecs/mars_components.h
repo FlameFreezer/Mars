@@ -12,9 +12,9 @@
 namespace mars {
     using ComponentT = u8;
     enum class Component : ComponentT {
-        draw,
-        physics,
-        collide,
+        DRAW,
+        PHYSICS,
+        COLLIDE,
         USER_COMP_0,
         USER_COMP_1,
         USER_COMP_2,
@@ -22,13 +22,12 @@ namespace mars {
         USER_COMP_4,
         USER_COMP_5,
         //KEEP THIS AT THE END OF THE ENUM
-        maxComponent
+        MAX_COMPONENT
     };
-    constexpr ComponentT numComponents = std::to_underlying(Component::maxComponent);
+    constexpr ComponentT numComponents = std::to_underlying(Component::MAX_COMPONENT);
 
-    //TODO: default texture with ID = 0
     struct Draw {
-        static constexpr Component component = Component::draw;
+        static constexpr Component component = Component::DRAW;
         glm::vec2 position = glm::vec2(0.0f);
         glm::vec2 scale = glm::vec2(1.0f);
         float angle = 0;
@@ -37,7 +36,7 @@ namespace mars {
         u64 spriteIndex = 0;
     };
     struct Physics {
-        static constexpr Component component = Component::physics;
+        static constexpr Component component = Component::PHYSICS;
         glm::vec2 velocity = glm::vec2(0.0f);
         glm::vec2 gravity = glm::vec2(0.0f, 1.0f);
         const Room* room = nullptr;
@@ -47,7 +46,7 @@ namespace mars {
         circle,
     };
     struct Collide {
-        static constexpr Component component = Component::collide;
+        static constexpr Component component = Component::COLLIDE;
         glm::vec2 position = glm::vec2(0.0f);
         BoundingShape boundingShape = BoundingShape::rectangle;
         union {
@@ -62,7 +61,7 @@ namespace mars {
     //This struct template allows accessing the type of a component at compile time just using the actual component enum member
     template<Component c>
     struct GetComp {};
-    template<> struct GetComp<Component::draw> {using Type = Draw;};
-    template<> struct GetComp<Component::physics> {using Type = Physics;};
-    template<> struct GetComp<Component::collide> {using Type = Collide;};
+    template<> struct GetComp<Component::DRAW> {using Type = Draw;};
+    template<> struct GetComp<Component::PHYSICS> {using Type = Physics;};
+    template<> struct GetComp<Component::COLLIDE> {using Type = Collide;};
 }

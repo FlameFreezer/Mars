@@ -53,6 +53,7 @@ namespace mars {
         }
         Event& operator=(const Event&) = delete;
         Event& operator=(Event&& other) noexcept {
+            if (this == &other) return *this;
             mObservers = std::move(other.mObservers);
             return *this;
         }
