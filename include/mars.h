@@ -15,6 +15,7 @@
 #include "mars_event.h"
 #include "assetmanager/mars_assets.h"
 #include "assetmanager/mars_texture.h"
+#include "animation/mars_animation_player.h"
 #include "error.h"
 
 namespace mars {

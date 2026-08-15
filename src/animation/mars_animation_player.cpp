@@ -3,8 +3,6 @@
 #include <initializer_list>
 
 namespace mars {
-    AnimationPlayer::AnimationPlayer(ID entityID) noexcept : mEntityID((entityID)) {}
-
     void AnimationPlayer::update(float delta) noexcept {
         // Don't play if paused
         if (mIsPaused) return;
@@ -27,6 +25,7 @@ namespace mars {
             if (anim.isLooped) {
                 mAnimationSpriteIndex %= anim.spriteIndices.size();
             }
+            else if (mAnimationSpriteIndex == anim.spriteIndices.size()) --mAnimationSpriteIndex;
             MARS_COMPONENT(mars::Draw, mEntityID).spriteIndex = anim.spriteIndices[mAnimationSpriteIndex];
         }
     }
@@ -50,6 +49,10 @@ namespace mars {
 
     bool AnimationPlayer::isPaused() const noexcept {
         return mIsPaused;
+    }
+
+    void AnimationPlayer::setEntity(Entity entity) noexcept {
+        mEntityID = entity.id();
     }
 
     void AnimationPlayer::addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped, std::initializer_list<u32> spriteIndices) noexcept {
