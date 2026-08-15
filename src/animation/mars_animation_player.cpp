@@ -1,6 +1,5 @@
 #include "animation/mars_animation_player.h"
 #include "ecs/mars_ecs.h"
-#include <initializer_list>
 
 namespace mars {
     void AnimationPlayer::update(float delta) noexcept {
@@ -55,11 +54,11 @@ namespace mars {
         mEntityID = entity.id();
     }
 
-    void AnimationPlayer::addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped, std::initializer_list<u32> spriteIndices) noexcept {
+    void AnimationPlayer::addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped, HeapArray<u32>&& spriteIndices) noexcept {
         Animation anim;
         anim.texture = texture;
         anim.framesPerSecond = framesPerSecond;
-        anim.spriteIndices = spriteIndices;
+        anim.spriteIndices = std::move(spriteIndices);
         anim.isLooped = isLooped;
         mAnimations.push_back(std::move(anim));
     }

@@ -1,12 +1,10 @@
 #pragma once
 
-#include <initializer_list>
 #include <memory>
 #include <vector>
 
 #include "assetmanager/mars_texture.h"
 #include "ecs/mars_entity.h"
-#include "jsonparser.h"
 
 namespace mars {
     struct Animation {
@@ -18,10 +16,9 @@ namespace mars {
     class AnimationPlayer {
     public:
         void update(float delta) noexcept;
-        void addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped, std::initializer_list<u32> spriteIndices) noexcept;
+        void addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped, HeapArray<u32>&& spriteIndices) noexcept;
         // This overload assumes that the animation should consume every frame of the texture
         void addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped) noexcept;
-        Error<noreturn> loadAnimations(const JSON::Value& json) noexcept;
         void play(u32 animationIndex, u32 startingFrame = 0) noexcept;
         void pause() noexcept;
         void resume() noexcept;
