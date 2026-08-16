@@ -76,33 +76,30 @@ namespace mars {
 
 template<>
 Error<mars::Camera2D> JSON::valueTo(const JSON::Value& value) noexcept {
-	if (value.getType() != JSON::Type::jobject) {
-		FATAL(std::format("When constructing mars::Camera2D, expected {}, got {}", JSON::typeToString(JSON::Type::jobject), JSON::typeToString(value.getType())));
-	}
+    TRY_INIT(const JSON::Object*, json, value.getObject());
 	mars::Camera2DBuilder cameraBuilder{};
-	const JSON::Object& json{ value.getObject().value()};
 	float metersPerPixel = 1.0f;
 
-	if (json.contains("isPixels")) {
-		TRY_INIT(bool, isPixels, JSON::valueTo<bool>(json.at("isPixels")));
+	if (json->contains("isPixels")) {
+		TRY_INIT(bool, isPixels, JSON::valueTo<bool>(json->at("isPixels")));
 		if (isPixels) {
 			metersPerPixel = 1.0f / mars::Global::get().pixelsPerMeter();
 		}
 	}
-	if (json.contains("position")) {
-		TRY_INIT(glm::vec2, pos, JSON::valueTo<glm::vec2>(json.at("position")));
+	if (json->contains("position")) {
+		TRY_INIT(glm::vec2, pos, JSON::valueTo<glm::vec2>(json->at("position")));
 		cameraBuilder.setPosition(pos * metersPerPixel);
 	}
-	if (json.contains("scale")) {
-		TRY_INIT(glm::vec2, scale, JSON::valueTo<glm::vec2>(json.at("scale")));
+	if (json->contains("scale")) {
+		TRY_INIT(glm::vec2, scale, JSON::valueTo<glm::vec2>(json->at("scale")));
 		cameraBuilder.setScale(scale * metersPerPixel);
 	}
-	if (json.contains("targetPosition")) {
-		TRY_INIT(glm::vec2, targetPosition, JSON::valueTo<glm::vec2>(json.at("targetPosition")));
+	if (json->contains("targetPosition")) {
+		TRY_INIT(glm::vec2, targetPosition, JSON::valueTo<glm::vec2>(json->at("targetPosition")));
 		cameraBuilder.setTargetPosition(targetPosition * metersPerPixel);
 	}
-    if (json.contains("speed")) {
-        TRY_INIT(float, speed, JSON::valueTo<float>(json.at("speed")));
+    if (json->contains("speed")) {
+        TRY_INIT(float, speed, JSON::valueTo<float>(json->at("speed")));
         cameraBuilder.setSpeed(speed * metersPerPixel);
     }
 	return cameraBuilder.build();

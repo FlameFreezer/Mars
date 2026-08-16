@@ -237,13 +237,11 @@ public:
         assert(okay());
         return *mValue;
     }
-    const T& moveValue() const noexcept {
+    T* moveValue() noexcept {
         assert(okay());
-        return value();
-    }
-    T& moveValue() noexcept {
-        assert(okay());
-        return value();
+        T* res = mValue;
+        mValue = nullptr;
+        return res;
     }
     const MessageList& message() const noexcept {
         assert(!okay());
@@ -335,6 +333,12 @@ public:
     const T& value() const noexcept {
         assert(okay());
         return *mValue;
+    }
+    const T* moveValue() noexcept {
+        assert(okay());
+        const T* res = mValue;
+        mValue = nullptr;
+        return res;
     }
     const MessageList& message() const noexcept {
         assert(!okay());

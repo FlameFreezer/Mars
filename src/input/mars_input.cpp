@@ -1,5 +1,7 @@
 #include "input/mars_input.h"
 
+#include <fstream>
+
 namespace mars {
     std::mutex Input::mutex{};
 
@@ -18,11 +20,9 @@ namespace mars {
         input.seekg(0, std::ios::beg);
         input.read(buff.data(), buff.size());
         input.close();
-        TRY_INIT(JSON::Value, mappings, JSON::parse(std::string(buff.data(), buff.size())));
-        if(mappings.getType() != JSON::Type::jarray) {
-            FATAL("Input mappings file should start with an array");
-        }
-        for(const JSON::Value& jmapping : mappings.getArray().value()) {
+        TRY_INIT(JSON::Value, json, JSON::parse(std::string(buff.data(), buff.size())));
+        TRY_INIT(const JSON::Array*, mappings, json.getArray());
+        for(const JSON::Value& jmapping : *mappings) {
             Mapping resultMapping{};
             resultMapping.isValid = true;
             if(jmapping.getType() != JSON::Type::jobject) {
@@ -56,7 +56,7 @@ namespace mars {
                     FATAL("Mapping field \"sticks\" should hold a JSON object");
                 }
                 for(const auto [stickName, stickValue] : mapping.at("sticks").getObject().value()) {
-                    resultMapping.axes[resultMapping.numAxes] = strToAxis.at(stickName);
+                    resultMapping.axes[resultMapping.numAxes] = strToGamepadAxis.at(stickName);
                     if(stickValue.getType() != JSON::Type::jnumber) {
                         FATAL("Joystick values should be numbers");
                     }

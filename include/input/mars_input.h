@@ -1,12 +1,11 @@
 #pragma once
 
+#include "SDL3/SDL_gamepad.h"
 #include <string>
 #include <unordered_map>
-#include <fstream>
 #include <utility>
 #include <vector>
 #include <cstring>
-#include <format>
 #include <mutex>
 
 #include <SDL3/SDL.h>
@@ -17,37 +16,32 @@
 #include <jsonparser.h>
 #include <timer/mars_timer.h>
 
-static std::unordered_map<std::string, SDL_Scancode> initScancodeMap() noexcept {
-    std::unordered_map<std::string, SDL_Scancode> map;
-    map["space"] = SDL_SCANCODE_SPACE;
-    map["a"] = SDL_SCANCODE_A;
-    map["d"] = SDL_SCANCODE_D;
-    map["l"] = SDL_SCANCODE_L;
-    map["p"] = SDL_SCANCODE_P;
-    map["w"] = SDL_SCANCODE_W;
-    map["s"] = SDL_SCANCODE_S;
-    return map;
-}
-static std::unordered_map<std::string, SDL_GamepadButton> initGamepadButtonMap() noexcept {
-    std::unordered_map<std::string, SDL_GamepadButton> map;
-    map["south"] = SDL_GAMEPAD_BUTTON_SOUTH;
-    map["north"] = SDL_GAMEPAD_BUTTON_NORTH;
-    map["east"] = SDL_GAMEPAD_BUTTON_EAST;
-    map["west"] = SDL_GAMEPAD_BUTTON_WEST;
-    map["dpad right"] = SDL_GAMEPAD_BUTTON_DPAD_RIGHT;
-    map["dpad left"] = SDL_GAMEPAD_BUTTON_DPAD_LEFT;
-    map["dpad up"] = SDL_GAMEPAD_BUTTON_DPAD_UP;
-    map["dpad down"] = SDL_GAMEPAD_BUTTON_DPAD_DOWN;
-    map["left shoulder"] = SDL_GAMEPAD_BUTTON_LEFT_SHOULDER;
-    return map;
-}
+static const std::unordered_map<std::string, SDL_Scancode> strToScancode = {
+    {"space", SDL_SCANCODE_SPACE},
+    {"a", SDL_SCANCODE_A},
+    {"d", SDL_SCANCODE_D},
+    {"l", SDL_SCANCODE_L},
+    {"p", SDL_SCANCODE_P},
+    {"w", SDL_SCANCODE_W},
+    {"s", SDL_SCANCODE_S},
+};
 
-static std::unordered_map<std::string, SDL_GamepadAxis> initAxisMap() noexcept {
-    std::unordered_map<std::string, SDL_GamepadAxis> map;
-    map["leftx"] = SDL_GAMEPAD_AXIS_LEFTX;
-    map["lefty"] = SDL_GAMEPAD_AXIS_LEFTY;
-    return map;
-}
+static const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = {
+    {"south", SDL_GAMEPAD_BUTTON_SOUTH},
+    {"north", SDL_GAMEPAD_BUTTON_NORTH},
+    {"east", SDL_GAMEPAD_BUTTON_EAST},
+    {"west", SDL_GAMEPAD_BUTTON_WEST},
+    {"dpad right", SDL_GAMEPAD_BUTTON_DPAD_RIGHT},
+    {"dpad left", SDL_GAMEPAD_BUTTON_DPAD_LEFT},
+    {"dpad up", SDL_GAMEPAD_BUTTON_DPAD_UP},
+    {"dpad down", SDL_GAMEPAD_BUTTON_DPAD_DOWN},
+    {"left shoulder", SDL_GAMEPAD_BUTTON_LEFT_SHOULDER},
+};
+
+static const std::unordered_map<std::string, SDL_GamepadAxis> strToGamepadAxis = {
+    {"leftx", SDL_GAMEPAD_AXIS_LEFTX},
+    {"lefty", SDL_GAMEPAD_AXIS_LEFTY},
+};
 
 namespace mars {
     constexpr u8 maxScancodes = 5;
@@ -282,10 +276,6 @@ namespace mars {
         const bool* mKeyState = nullptr;
         int mNumKeys = 0;
         std::vector<ActionBuffer> mActionBuffers{};
-
-		const std::unordered_map<std::string, SDL_Scancode> strToScancode = initScancodeMap();
-		const std::unordered_map<std::string, SDL_GamepadButton> strToGamepadButton = initGamepadButtonMap();
-		const std::unordered_map<std::string, SDL_GamepadAxis> strToAxis = initAxisMap();
 
         Input() noexcept;
 
