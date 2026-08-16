@@ -7,7 +7,7 @@
 #include "mars_heaparray.h"
 #include "ecs/mars_ecs.h"
 #include "mars_room.h"
-#include "mars_time.h"
+#include "time/mars_time.h"
 #include "timer/mars_timer.h"
 #include "input/mars_input.h"
 #include "mars_global.h"

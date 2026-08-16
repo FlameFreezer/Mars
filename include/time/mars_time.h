@@ -1,13 +1,12 @@
 #pragma once
 
 #include <chrono>
+#include <mutex>
 
 namespace mars {
     class Time {
-        std::chrono::steady_clock::time_point mTime{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point::duration mDelta{0};
-        public:
-        Time() noexcept = default;
+    public:
+        static Time& get() noexcept;
         /// Gets the epoch time for the start of the frame. Make sure to call `updateTime` before any calls to this within the current frame.
         /// Returns:     The epoch time of the start of the current frame, in the system's resolution time
         std::chrono::steady_clock::time_point frameTime() const noexcept;
@@ -20,5 +19,14 @@ namespace mars {
         /// Updates the `time` and `deltaTime` private class members to reflect the current frame. Should be called at the start of the current frame.
         /// Returns: void    Nothing
         void update() noexcept;
+        Time(const Time&) = delete;
+        Time(Time&&) = delete;
+        Time& operator=(const Time&) = delete;
+        Time& operator=(Time&&) = delete;
+    private:
+        static std::mutex mutex;
+        Time() noexcept = default;
+        std::chrono::steady_clock::time_point mTime{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point::duration mDelta{0};
     };
 }
