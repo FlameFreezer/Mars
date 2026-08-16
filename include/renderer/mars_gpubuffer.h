@@ -3,57 +3,58 @@
 #include <vulkan/vulkan.h>
 
 #include <error.h>
-#include "mars_vkhelper.h"
 
 namespace mars {
     struct GPUBuffer {
+        static VkDevice device;
+        static VkPhysicalDevice physicalDevice;
         VkBuffer handle{};
         VkDeviceMemory memory{};
         VkDeviceSize size{};
 
-        void destroy(VkDevice device) {
-            if (handle) {
-				vkDestroyBuffer(device, handle, nullptr);
-            }
-            if (memory) {
-				vkFreeMemory(device, memory, nullptr);
-            }
-        }
-        static Error<GPUBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
-            GPUBuffer buffer;
-            buffer.size = size;
-            const VkBufferCreateInfo bufferInfo = {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .size = size,
-                .usage = usage,
-                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = 0,
-                .pQueueFamilyIndices = nullptr
-            };
-            if(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer.handle) != VK_SUCCESS) {
-                FATAL("Failed to create VkBuffer while initializing GPUBuffer");
-            }
-            TRY_ASSIGN(buffer.memory, vkhelper::allocateDeviceMemory(device, physicalDevice, buffer.handle, memProperties));
-            return buffer;
-        }
+        GPUBuffer() noexcept = default;
+        GPUBuffer(GPUBuffer&& other) noexcept;
+        ~GPUBuffer() noexcept;
+
+        static void attachDevice(VkDevice device, VkPhysicalDevice physicalDevice) noexcept;
+
+        void destroy() noexcept;
+
+        static Error<GPUBuffer> make(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept;
+
+        GPUBuffer& operator=(GPUBuffer&& other) noexcept;
     };
     template<class T>
     struct UniformBuffer {
         GPUBuffer buffer{};
         T* mappedMemory{};
 
-        void destroy(VkDevice device) noexcept {
-            if (buffer.memory) {
-				vkUnmapMemory(device, buffer.memory);
-            }
-            buffer.destroy(device);
+        UniformBuffer() noexcept = default;
+        UniformBuffer(UniformBuffer&& other) noexcept : buffer(std::move(other.buffer)), mappedMemory(other.mappedMemory) {
+            other.mappedMemory = nullptr;
         }
-        static Error<UniformBuffer> make(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags2 usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) noexcept {
+        ~UniformBuffer() noexcept {
+            destroy();
+        }
+
+        UniformBuffer& operator=(UniformBuffer&& other) noexcept {
+            if (this != &other) {
+                buffer = std::move(other.buffer);
+                mappedMemory = other.mappedMemory;
+
+                other.mappedMemory = nullptr;
+            }
+            return *this;
+        }
+
+        void destroy() noexcept {
+            if (buffer.memory != nullptr && mappedMemory != nullptr) {
+				vkUnmapMemory(buffer.device, buffer.memory);
+            }
+            buffer.destroy();
+        }
+        static Error<UniformBuffer> make(VkDeviceSize size, VkBufferUsageFlags2 usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) noexcept {
             Error<GPUBuffer> buffer = GPUBuffer::make(
-                device, 
-                physicalDevice, 
                 size, 
                 usage, 
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
@@ -63,9 +64,10 @@ namespace mars {
                 return MOVE_ERROR(buffer);
             }
 
-            UniformBuffer result{buffer.moveValue()};
+            UniformBuffer result;
+            result.buffer = buffer.moveValue();
 
-            if(vkMapMemory(device, result.buffer.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
+            if(vkMapMemory(result.buffer.device, result.buffer.memory, 0, size, 0, reinterpret_cast<void**>(&result.mappedMemory)) != VK_SUCCESS) {
                 FATAL("Failed to map device memory to host while creating uniform buffer");
             }
             return result;

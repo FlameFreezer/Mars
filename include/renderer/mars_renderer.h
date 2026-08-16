@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <queue>
@@ -143,15 +142,15 @@ namespace mars {
 
     class Renderer {
         public:
-        static Renderer& get() noexcept;
-        static VkDevice device() noexcept;
-        static VkPhysicalDevice physicalDevice() noexcept;
-
         rendererFlags::FlagT flags = 0;
 
-        static Error<Renderer&> init(const std::string& name) noexcept; 
-        //Destructor
+        static Error<std::unique_ptr<Renderer>> init(const std::string& name) noexcept; 
+
         ~Renderer() noexcept; 
+
+        VkDevice device() const noexcept;
+
+        VkPhysicalDevice physicalDevice() const noexcept;
 
         void destroy() noexcept;
 
@@ -164,15 +163,7 @@ namespace mars {
         const mars::Camera2D* getMainCamera2D() const noexcept;
 
         void setMainCamera2D(const mars::Camera2D& camera2D) noexcept;
-
-        Renderer(const Renderer&) = delete;
-        Renderer(Renderer&&) = delete;
-        Renderer& operator=(const Renderer&) = delete;
-        Renderer& operator=(Renderer&&) = delete;
     private:
-        Renderer() = default;
-        static std::mutex mutex;
-
         Cube cube;
 
         UniformBuffer<glm::mat4> mCamera2D;

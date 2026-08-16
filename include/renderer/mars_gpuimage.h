@@ -3,24 +3,29 @@
 #include <vulkan/vulkan.h>
 
 #include <error.h>
-#include "mars_vkhelper.h"
 
 namespace mars {
     struct GPUImage {
-        VkImage handle;
-        VkImageView view;
-        VkDeviceMemory memory;
-        u32 width;
-        u32 height;
+        static VkDevice device;
+        static VkPhysicalDevice physicalDevice;
 
-        void destroy(VkDevice device) noexcept {
-            vkDestroyImageView(device, view, nullptr);
-            vkDestroyImage(device, handle, nullptr);
-            vkFreeMemory(device, memory, nullptr);
-        }
+        VkImage handle{};
+        VkImageView view{};
+        VkDeviceMemory memory{};
+        u32 width = 0;
+        u32 height = 0;
+
+        GPUImage() noexcept = default;
+        GPUImage(GPUImage&& other) noexcept;
+        ~GPUImage() noexcept;
+
+        void destroy() noexcept;
+
+        GPUImage& operator=(GPUImage&& other) noexcept;
+
+        static void attachDevice(VkDevice device, VkPhysicalDevice physicalDevice) noexcept;
+
         static Error<GPUImage> make(
-                VkDevice device, 
-                VkPhysicalDevice physicalDevice, 
                 VkExtent3D extent,
                 VkSampleCountFlagBits sampleCount, 
                 VkImageTiling tiling, 
@@ -28,60 +33,6 @@ namespace mars {
                 VkMemoryPropertyFlags memProperties,
                 VkFormat format,
                 VkImageAspectFlags aspect
-            ) noexcept 
-        {
-            GPUImage result{};
-            result.width = extent.width;
-            result.height = extent.height;
-            const VkImageCreateInfo imageInfo = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .imageType = VK_IMAGE_TYPE_2D,
-                .format = format,
-                .extent = extent,
-                .mipLevels = 1, 
-                .arrayLayers = 1,
-                .samples = sampleCount,
-                .tiling = tiling,
-                .usage = usage,
-                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = 0,
-                .pQueueFamilyIndices = nullptr,
-                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
-            };
-            if(vkCreateImage(device, &imageInfo, nullptr, &result.handle) != VK_SUCCESS) {
-                FATAL("Failed to create image");
-            }
-
-            TRY_ASSIGN(result.memory, vkhelper::allocateDeviceMemory(device, physicalDevice, result.handle, memProperties));
-
-            const VkImageViewCreateInfo viewInfo = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .image = result.handle,
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format = format,
-                .components = {
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY
-                },
-                .subresourceRange = {
-                    .aspectMask = aspect,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1
-                }
-            };
-            if(vkCreateImageView(device, &viewInfo, nullptr, &result.view) != VK_SUCCESS) {
-                FATAL("Failed to create image view");
-            }
-
-            return result;
-        }
+            ) noexcept; 
     };
 }

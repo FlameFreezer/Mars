@@ -10,11 +10,8 @@ namespace mars {
         auto r = slice(mImage.width, mImage.height);
     }
     Texture::~Texture() noexcept {
-        vkDeviceWaitIdle(Renderer::device());
-        mImage.destroy(Renderer::device());
     }
     Sprite::~Sprite() noexcept {
-        uvBuffer.destroy(Renderer::device());
     }
 
     Error<Slice<const Sprite>> Texture::slice(u32 spriteWidth, u32 spriteHeight) noexcept {
@@ -36,9 +33,7 @@ namespace mars {
                 sprite.uMax = ((j + 1) * spriteWidth - 0.5) / static_cast<float>(mImage.width); 
                 sprite.vMin = (i * spriteHeight + 0.5) / static_cast<float>(mImage.height);
                 sprite.vMax = ((i + 1) * spriteHeight - 0.5) / static_cast<float>(mImage.height);
-                TRY_ASSIGN(sprite.uvBuffer, UniformBuffer<glm::vec2>::make(
-                    Renderer::device(), Renderer::physicalDevice(), 
-                    4 * sizeof(glm::vec2), VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT));
+                TRY_ASSIGN(sprite.uvBuffer, UniformBuffer<glm::vec2>::make(4 * sizeof(glm::vec2), VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT));
                 sprite.uvBuffer.mappedMemory[0] = {sprite.uMin, sprite.vMin};
                 sprite.uvBuffer.mappedMemory[1] = {sprite.uMax, sprite.vMin};
                 sprite.uvBuffer.mappedMemory[2] = {sprite.uMax, sprite.vMax};

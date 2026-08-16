@@ -7,12 +7,14 @@
 #include <memory>
 
 #include "mars_texture.h"
+#include "renderer/mars_renderer.h"
 
 namespace mars {
     class Assets {
     public:
         static Assets& get() noexcept;
-        static Error<std::shared_ptr<Texture>> getTexture(std::string_view path) noexcept;
+        Error<std::shared_ptr<Texture>> getTexture(std::string_view path) noexcept;
+        void setRenderer(Renderer* renderer) noexcept;
         Assets& operator=(const Assets&) = delete;
         Assets& operator=(Assets&&) = delete;
         Assets(const Assets&) = delete;
@@ -20,8 +22,10 @@ namespace mars {
     private:
         Assets() = default;
         static std::mutex mutex;
+
         Error<std::shared_ptr<Texture>> loadTexture(std::string_view path) noexcept;
 
         std::unordered_map<std::string, std::weak_ptr<Texture>> mTextures; 
+        Renderer* mRenderer = nullptr;
     };
 }
