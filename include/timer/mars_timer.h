@@ -79,11 +79,10 @@ namespace mars {
     };
 
     class Timer {
-        std::mutex mtx;
         std::chrono::steady_clock::time_point::duration mWaitTime {0};
         std::chrono::steady_clock::time_point::duration mTimeLeft {0};
         TimerStatus mStatus = TimerStatus::stopped;
-        void startInternal(std::unique_lock<std::mutex>&& l) noexcept;
+        void startInternal() noexcept;
         void updateInternal(std::chrono::steady_clock::time_point::duration deltaTime) noexcept;
         public:
         Timer() noexcept = default;
