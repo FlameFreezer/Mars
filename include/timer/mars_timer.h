@@ -153,6 +153,8 @@ namespace mars {
         /// Retrieves the total wait time in seconds.
         /// Returns: float
         float waitTime() const noexcept;
-
+        /// Returns true if the timer has finished running or was never started, returns false otherwise.
+        /// Returns: bool
+        bool isStopped() const noexcept;
     };
 }

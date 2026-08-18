@@ -174,4 +174,8 @@ namespace mars {
         const std::chrono::duration<float, std::chrono::seconds::period> waitTimeS{ mWaitTime };
         return waitTimeS.count();
     }
+
+    bool Timer::isStopped() const noexcept {
+        return mStatus == TimerStatus::stopped;
+    }
 }

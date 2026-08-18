@@ -40,6 +40,7 @@ namespace mars {
         glm::vec2 velocity = glm::vec2(0.0f);
         glm::vec2 gravity = glm::vec2(0.0f, 1.0f);
         const Room* room = nullptr;
+        bool doUpdate = true;
     };
     enum class BoundingShape : u8 {
         rectangle,
