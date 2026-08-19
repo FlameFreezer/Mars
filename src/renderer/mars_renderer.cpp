@@ -1311,12 +1311,12 @@ namespace mars {
         //Iterate through every drawable entity
         const ComponentSystem<Draw>& sysDraw = ECS::get().system<Draw::component>();
         for (u64 i = 1; i < sysDraw.size(); i++) {
+            const mars::Draw& draw = sysDraw.data()[i];
             // Update and bind the texture
-            const Texture& texture = *sysDraw.textures()[i];
-            const Sprite& sprite = texture.sprites()[sysDraw.spriteIndices()[i]];
+            const Sprite& sprite = draw.texture->sprites()[draw.spriteIndex];
             const VkDescriptorImageInfo materialInfo = {
                 .sampler = sampler,
-                .imageView = texture.image().view,
+                .imageView = draw.texture->image().view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
             const VkDescriptorBufferInfo bufferInfo = {
@@ -1355,9 +1355,9 @@ namespace mars {
             //Generate the model matrix
             glm::mat4 modelMatrix{ 1.0f };
             const float pixelsPerMeter = mars::Global::get().pixelsPerMeter();
-            modelMatrix[0][0] = sysDraw.scales()[i].x * pixelsPerMeter;
-            modelMatrix[1][1] = sysDraw.scales()[i].y * pixelsPerMeter;
-            modelMatrix[3] = glm::vec4{ sysDraw.positions()[i] * pixelsPerMeter, sysDraw.zLayers()[i], 1.0f };
+            modelMatrix[0][0] = draw.scale.x * pixelsPerMeter;
+            modelMatrix[1][1] = draw.scale.y * pixelsPerMeter;
+            modelMatrix[3] = glm::vec4{ draw.position * pixelsPerMeter, draw.zLayer, 1.0f };
 
             //Push the model matrix to the shader
             vkCmdPushConstants(
