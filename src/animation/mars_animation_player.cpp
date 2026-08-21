@@ -1,12 +1,11 @@
 #include "animation/mars_animation_player.h"
-#include "ecs/mars_ecs.h"
 
 namespace mars {
     void AnimationPlayer::update(float delta) noexcept {
         // Don't play if paused
         if (mIsPaused) return;
         // Don't play if associated entity is invalid
-        if (!MARS_SYSTEM(mars::Draw).has(mEntityID) or mEntityID == nullID) return;
+        if (!sysDraw.has(mEntityID) or mEntityID == nullID) return;
         // Don't play if animation index is invalid
         if (mAnimationIndex >= mAnimations.size()) return;
         // Get the selected animation
@@ -29,7 +28,7 @@ namespace mars {
                 --mAnimationSpriteIndex;
                 mIsPaused = true;
             }
-            MARS_COMPONENT(mars::Draw, mEntityID).spriteIndex = anim.spriteIndices[mAnimationSpriteIndex];
+            sysDraw[mEntityID].spriteIndex = anim.spriteIndices[mAnimationSpriteIndex];
         }
     }
 
@@ -38,8 +37,8 @@ namespace mars {
         mAnimationIndex = animationIndex;
         mTimeAccumulated = 0.0f;
         mAnimationSpriteIndex = startingFrame;
-        MARS_COMPONENT(mars::Draw, mEntityID).spriteIndex = mAnimations[mAnimationSpriteIndex].spriteIndices[mAnimationSpriteIndex];
-        MARS_COMPONENT(mars::Draw, mEntityID).texture = mAnimations[mAnimationSpriteIndex].texture;
+        sysDraw[mEntityID].spriteIndex = mAnimations[mAnimationSpriteIndex].spriteIndices[mAnimationSpriteIndex];
+        sysDraw[mEntityID].texture = mAnimations[mAnimationSpriteIndex].texture;
     }
 
     void AnimationPlayer::pause() noexcept {

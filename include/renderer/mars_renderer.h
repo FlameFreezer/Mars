@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ecs/mars_component_system.h"
 #include <array>
 #include <string>
 #include <string_view>
@@ -144,8 +145,9 @@ namespace mars {
         public:
         rendererFlags::FlagT flags = 0;
 
-        static Error<std::unique_ptr<Renderer>> init(const std::string& name) noexcept; 
+        static Error<std::unique_ptr<Renderer>> init(const std::string& name, ComponentSystem<Draw>& sysDraw) noexcept; 
 
+        Renderer(ComponentSystem<Draw>& sysDraw) noexcept : sysDraw(sysDraw) {}
         ~Renderer() noexcept; 
 
         VkDevice device() const noexcept;
@@ -164,6 +166,7 @@ namespace mars {
 
         void setMainCamera2D(const mars::Camera2D& camera2D) noexcept;
     private:
+        ComponentSystem<Draw>& sysDraw;
         Cube cube;
 
         UniformBuffer<glm::mat4> mCamera2D;

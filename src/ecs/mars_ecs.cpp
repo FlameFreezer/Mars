@@ -38,10 +38,6 @@ namespace mars {
             }
         }
     }
-    EntityComponentSystem& EntityComponentSystem::get() noexcept {
-        static EntityComponentSystem instance{};
-        return instance;
-    }
     Error<Entity> EntityComponentSystem::createEntity(Signature s) noexcept {
         if (mIDs.empty()) {
             FATAL("Tried to create an entity, but the maximum number of entities were already created");

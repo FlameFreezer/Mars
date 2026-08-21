@@ -1,4 +1,5 @@
 #include "renderer/mars_renderer.h"
+#include "ecs/mars_component_system.h"
 
 #include <fstream>
 #include <print>
@@ -1309,7 +1310,6 @@ namespace mars {
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout2D, 0, 1, &mDescriptorSets[currentFrame], 0, nullptr);
 
         //Iterate through every drawable entity
-        const ComponentSystem<Draw>& sysDraw = ECS::get().system<Draw::component>();
         for (u64 i = 1; i < sysDraw.size(); i++) {
             const mars::Draw& draw = sysDraw.data()[i];
             // Update and bind the texture
@@ -2036,8 +2036,8 @@ namespace mars {
         return SUCCESS;
     }
 
-    Error<std::unique_ptr<Renderer>> Renderer::init(const std::string& name) noexcept {
-        std::unique_ptr<Renderer> r(new Renderer);
+    Error<std::unique_ptr<Renderer>> Renderer::init(const std::string& name, ComponentSystem<Draw>& sysDraw) noexcept {
+        std::unique_ptr<Renderer> r(new Renderer(sysDraw));
         r->flags |= rendererFlags::instanceInvalid | rendererFlags::deviceInvalid;
 
         if(Error<noreturn> res = r->createVkInstance(name); !res.okay()) {

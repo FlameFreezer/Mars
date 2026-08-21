@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "assetmanager/mars_texture.h"
+#include "ecs/mars_component_system.h"
 #include "ecs/mars_entity.h"
 
 namespace mars {
@@ -15,6 +16,7 @@ namespace mars {
     };
     class AnimationPlayer {
     public:
+        AnimationPlayer(mars::ComponentSystem<mars::Draw>& sysDraw) : sysDraw(sysDraw) {}
         void update(float delta) noexcept;
         void addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped, HeapArray<u32>&& spriteIndices) noexcept;
         // This overload assumes that the animation should consume every frame of the texture
@@ -25,6 +27,7 @@ namespace mars {
         void setEntity(Entity entity) noexcept;
         bool isPaused() const noexcept;
     private:
+        mars::ComponentSystem<mars::Draw>& sysDraw;
         std::vector<Animation> mAnimations;
         //Animation is mAnimations[mAnimationIndex]
         u32 mAnimationIndex = 0;
