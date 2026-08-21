@@ -1,16 +1,7 @@
 #include <assetmanager/mars_assets.h>
 
-#include <mutex>
-
-std::mutex mars::Assets::mutex{};
 
 namespace mars {
-    Assets& Assets::get() noexcept {
-        std::unique_lock<std::mutex> lock{Assets::mutex};
-        static Assets instance;
-        return instance;
-    }
-
     void Assets::setRenderer(Renderer* renderer) noexcept {
         mRenderer = renderer;
     }

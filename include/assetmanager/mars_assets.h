@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mutex>
 #include <unordered_map>
 #include <string>
 #include <string_view>
@@ -12,7 +11,7 @@
 namespace mars {
     class Assets {
     public:
-        static Assets& get() noexcept;
+        Assets() = default;
         Error<std::shared_ptr<Texture>> getTexture(std::string_view path) noexcept;
         void setRenderer(Renderer* renderer) noexcept;
         Assets& operator=(const Assets&) = delete;
@@ -20,9 +19,6 @@ namespace mars {
         Assets(const Assets&) = delete;
         Assets(Assets&&) = delete;
     private:
-        Assets() = default;
-        static std::mutex mutex;
-
         Error<std::shared_ptr<Texture>> loadTexture(std::string_view path) noexcept;
 
         std::unordered_map<std::string, std::weak_ptr<Texture>> mTextures; 
