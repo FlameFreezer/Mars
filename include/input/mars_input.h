@@ -6,7 +6,6 @@
 #include <utility>
 #include <vector>
 #include <cstring>
-#include <mutex>
 
 #include <SDL3/SDL.h>
 
@@ -71,8 +70,8 @@ namespace mars {
 
     class Input {
         public:
-        static Input& get() noexcept;
-
+        Input() noexcept;
+        ~Input() noexcept;
         Error<noreturn> loadMappings(const std::string& path, const std::unordered_map<std::string, u16>& strToIndex) noexcept; 
 
         template<class ActionIndex>
@@ -260,7 +259,6 @@ namespace mars {
         Input& operator=(const Input&) = delete;
         Input& operator=(Input&&) = delete;
     private:
-        static std::mutex mutex;
         std::vector<Mapping> mMappings{};
         bool mPrevGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
         bool mGamepadButtonState[SDL_GAMEPAD_BUTTON_COUNT] = { false };
@@ -276,10 +274,6 @@ namespace mars {
         const bool* mKeyState = nullptr;
         int mNumKeys = 0;
         std::vector<ActionBuffer> mActionBuffers{};
-
-        Input() noexcept;
-
-        ~Input() noexcept;
 
         template<class ActionIndex>
         bool isMappingValid(ActionIndex action) const noexcept {

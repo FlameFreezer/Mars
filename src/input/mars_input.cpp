@@ -3,13 +3,6 @@
 #include <fstream>
 
 namespace mars {
-    std::mutex Input::mutex{};
-
-    Input& Input::get() noexcept {
-        std::unique_lock<std::mutex> l(mutex);
-        static Input instance;
-        return instance;
-    }
 
     Error<noreturn> Input::loadMappings(const std::string& path, const std::unordered_map<std::string, u16>& strToIndex) noexcept {
         std::ifstream input(path, std::ios::ate);
