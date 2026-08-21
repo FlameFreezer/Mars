@@ -1,16 +1,9 @@
 #include <chrono>
-#include <mutex>
 
 #include "time/mars_time.h"
 
 namespace mars {
-    std::mutex Time::mutex{};
 
-    Time& Time::get() noexcept {
-        std::unique_lock<std::mutex> lock(Time::mutex);
-        static Time instance;
-        return instance;
-    }
     std::chrono::steady_clock::time_point Time::frameTime() const noexcept {
         return mTime;
     }
