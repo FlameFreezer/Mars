@@ -3,6 +3,7 @@
 #include <queue>
 #include <utility>
 
+#include "ecs/mars_components.h"
 #include "mars_entity.h"
 #include "mars_signature.h"
 #include <mars_types.h>
@@ -30,6 +31,14 @@ namespace mars {
         template<Component c>
         const ComponentSystem<typename GetComp<c>::Type>& system() const noexcept {
             return *reinterpret_cast<const ComponentSystem<typename GetComp<c>::Type>*>(mComponentSystems[std::to_underlying(c)]);
+        }
+        template<class C>
+        ComponentSystem<C>& system() noexcept {
+            return *reinterpret_cast<ComponentSystem<C>*>(mComponentSystems[std::to_underlying(C::component)]);
+        }
+        template<class C>
+        const ComponentSystem<C>& system() const noexcept {
+            return *reinterpret_cast<ComponentSystem<C>*>(mComponentSystems[std::to_underlying(C::component)]);
         }
 
         template<Component c>

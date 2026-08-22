@@ -48,8 +48,6 @@ namespace mars {
         bool has(ID id) const noexcept {
             if (id >= maxEntities) return false;
             if (index(id) >= maxEntities) return false;
-            //The nullID has space reserved in this component, but shouldn't be considered ot have it
-            if (id == nullID) return false;
             return mIDs[index(id)] == id;
         }
         //Abstract function which should swap the data at id with the data at the end, then calls

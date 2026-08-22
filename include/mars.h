@@ -13,6 +13,7 @@
 #include "mars_global.h"
 #include "jsonparser.h"
 #include "mars_event.h"
+#include "mars_math.h"
 #include "assetmanager/mars_assets.h"
 #include "assetmanager/mars_texture.h"
 #include "animation/mars_animation_player.h"

@@ -7,11 +7,8 @@
 namespace mars {
     template<ComponentT c>
     void allocSystem(ComponentSystemParent* systems[]) noexcept {
-        //Allocate the system
         systems[c] = new ComponentSystem<typename GetComp<static_cast<Component>(c)>::Type>();
-        //Reserve space for the null entity
         systems[c]->reserve(nullID);
-        //Allocate the next system
         allocSystem<c + 1>(systems);
     }
     // Base Case: do nothing once all systems have been allocated. We stop at the first user
