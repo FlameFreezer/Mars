@@ -24,7 +24,7 @@ namespace mars {
         mSprites.resize(rows * columns);
         for (u64 i = 0; i < rows; i++) {
             for (u64 j = 0; j < columns; j++) {
-                Sprite& sprite = mSprites[i * rows + j];
+                Sprite& sprite = mSprites[i * columns + j];
                 sprite.texture = this;
                 sprite.height = spriteHeight;
                 sprite.width = spriteWidth;

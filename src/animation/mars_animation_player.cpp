@@ -19,15 +19,13 @@ namespace mars {
             mTimeAccumulated -= secondsPerFrame;
             // Move on to the next frame
             mAnimationSpriteIndex++;
-            // If the animation is looped, return us to the first frame if beyond the last one
-            if (anim.isLooped) {
-                mAnimationSpriteIndex %= anim.spriteIndices.size();
+
+            // Keep the frame index within bounds
+            if (mAnimationSpriteIndex >= anim.spriteIndices.size()) {
+                if (anim.isLooped) mAnimationSpriteIndex %= anim.spriteIndices.size();
+                else mAnimationSpriteIndex = anim.spriteIndices.size() - 1;
             }
-            // Otherwise stay on the last frame
-            else if (mAnimationSpriteIndex == anim.spriteIndices.size()) {
-                --mAnimationSpriteIndex;
-                mIsPaused = true;
-            }
+
             sysDraw[mEntityID].spriteIndex = anim.spriteIndices[mAnimationSpriteIndex];
         }
     }
@@ -37,8 +35,8 @@ namespace mars {
         mAnimationIndex = animationIndex;
         mTimeAccumulated = 0.0f;
         mAnimationSpriteIndex = startingFrame;
-        sysDraw[mEntityID].spriteIndex = mAnimations[mAnimationSpriteIndex].spriteIndices[mAnimationSpriteIndex];
-        sysDraw[mEntityID].texture = mAnimations[mAnimationSpriteIndex].texture;
+        sysDraw[mEntityID].spriteIndex = mAnimations[mAnimationIndex].spriteIndices[mAnimationSpriteIndex];
+        sysDraw[mEntityID].texture = mAnimations[mAnimationIndex].texture;
     }
 
     void AnimationPlayer::pause() noexcept {
@@ -76,5 +74,9 @@ namespace mars {
             anim.spriteIndices[i] = i;
         }
         mAnimations.push_back(std::move(anim));
+    }
+
+    u32 AnimationPlayer::currentAnimation() const noexcept {
+        return mAnimationIndex;
     }
 }

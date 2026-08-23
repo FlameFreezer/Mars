@@ -45,6 +45,7 @@ namespace mars {
             vkFreeMemory(device, memory, nullptr);
             memory = nullptr;
         }
+        size = 0;
     }
     Error<GPUBuffer> GPUBuffer::make(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memProperties) noexcept {
         GPUBuffer buffer;

@@ -50,6 +50,7 @@ namespace mars {
         void destroy() noexcept {
             if (buffer.memory != nullptr && mappedMemory != nullptr) {
 				vkUnmapMemory(buffer.device, buffer.memory);
+                mappedMemory = nullptr;
             }
             buffer.destroy();
         }

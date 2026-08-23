@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -26,11 +27,12 @@ namespace mars {
         void resume() noexcept;
         void setEntity(Entity entity) noexcept;
         bool isPaused() const noexcept;
+        u32 currentAnimation() const noexcept;
     private:
         mars::ComponentSystem<mars::Draw>& sysDraw;
         std::vector<Animation> mAnimations;
         //Animation is mAnimations[mAnimationIndex]
-        u32 mAnimationIndex = 0;
+        u32 mAnimationIndex = std::numeric_limits<u32>::max();
         //Sprite index is mAnimations[mAnimationIndex].spriteIndices[mAnimationSpriteIndex]
         u32 mAnimationSpriteIndex = 0;
         ID mEntityID = nullID;

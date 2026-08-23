@@ -10,14 +10,14 @@
 
 namespace mars {
     struct Sprite {
-        const class Texture* texture;
+        const class Texture* texture = nullptr;
         float uMin = 0.0f;
         float uMax = 1.0f;
         float vMin = 0.0f;
         float vMax = 1.0f;
-        u32 width;
-        u32 height;
-        UniformBuffer<glm::vec2> uvBuffer;
+        u32 width = 0.0f;
+        u32 height = 0.0f;
+        UniformBuffer<glm::vec2> uvBuffer{};
         ~Sprite() noexcept;
     };
     class Texture {
