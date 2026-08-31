@@ -4,8 +4,8 @@ Mars is my framework for making silly games with C++. Though incomplete for now,
 
 1. An entity-component system
 2. A nicely encapsulated renderer written in Vulkan
-3. A `mars::Error` class template for error handling in a Zig-like style. Please do not use exceptions with Mars or you will make me very sad
-4. Configurable input maps through JSON
+3. `Error` class template for handling errors as values. Please do not use exceptions with Mars or you will make me very sad
+4. JSON parsing header `jsonparser.h`
 
 ## Renderer
 
@@ -14,14 +14,11 @@ The renderer, for now, is a two-phase system which first draws a 2D scene and th
 ## Future plans
 
 - More rendering systems, with a flag passed to `mars::Game::init` controlling which one is initialized
-- Haskell-like monad syntax for use with `mars::Error`
 - A class template for optional values
 - Custom linear algebra library to replace glm
-- Proper hyprland support
+- hyprland support
 - No use of C++ Standard Template Library
-- Extensibility for Component Systems
 - Proper documentation
-- Support for compilers other than Clang
 
 ## How to Compile
 
@@ -29,6 +26,13 @@ The renderer, for now, is a two-phase system which first draws a 2D scene and th
 2. `$ cd Mars`
 3. `$ mkdir build && cmake -B build`
 4. Build with your chosen build system or `$ cmake --build build`
+
+Alternatively, you can build Mars alongside your project by including these lines in your project's `CMakeLists.txt` file
+
+```
+add_subdirectory(<path to library>/Mars)
+target_link_libraries(<target> PRIVATE Mars)
+```
 
 ### Compilation Options
 
