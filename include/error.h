@@ -15,7 +15,7 @@ enum class ErrorTag : u8 {
     fatalError,
 };
 
-static constexpr std::string typeToString(ErrorTag tag) noexcept {
+static const char* typeToString(ErrorTag tag) noexcept {
     switch(tag) {
     case ErrorTag::allOkay:
         return "All Okay";
@@ -193,7 +193,6 @@ class [[nodiscard("Potentially unhandled error value")]] Error<T&> {
     };
     ErrorTag mTag {ErrorTag::allOkay};
 public:
-	friend class Error<T&>;
 	friend class Error<const T&>;
     Error() noexcept = delete;
     Error(T& inValue) noexcept : mTag(ErrorTag::allOkay), mValue(&inValue) {}
@@ -285,7 +284,6 @@ class [[nodiscard("Potentially unhandled error value")]] Error<const T&> {
     ErrorTag mTag {ErrorTag::allOkay};
 public:
 	friend class Error<T&>;
-	friend class Error<const T&>;
     Error() noexcept = delete;
     Error(const T& inValue) noexcept : mTag(ErrorTag::allOkay), mValue(&inValue) {}
     Error(ErrorTag inTag, const std::string& inMessage) noexcept : mTag(inTag), mMessage() {

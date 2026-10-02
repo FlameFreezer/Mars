@@ -28,7 +28,7 @@ ParameterBlock<Global> global;
 ParameterBlock<Instance> instance;
 
 [shader("vertex")]
-VertexOut vertMain(int vertexID: SV_VulkanVertexID, uniform float4x4 transform) {
+VertexOut vertMain(int vertexID: SV_VertexID, uniform float4x4 transform) {
     VertexOut output;
     output.position = mul(global.camera, mul(transform, float4(vertices[indices[vertexID]], 0.0, 1.0)));
     output.texCoord = instance.textureCoords[indices[vertexID]];
