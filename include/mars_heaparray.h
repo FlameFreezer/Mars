@@ -12,7 +12,7 @@ namespace mars {
     class HeapArray {
     private:
         T* mPtr;
-        std::size_t mSize;
+        size_t mSize;
     public:
         HeapArray() noexcept : mPtr(nullptr), mSize(0) {}
         HeapArray(const HeapArray& other) noexcept : mPtr(new T[other.mSize]), mSize(other.mSize) {
@@ -132,7 +132,7 @@ namespace mars {
     class Slice {
     private:
         T* mPtr;
-        std::size_t mSize;
+        size_t mSize;
     public:
         Slice() noexcept : mPtr(nullptr), mSize(0) {}
         Slice(T* ptr, std::size_t size) noexcept : mPtr(ptr), mSize(size) {}
