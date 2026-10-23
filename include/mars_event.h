@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <limits>
 
 #include "mars_swaparray.h"
 
@@ -15,6 +16,7 @@ namespace mars {
     struct ObserverMeta {
         Event<Args...>* event = nullptr;
         IObserver<Args...>* observer = nullptr;
+        u32 observerEventIndex = std::numeric_limits<u32>::max();
     };
     template<class... Args>
     class IObserver {
@@ -38,18 +40,18 @@ namespace mars {
         virtual ~IObserver() noexcept {
             // mMeta == nullptr if this is a moved-from object
             if (mMeta) {
-                mMeta->observer = nullptr;
-
-                // If we aren't attached to an event, we can delete the metadata.
-                // Otherwise, the event is in charge of deleting the metadata; 
-                if(mMeta->event == nullptr) delete mMeta;
+                detach();
+                delete mMeta;
             }
         }
         bool isAttached() const noexcept {
             return mMeta->event != nullptr;
         }
         void detach() const noexcept {
-            mMeta->event = nullptr;
+            if (mMeta->event) {
+                mMeta->event->detachFromObserver(mMeta);
+                mMeta->event = nullptr;
+            }
         }
         ObserverMeta<Args...>* getMetadata() noexcept {
             return mMeta;
@@ -84,15 +86,7 @@ namespace mars {
         }
         ~Event() noexcept {
             while(mObservers.size() != 0) {
-                // If the observer was already detached, we have to delete the metadata
-                if (mObservers[0]->observer == nullptr) {
-                    delete mObservers[0];
-                }
-                // Otherwise, detach the observer
-                else {
-                    mObservers[0]->observer->detach();
-                }
-                mObservers.erase(0);
+                mObservers[0]->observer->detach();
             }
         }
         Event& operator=(const Event&) = delete;
@@ -109,25 +103,23 @@ namespace mars {
         template<class Owner>
         void attach(Observer<Owner, Args...>& observer, void (Owner::*method)(Args...)) noexcept {
             observer.getMetadata()->event = this;
+            observer.getMetadata()->observerEventIndex = mObservers.size();
             observer.mMethod = method;
             mObservers.pushBack(observer.getMetadata());
         }
         size_t getObserverCount() const noexcept {
             return mObservers.size();
         }
+        void detachFromObserver(ObserverMeta<Args...>* meta) noexcept {
+            mObservers.erase(meta->observerEventIndex);
+            if (mObservers.size() != 0) {
+                mObservers[meta->observerEventIndex]->observerEventIndex = meta->observerEventIndex;
+            }
+        }
     private:
         void foreachObserver(std::function<void(ObserverMeta<Args...>*)> function) noexcept {
             for (size_t i = 0; i < mObservers.size(); i++) {
-                // If the observer was detached, delete this metadata
-                if (mObservers[i]->observer == nullptr) {
-                    delete mObservers[i];
-                    mObservers.erase(i);
-                    i--;
-                }
-                // Otherwise, perform the provided procedure on the observer
-                else {
-                    function(mObservers[i]);
-                }
+                function(mObservers[i]);
             }
         }
         SwapArray<ObserverMeta<Args...>*> mObservers;
