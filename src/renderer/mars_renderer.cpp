@@ -1852,6 +1852,7 @@ namespace mars {
             };
         }
 
+
         VkPhysicalDeviceVulkan14Features vulkan14Features{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
             .pNext = nullptr,
@@ -1864,9 +1865,14 @@ namespace mars {
             .dynamicRendering = VK_TRUE,
             .maintenance4 = VK_TRUE
         };
+        VkPhysicalDeviceVulkan11Features vulkan11Features{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+            .pNext = &vulkan13Features,
+            .shaderDrawParameters = VK_TRUE
+        };
         VkPhysicalDeviceFeatures2 features2{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-            .pNext = &vulkan13Features,
+            .pNext = &vulkan11Features,
             .features = {
                 .samplerAnisotropy = VK_TRUE
             }
