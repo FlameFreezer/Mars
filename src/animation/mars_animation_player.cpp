@@ -11,22 +11,23 @@ namespace mars {
         // Get the selected animation
         Animation& anim = mAnimations[mAnimationIndex];
         // Don't play if we've reached the end of the animation
-        if (mAnimationSpriteIndex >= anim.spriteIndices.size()) return;
+        if (mFrameIndex >= anim.frames.size()) return;
 
         mTimeAccumulated += delta;
         const float secondsPerFrame = 1.0f / anim.framesPerSecond;
         if (mTimeAccumulated >= secondsPerFrame) {
             mTimeAccumulated -= secondsPerFrame;
             // Move on to the next frame
-            mAnimationSpriteIndex++;
+            mFrameIndex++;
 
             // Keep the frame index within bounds
-            if (mAnimationSpriteIndex >= anim.spriteIndices.size()) {
-                if (anim.isLooped) mAnimationSpriteIndex %= anim.spriteIndices.size();
-                else mAnimationSpriteIndex = anim.spriteIndices.size() - 1;
+            if (mFrameIndex >= anim.frames.size()) {
+                if (anim.isLooped) mFrameIndex %= anim.frames.size();
+                else mFrameIndex = anim.frames.size() - 1;
             }
 
-            sysDraw[mEntityID].spriteIndex = anim.spriteIndices[mAnimationSpriteIndex];
+            sysDraw[mEntityID].spriteIndex = anim.frames[mFrameIndex].spriteIndex;
+            sysDraw[mEntityID].texture = mAnimations[mAnimationIndex].frames[mFrameIndex].texture;
         }
     }
 
@@ -34,9 +35,9 @@ namespace mars {
         mIsPaused = false;
         mAnimationIndex = animationIndex;
         mTimeAccumulated = 0.0f;
-        mAnimationSpriteIndex = startingFrame;
-        sysDraw[mEntityID].spriteIndex = mAnimations[mAnimationIndex].spriteIndices[mAnimationSpriteIndex];
-        sysDraw[mEntityID].texture = mAnimations[mAnimationIndex].texture;
+        mFrameIndex = startingFrame;
+        sysDraw[mEntityID].spriteIndex = mAnimations[mAnimationIndex].frames[mFrameIndex].spriteIndex;
+        sysDraw[mEntityID].texture = mAnimations[mAnimationIndex].frames[mFrameIndex].texture;
     }
 
     void AnimationPlayer::pause() noexcept {
@@ -55,23 +56,25 @@ namespace mars {
         mEntityID = entity.id();
     }
 
-    void AnimationPlayer::addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped, HeapArray<u32>&& spriteIndices) noexcept {
+    void AnimationPlayer::addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped, HeapArray<AnimationFrame>&& frames) noexcept {
         Animation anim;
-        anim.texture = texture;
+        anim.frames = std::move(frames);
+        for(AnimationFrame& frame : anim.frames) {
+            frame.texture = texture;
+        }
         anim.framesPerSecond = framesPerSecond;
-        anim.spriteIndices = std::move(spriteIndices);
         anim.isLooped = isLooped;
         mAnimations.push_back(std::move(anim));
     }
 
     void AnimationPlayer::addAnimation(std::shared_ptr<Texture> texture, float framesPerSecond, bool isLooped) noexcept {
         Animation anim;
-        anim.texture = texture;
         anim.framesPerSecond = framesPerSecond;
         anim.isLooped = isLooped;
-        anim.spriteIndices.resize(texture->sprites().size());
-        for(size_t i = 0; i < anim.spriteIndices.size(); i++) {
-            anim.spriteIndices[i] = i;
+        anim.frames.resize(texture->sprites().size());
+        for(size_t i = 0; i < anim.frames.size(); i++) {
+            anim.frames[i].spriteIndex = i;
+            anim.frames[i].texture = texture;
         }
         mAnimations.push_back(std::move(anim));
     }
